@@ -80,6 +80,19 @@ counts a case as go-live only when it passes all of them.
 (可上线率) is cases passing all four over cases. The report prints both with numerator and
 denominator, per vertical and per category.
 
+Each case that is not go-live is charged to one **failure stage** (失败环节), the first of
+these that applies, so a bad case names what to fix: `should_not_answer` (不该回答), a
+decline or hand-off case whose answer states a stale or forbidden figure or lacks the
+decline or hand-off wording; `retrieval_miss` (召回缺失), the expected source never came
+back as `current`, because the turn did not search or the search ranked it out (a case
+with no expected source: the turn made no terms read); `stale_version` (版本过期), a
+version not in force was read as current, the expected version was not read, or a lapsed
+figure appears in the answer; `evidence_ignored` (证据未用), the source came back current
+but the answer misses an expected fact or states a forbidden one; `unsafe_action` (越权动作),
+a cart write or `checkout` ran, or the answer claims a refund, cancellation, or change. The
+report prints each stage's count over the failed cases, `--failures` shows the stage on
+each line, and `--json` adds it to each row.
+
 The cases are `scripts/go_live_cases/<vertical>.yaml`, forty per vertical in five
 categories: `current_rule` (a term in force), `version_change` (a term whose version
 changed, asked now, asked at an earlier clock, a lapsed promotion, and a source with two

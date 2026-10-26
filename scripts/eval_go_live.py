@@ -15,7 +15,8 @@ the vertical's mock backend at a fixed clock, and scored on four gates:
                happened, and a hand-off case points the customer to a person or the app
 
 Surface accuracy counts the first gate; the go-live rate counts cases that pass all four.
-``docs/metrics.md`` describes the case file and how to read the report.
+Each case that fails is charged to one failure stage, the part of the pipeline to fix.
+``docs/metrics.md`` describes the case file, the stages, and how to read the report.
 
     python scripts/eval_go_live.py                      # offline, every vertical
     python scripts/eval_go_live.py --vertical retail --failures
@@ -56,6 +57,14 @@ CASES_DIR = REPO_ROOT / "scripts" / "go_live_cases"
 DEFAULT_CLOCK = "2026-10-01T12:00:00+00:00"
 CATEGORIES = ("current_rule", "version_change", "missing_info", "colloquial", "must_handoff")
 GATES = ("correct", "traceable", "version", "safe")
+# The stage a failed case is charged to, decided in this order (docs/metrics.md).
+STAGES = (
+    "should_not_answer",
+    "retrieval_miss",
+    "stale_version",
+    "evidence_ignored",
+    "unsafe_action",
+)
 
 
 @dataclass(frozen=True)
@@ -339,6 +348,26 @@ def score(case: Case, turn: Turn, truth: dict[str, set[str]]) -> dict[str, bool]
     return {"correct": correct, "traceable": traceable, "version": version, "safe": safe}
 
 
+def failure_stage(case: Case, turn: Turn, gates: dict[str, bool]) -> str | None:
+    """The first stage in ``STAGES`` that explains a failed case; None for a go-live one.
+    Every failed gate maps to a stage, so a failed case always gets one."""
+    if all(gates.values()):
+        return None
+    answer = turn.answer
+    wrong = _has(answer, [*case.stale, *case.forbid])
+    if case.action == "decline" and (wrong or not _has(answer, DECLINE_CUES)):
+        return "should_not_answer"
+    if case.action == "handoff" and (wrong or not _has(answer, HANDOFF_CUES)):
+        return "should_not_answer"
+    if not gates["traceable"]:
+        return "retrieval_miss"
+    if not gates["version"]:
+        return "stale_version"
+    if not gates["correct"]:
+        return "evidence_ignored"
+    return "unsafe_action"
+
+
 # -- the report ---------------------------------------------------------------------
 
 
@@ -361,6 +390,14 @@ def _pct(numerator: int, denominator: int) -> str:
     return f"{100 * numerator / denominator:.1f}%" if denominator else "n/a"
 
 
+def print_stages(stages: Counter) -> None:
+    failed = sum(stages.values())
+    print(f"\n{'failure stage':<20}{'cases':>8}{'share':>9}")
+    for stage in STAGES:
+        cell = f"{stages[stage]}/{failed}"
+        print(f"{stage:<20}{cell:>8}{_pct(stages[stage], failed):>9}")
+
+
 def print_table(title: str, tallies: dict[str, Tally]) -> None:
     columns = (*GATES, "go_live")
     print(f"\n{title:<16}{'cases':>6}" + "".join(f"{c:>11}" for c in columns))
@@ -377,6 +414,7 @@ async def _evaluate(args: argparse.Namespace) -> dict[str, Any]:
     verticals = list(VERTICALS) if args.vertical == "all" else [args.vertical]
     by_vertical: dict[str, Tally] = {}
     by_category: dict[str, Tally] = {c: Tally() for c in CATEGORIES}
+    stages: Counter = Counter()
     rows: list[dict[str, Any]] = []
     for vertical in verticals:
         example_root = REPO_ROOT / "examples" / vertical
@@ -404,8 +442,11 @@ async def _evaluate(args: argparse.Namespace) -> dict[str, Any]:
             )
             overlay = [Policy.model_validate(p) for p in case.overlay]
             gates = score(case, turn, in_force_versions([*base, *overlay], clock))
+            stage = failure_stage(case, turn, gates)
             tally.add(gates)
             by_category[case.category].add(gates)
+            if stage:
+                stages[stage] += 1
             rows.append(
                 {
                     "vertical": vertical,
@@ -413,14 +454,15 @@ async def _evaluate(args: argparse.Namespace) -> dict[str, Any]:
                     "category": case.category,
                     **gates,
                     "go_live": all(gates.values()),
+                    "stage": stage,
                     "evidence": turn.evidence,
                     "blocked": turn.blocked,
                     "answer": turn.answer,
                 }
             )
-            if args.failures and not all(gates.values()):
+            if args.failures and stage:
                 failed = ", ".join(g for g, ok in gates.items() if not ok)
-                print(f"  ✗ {vertical}/{case.id} [{failed}]: {turn.answer[:160]!r}")
+                print(f"  ✗ {vertical}/{case.id} {stage} [{failed}]: {turn.answer[:160]!r}")
     total = Tally()
     for tally in by_vertical.values():
         total.cases += tally.cases
@@ -428,6 +470,7 @@ async def _evaluate(args: argparse.Namespace) -> dict[str, Any]:
     return {
         "by_vertical": by_vertical,
         "by_category": by_category,
+        "stages": stages,
         "total": total,
         "rows": rows,
     }
@@ -472,6 +515,7 @@ def main() -> int:
     result = asyncio.run(evaluate(args))
     print_table("vertical", result["by_vertical"])
     print_table("category", {c: t for c, t in result["by_category"].items() if t.cases})
+    print_stages(result["stages"])
     total: Tally = result["total"]
     correct, live = total.passed["correct"], total.passed["go_live"]
     print(
