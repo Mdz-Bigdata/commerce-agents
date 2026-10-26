@@ -21,6 +21,7 @@ portal session. A vertical's own portal reads are passed in as ``portal_reads``.
 # module evaluates its annotations eagerly (no ``from __future__ import annotations``).
 
 import inspect
+import logging
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
@@ -31,9 +32,11 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from commerce_common.memory import MemoryStore
+from commerce_common.streaming import ToolOutcome
 from merchant_agent import (
     BusinessSnapshot,
     ChangeLedger,
+    ChangeNotApplicable,
     ChangeStatus,
     InventoryAlert,
     Listing,
@@ -62,6 +65,8 @@ from .sessions import SessionRecord, SessionStore, session_dependency
 MerchantRecord = SessionRecord[MerchantSessionState]
 
 _LISTINGS_CAP = 100
+
+logger = logging.getLogger(__name__)
 
 
 class DemoMerchant(Protocol):
@@ -257,8 +262,10 @@ def build_merchant_router(
 
     async def change_action(change_id: str, action: str, record: MerchantRecord) -> dict:
         """``{"ok": true, "change": record}`` when the change moved; ``{"ok": false,
-        "change": null, "reason": text}`` when a gate held it, with the record in
-        ``change`` when the hold was its expiry; 400 when the call failed.
+        "change": null, "reason": text}`` when a gate held it or the change cannot go
+        through as it stands (its values moved since staging, it is no longer staged),
+        with the record in ``change`` when the change has expired; 400 when the call
+        failed and a retry may succeed.
         A click on the preview card is the host's own approval or dismissal, so the id is
         marked before the executor runs; neither mark outlives the click, whatever the
         outcome, so a later chat turn cannot spend one."""
@@ -274,12 +281,24 @@ def build_merchant_router(
             state=record.state,
             memory=agent.memory,
         )
-        execution = await executor.execute(action, {"change_id": change_id})
-        record.state.host_action_change_ids.discard(change_id)
-        record.state.approved_change_ids.discard(change_id)
-        if execution.is_error:
+        standing = False  # a refusal that stands until the change is staged again
+        try:
+            execution = await executor.dispatch(action, {"change_id": change_id})
+        except ChangeNotApplicable as refused:
+            standing = True
+            # Sanitized and capped by the executor, as the assistant's own call reports it.
+            execution = cast(ToolOutcome, executor.domain_error(refused))
+        except Exception:
+            logger.warning("preview card %s of %s failed", action, change_id, exc_info=True)
+            raise HTTPException(
+                status_code=400, detail=executor.unavailable_text.format(name=action)
+            ) from None
+        finally:
+            record.state.host_action_change_ids.discard(change_id)
+            record.state.approved_change_ids.discard(change_id)
+        if execution.is_error and not standing:
             raise HTTPException(status_code=400, detail=execution.result_text)
-        if execution.blocked is not None:
+        if standing or execution.blocked is not None:
             # An expired change is shown as expired, so the card stops offering Approve.
             current = backend.ledger.get(change_id)
             expired = current is not None and current.status is ChangeStatus.EXPIRED

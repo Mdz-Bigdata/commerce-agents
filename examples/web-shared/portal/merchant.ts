@@ -15,9 +15,24 @@ export interface ChangeRef {
 
 export type ChangeAction = "apply" | "discard";
 
+/**
+ * The API's answer to Approve or Dismiss: the change as it now stands when it moved or
+ * expired, and the backend's reason, untranslated, when the action did not go through.
+ */
+export interface ChangeActionResult<TChange> {
+  change: TChange | null;
+  reason: string | null;
+}
+
+/** Null when the call itself failed; a retry may succeed. */
+export type ChangeActionHandler<TChange> = (
+  changeId: string,
+  action: ChangeAction,
+) => Promise<ChangeActionResult<TChange> | null>;
+
 export interface MerchantChat<TChange extends ChangeRef> extends AgentTurn {
   /** Goes through the same gate as the agent's own apply/discard. */
-  actOnChange: (changeId: string, action: ChangeAction) => Promise<TChange | null>;
+  actOnChange: ChangeActionHandler<TChange>;
 }
 
 /** Chips written for the staged state go stale once the change moves on. */
@@ -82,16 +97,17 @@ export function useMerchantChat<TChange extends ChangeRef>(
   setItemsRef.current = turn.setItems;
 
   const actOnChange = useCallback(
-    async (changeId: string, action: ChangeAction) => {
-      const data = await api.post<{ change: TChange | null }>(
+    async (changeId: string, action: ChangeAction): Promise<ChangeActionResult<TChange> | null> => {
+      const data = await api.post<{ change: TChange | null; reason?: string | null }>(
         `/changes/${encodeURIComponent(changeId)}/${action}`,
       );
-      const change = data?.change ?? null;
+      if (!data) return null;
+      const change = data.change ?? null;
       if (change) {
         onPortalRefresh();
         turn.setItems((items) => applyChangeUpdate(items, change));
       }
-      return change;
+      return { change, reason: data.reason ?? null };
     },
     [api, onPortalRefresh, turn.setItems],
   );

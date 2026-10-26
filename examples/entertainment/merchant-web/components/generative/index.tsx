@@ -3,7 +3,7 @@
 
 /** One entry per merchant presentation tool. */
 
-import { type ChangeAction, type GenerativeBlockProps, UnknownBlock } from "web-shared";
+import { type ChangeActionHandler, type GenerativeBlockProps, UnknownBlock } from "web-shared";
 import type {
   ChangePreviewPayload,
   DigestPayload,
@@ -22,7 +22,7 @@ export default function GenerativeBlock({
   onChangeAction,
   onPrefill,
 }: GenerativeBlockProps & {
-  onChangeAction?: (changeId: string, action: ChangeAction) => Promise<StagedChange | null>;
+  onChangeAction?: ChangeActionHandler<StagedChange>;
   onPrefill?: (text: string) => void;
 }) {
   switch (block.component) {

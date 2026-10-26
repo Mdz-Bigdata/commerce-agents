@@ -10,7 +10,7 @@ import { describeApply, type FieldKinds, formatDate, formatFieldValue, formatMon
 import { type Translate, useT } from "../i18n";
 import { Icon, type IconName } from "../icons";
 import { AskButton, Button, KindIcon, Pill, type Tone } from "../ui";
-import type { ChangeAction } from "./merchant";
+import type { ChangeAction, ChangeActionHandler } from "./merchant";
 
 export function GenCard({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
@@ -105,10 +105,7 @@ export function ChangeStatusPill({ status }: { status: ChangeLike["status"] }) {
  * Tracks the change a card shows: starts from the streamed payload, is replaced by the API
  * response when the operator acts, and re-syncs when a later turn rewrites the payload.
  */
-export function useChangeActions<T extends ChangeLike>(
-  streamed: T,
-  onAct?: (changeId: string, action: ChangeAction) => Promise<T | null>,
-) {
+export function useChangeActions<T extends ChangeLike>(streamed: T, onAct?: ChangeActionHandler<T>) {
   const t = useT();
   const [change, setChange] = useState<T>(streamed);
   useEffect(() => {
@@ -121,8 +118,11 @@ export function useChangeActions<T extends ChangeLike>(
     if (!onAct || busy) return;
     setBusy(action);
     setError(null);
-    const updated = await onAct(change.change_id, action);
-    if (updated) setChange(updated);
+    const result = await onAct(change.change_id, action);
+    if (result?.change) setChange(result.change);
+    // A change that came back (expired) says so in its own status line.
+    else if (result?.reason)
+      setError(action === "apply" ? t("Not applied: {reason}", { reason: result.reason }) : t("Not dismissed: {reason}", { reason: result.reason }));
     else setError(t("That action did not go through. Check the API and try again."));
     setBusy(null);
   };

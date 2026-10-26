@@ -267,6 +267,8 @@ export const SHARED_ZH: Readonly<Record<string, string>> = {
   "Approving sets {fields} on campaign {targets}.": "批准后，将设置活动 {targets} 的{fields}。",
   "{list} and {n} more": "{list} 及另外 {n} 项",
   "That action did not go through. Check the API and try again.": "操作未成功。请检查 API 后重试。",
+  "Not applied: {reason}": "未应用：{reason}",
+  "Not dismissed: {reason}": "未驳回：{reason}",
   Before: "更改前",
   After: "更改后",
   "New price {price}, previous {previous}, {cost} {amount}": "新价格 {price}，原价 {previous}，{cost} {amount}",
