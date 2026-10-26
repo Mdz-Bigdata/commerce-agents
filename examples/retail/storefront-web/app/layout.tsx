@@ -2,18 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Metadata } from "next";
-import { Instrument_Sans } from "next/font/google";
 import { cookies } from "next/headers";
 import { LocaleProvider } from "web-shared/i18n";
 import { htmlLang, LOCALE_COOKIE, parseLocale } from "web-shared/locale";
 import { ZH } from "../lib/i18n-zh";
+import { fontVariables } from "./fonts";
 import "./globals.css";
-
-const instrumentSans = Instrument_Sans({
-  subsets: ["latin"],
-  variable: "--font-body",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "ACME",
@@ -23,7 +17,7 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const locale = parseLocale((await cookies()).get(LOCALE_COOKIE)?.value);
   return (
-    <html lang={htmlLang(locale)} suppressHydrationWarning className={instrumentSans.variable}>
+    <html lang={htmlLang(locale)} suppressHydrationWarning className={fontVariables}>
       <body suppressHydrationWarning>
         <LocaleProvider initial={locale} messages={ZH}>
           {children}

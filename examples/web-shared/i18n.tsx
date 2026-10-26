@@ -3,7 +3,7 @@
 
 "use client";
 
-import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { SHARED_ZH } from "./i18n-zh";
 import { htmlLang, type Locale, LOCALE_COOKIE } from "./locale";
 
@@ -42,6 +42,8 @@ interface LocaleState {
 }
 
 const english: Translate = (text, vars) => fill(text, vars);
+// Dispatched on window when a provider switches, so every provider on the page follows.
+const LOCALE_EVENT = "acme-locale-change";
 const LocaleContext = createContext<LocaleState>({
   locale: "en",
   setLocale: () => {},
@@ -64,6 +66,13 @@ export function LocaleProvider({
     document.cookie = `${LOCALE_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
     document.documentElement.lang = htmlLang(next);
     setState(next);
+    window.dispatchEvent(new CustomEvent<Locale>(LOCALE_EVENT, { detail: next }));
+  }, []);
+  // Another app on the same page switched: follow it.
+  useEffect(() => {
+    const follow = (event: Event) => setState((event as CustomEvent<Locale>).detail);
+    window.addEventListener(LOCALE_EVENT, follow);
+    return () => window.removeEventListener(LOCALE_EVENT, follow);
   }, []);
   const t = useCallback<Translate>(
     (text, vars) => translate(locale, table, text, vars),

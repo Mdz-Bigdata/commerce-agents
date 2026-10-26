@@ -9,7 +9,7 @@ import type {
   OverviewResponse,
 } from "./types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8002";
+const API_URL = process.env.NEXT_PUBLIC_TELECOM_API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8002";
 
 export const api = new AgentApi(API_URL, "/api/merchant");
 

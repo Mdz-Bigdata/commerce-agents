@@ -661,8 +661,35 @@ def check_verification_wiring() -> None:
                 f"examples/hub/index.html: {vertical} is not at run_demo.py's ports ({expected})"
             )
             clean = False
+    # The unified app: every app hosted-apps.cjs lists exists with the modules UnifiedApp.tsx
+    # imports from it, and UnifiedApp.tsx frames it under the same scope class.
+    unified = REPO_ROOT / "examples" / "unified-web"
+    listed = re.findall(
+        r'\{ dir: "([^"]+)", scope: "([^"]+)" \}', (unified / "hosted-apps.cjs").read_text()
+    )
+    shell = (unified / "components" / "UnifiedApp.tsx").read_text()
+    if not listed:
+        problem("examples/unified-web/hosted-apps.cjs: no hosted apps found")
+        clean = False
+    for directory, scope in listed:
+        root = REPO_ROOT / "examples" / directory
+        missing = [
+            f
+            for f in ("app/page.tsx", "app/fonts.ts", "app/globals.css", "lib/i18n-zh.ts")
+            if not (root / f).exists()
+        ]
+        if missing:
+            problem(f"examples/unified-web: {directory} lacks {', '.join(missing)}")
+            clean = False
+        if f'scope: "{scope}"' not in shell or f"../../{directory}/app/page" not in shell:
+            problem(
+                f"examples/unified-web/components/UnifiedApp.tsx: {directory} is not framed as {scope}"
+            )
+            clean = False
     if clean:
-        ok(f"all {len(VERTICALS)} verticals in every table and in the demo hub")
+        ok(
+            f"all {len(VERTICALS)} verticals in every table and in the demo hub; {len(listed)} apps in the unified app"
+        )
 
 
 PACKAGE_DIRS = (

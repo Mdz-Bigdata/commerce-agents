@@ -4,7 +4,7 @@
 import { AgentApi } from "web-shared";
 import type { Product } from "./types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8001";
+const API_URL = process.env.NEXT_PUBLIC_TRAVEL_API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8001";
 
 export const api = new AgentApi(API_URL, "/api");
 

@@ -2,27 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Metadata } from "next";
-import { Archivo, Fraunces } from "next/font/google";
 import { cookies } from "next/headers";
 import { LocaleProvider } from "web-shared/i18n";
 import { htmlLang, LOCALE_COOKIE, parseLocale } from "web-shared/locale";
 import { ZH } from "../lib/i18n-zh";
+import { fontVariables } from "./fonts";
 import "./globals.css";
-
-// Display face: wordmark and view titles. Data and tables stay in the body face.
-const fraunces = Fraunces({
-  subsets: ["latin"],
-  style: ["normal", "italic"],
-  axes: ["opsz"],
-  variable: "--font-display",
-  display: "swap",
-});
-
-const archivo = Archivo({
-  subsets: ["latin"],
-  variable: "--font-body",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "ACME Travel Merchant",
@@ -32,7 +17,7 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const locale = parseLocale((await cookies()).get(LOCALE_COOKIE)?.value);
   return (
-    <html lang={htmlLang(locale)} suppressHydrationWarning className={`${fraunces.variable} ${archivo.variable}`}>
+    <html lang={htmlLang(locale)} suppressHydrationWarning className={fontVariables}>
       <body suppressHydrationWarning>
         <LocaleProvider initial={locale} messages={ZH}>
           {children}

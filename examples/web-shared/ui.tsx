@@ -3,11 +3,17 @@
 
 "use client";
 
-import { type ButtonHTMLAttributes, type ReactNode, useEffect, useId, useState } from "react";
+import { type ButtonHTMLAttributes, createContext, type ReactNode, useContext, useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { formatChangePct } from "./format";
 import { useT } from "./i18n";
 import { Icon, type IconName } from "./icons";
+
+/**
+ * Where sheets render. A page that hosts several apps (examples/unified-web) provides each app's
+ * own element, so a sheet stays inside that app's styles; an app on its own renders into the body.
+ */
+export const PortalHostContext = createContext<HTMLElement | null>(null);
 
 export type Tone = "ok" | "warn" | "danger" | "info" | "violet" | "accent" | "muted";
 
@@ -401,15 +407,16 @@ export function Sheet({
 }) {
   const t = useT();
   const [host, setHost] = useState<HTMLElement | null>(null);
+  const scopedHost = useContext(PortalHostContext);
   const titleId = useId();
   useEffect(() => {
-    setHost(document.body);
+    setHost(scopedHost ?? document.body);
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, scopedHost]);
   if (!host) return null;
   return createPortal(
     <>

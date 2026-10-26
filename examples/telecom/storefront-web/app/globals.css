@@ -5,6 +5,9 @@
 
 @import "tailwindcss";
 @source "../../../web-shared";
+@source "../components";
+@source "../lib";
+@source "../app";
 @import "../../../web-shared/base.css";
 
 /* ACME Mobile design system: the shared light ground, cards, and ink

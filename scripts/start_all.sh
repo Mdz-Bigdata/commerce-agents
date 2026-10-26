@@ -7,7 +7,7 @@
 #   scripts/start_all.sh                       # all four verticals: APIs :8000-8003,
 #                                              # storefronts :3000-3003, portals :3100-3103
 #   scripts/start_all.sh retail travel         # only the verticals named
-#   scripts/start_all.sh --open                # and open the demo hub (every app, one page)
+#   scripts/start_all.sh --open                # and open the unified app (five apps, one app)
 #   scripts/start_all.sh --stop                # stop what an earlier run left behind, and exit
 #   scripts/start_all.sh --no-reload           # an API that does not restart on code changes
 #   scripts/start_all.sh --prod --fresh-memory # other flags pass through to scripts/run_demo.py
@@ -20,8 +20,9 @@
 # servers from an earlier run (anything else on a port is left alone and the server moves to
 # the next free port), so what starts is always the code on disk, and runs each vertical
 # under scripts/run_demo.py --all with an API that restarts when its Python, data, or skill
-# files change. The demo hub (examples/hub/index.html, :3200) shows every storefront and
-# portal in one page. Requests to localhost bypass any HTTP proxy the shell exports. Ctrl-C stops
+# files change. The unified app (examples/unified-web, :3300) runs the retail storefront and
+# portal, the travel storefront, and the telecom and ticketing portals as one app; the demo
+# hub (examples/hub/index.html, :3200) shows every storefront and portal in one page. Requests to localhost bypass any HTTP proxy the shell exports. Ctrl-C stops
 # everything. The web apps bundle with webpack by default: Turbopack cannot load
 # next/font/google files that Google Fonts serves from /l/font?kit=... URLs.
 
@@ -109,6 +110,22 @@ step "Stopping earlier servers"
 for vertical in "${VERTICALS[@]}"; do
   "$PYTHON" scripts/run_demo.py "$vertical" --stop | sed 's/^/  /'
 done
+# The unified app's dev server from an earlier run: matched by the directory it runs in.
+UNIFIED_DIR="$REPO_ROOT/examples/unified-web"
+for port in $(seq 3300 3309); do
+  for pid in $(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null); do
+    if [[ "$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p')" == "$UNIFIED_DIR" ]]; then
+      # Started in its own process group (below), so the group is the server and its children.
+      group="$(ps -o pgid= -p "$pid" | tr -d ' ')"
+      if [[ -n "$group" && "$group" != "$(ps -o pgid= -p $$ | tr -d ' ')" ]]; then
+        kill -- "-$group" 2>/dev/null
+      else
+        kill "$pid" 2>/dev/null
+      fi
+      echo "  ${DIM}Stopped the earlier unified app on :$port.${RESET}"
+    fi
+  done
+done
 # The demo hub's static server from an earlier run: matched by the directory it serves.
 HUB_DIR="$REPO_ROOT/examples/hub"
 for port in $(seq 3200 3209); do
@@ -188,9 +205,11 @@ done
 # Start each vertical under run_demo.py, which starts its web apps and stops its own tree.
 PIDS=()
 OPENER=""
+UNIFIED_PID=""
 stop_all() {
   trap - INT TERM EXIT
   [[ -z "$OPENER" ]] || kill "$OPENER" 2>/dev/null || true
+  [[ -z "$UNIFIED_PID" ]] || kill -TERM -- "-$UNIFIED_PID" 2>/dev/null || true
   [[ ${#PIDS[@]} -gt 0 ]] || return 0
   echo
   step "Stopping ${#PIDS[@]} vertical(s)"
@@ -215,15 +234,31 @@ while port_busy "$HUB_PORT"; do HUB_PORT=$((HUB_PORT + 1)); done
 PIDS+=("$!")
 echo "  ${GREEN}demo hub${RESET}         http://localhost:$HUB_PORT  ${DIM}(every storefront and portal in one page)${RESET}"
 
-# --open: the hub, once the first vertical's storefront answers.
+# The unified app: the five hosted apps behind one rail, each talking to its vertical's API at
+# the port assigned above (a vertical not started here shows as unreachable inside it).
+UNIFIED_PORT=3300
+while port_busy "$UNIFIED_PORT"; do UNIFIED_PORT=$((UNIFIED_PORT + 1)); done
+UNIFIED_ENV=()
+for i in "${!VERTICALS[@]}"; do
+  name="$(echo "${VERTICALS[$i]}" | tr '[:lower:]' '[:upper:]')"
+  UNIFIED_ENV+=("NEXT_PUBLIC_${name}_API_URL=http://localhost:${API_PORTS[$i]}")
+done
+# Its own process group (as run_demo.py gives each server), so stopping it takes its children.
+(cd "$UNIFIED_DIR" && exec "$PYTHON" -c 'import os, sys; os.setsid(); os.execvp(sys.argv[1], sys.argv[1:])' \
+  env "${UNIFIED_ENV[@]}" "$REPO_ROOT/examples/node_modules/.bin/next" dev --webpack --port "$UNIFIED_PORT") \
+  > >(sed -u "s/^/${DIM}[unified-web]${RESET} /") 2>&1 &
+UNIFIED_PID="$!"
+PIDS+=("$UNIFIED_PID")
+echo "  ${GREEN}unified app${RESET}      http://localhost:$UNIFIED_PORT  ${DIM}(five apps as one: rail on the left)${RESET}"
+
+# --open: the unified app, once it answers.
 if [[ $OPEN -eq 1 ]]; then
-  first_web=$(( $(default_port "${VERTICALS[0]}") - 5000 ))
   (
+    url="http://localhost:$UNIFIED_PORT"
     for _ in $(seq 1 240); do
-      curl -s -o /dev/null -m 2 "http://localhost:$first_web" && break
+      curl -s -o /dev/null -m 2 "$url" && break
       sleep 1
     done
-    url="http://localhost:$HUB_PORT"
     if command -v open >/dev/null 2>&1; then open "$url"; elif command -v xdg-open >/dev/null 2>&1; then xdg-open "$url"; fi
   ) &
   OPENER="$!"

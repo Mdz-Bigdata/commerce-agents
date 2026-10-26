@@ -14,7 +14,7 @@ paths each, four vertical examples, and a Claude Code plugin.
 - `*/runtime-agent-sdk/`: each agent as `ClaudeAgentOptions`, with a console.
 - `*/managed-agents/`: the manifest directory (with the derived `system.md`) and the role's MCP server.
 - `examples/demo_common/` and `examples/web-shared/`: what the verticals' APIs and web apps share (the model provider in `model_provider.py` and its settings panel's routes in `model_settings.py`, the operations log in `analytics.py`, the English/Chinese switch in `i18n.tsx`); `examples/` is the npm workspace.
-- `examples/<vertical>/`: `api/`, `data/`, `storefront-web/`, `merchant-web/`; ports 8000-8003, 3000-3003, 3100-3103. `examples/hub/`: the demo hub (:3200), every app in one page.
+- `examples/<vertical>/`: `api/`, `data/`, `storefront-web/`, `merchant-web/`; ports 8000-8003, 3000-3003, 3100-3103. `examples/hub/`: the demo hub (:3200), every app in one page. `examples/unified-web/`: five apps as one Next.js app (:3300), each imported from its own directory.
 - `plugins/commerce-builder/`: six skills, four commands, two hooks; `.claude-plugin/marketplace.json` points at it.
 - `docs/`: `safety.md`, `backends.md`, `deployment.md`, `metrics.md`. `start.command` (one-click start) and `scripts/`: install, demo, start-all, metrics, go-live eval (with `go_live_cases/`), constraint eval (with `constraint_cases/`), smoke, screenshots, check, deploy, verify.
 - `tests/`: the suites that span packages (both roles on all three paths); each package keeps its own `tests/`.

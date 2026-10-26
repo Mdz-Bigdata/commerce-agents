@@ -5,6 +5,9 @@
 
 @import "tailwindcss";
 @source "../../../web-shared";
+@source "../components";
+@source "../lib";
+@source "../app";
 @import "../../../web-shared/base.css";
 
 /* ACME Tickets storefront: the shared light ground (web-shared/theme.css), condensed

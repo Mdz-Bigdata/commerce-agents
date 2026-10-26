@@ -104,6 +104,15 @@ def main() -> int:
                             cwd=EXAMPLES / vertical / app,
                         )
                     )
+            # The one app over five (examples/unified-web) builds with webpack: its "@/" resolver
+            # is a webpack plugin.
+            steps.append(
+                Step(
+                    "unified-web (next build)",
+                    [str(NEXT), "build", "--webpack"],
+                    cwd=EXAMPLES / "unified-web",
+                )
+            )
         else:
             print("note: npm not found; skipping web builds (use --skip-web to silence)")
 

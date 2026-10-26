@@ -26,7 +26,7 @@ export function flyToCart(product: Product, source: HTMLElement): void {
   ghost.className = `pointer-events-none fixed z-50 flex h-10 w-10 items-center justify-center rounded-lg text-xl shadow-md ${productTileClass(product.product_id)}`;
   ghost.style.left = `${from.left + from.width / 2 - 20}px`;
   ghost.style.top = `${from.top + from.height / 2 - 20}px`;
-  document.body.appendChild(ghost);
+  (source.closest<HTMLElement>("[data-portal-host]") ?? document.body).appendChild(ghost);
   if (typeof ghost.animate !== "function") {
     ghost.remove();
     return;
