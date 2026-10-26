@@ -41,6 +41,50 @@ def test_within_guardrails_is_clean(config):
     assert check_guardrails(ChangeKind.PRICE_UPDATE, _price_items(3), config) == []
 
 
+def test_listing_and_campaign_copy_with_a_blocked_claim_is_refused(config):
+    claims = [
+        ChangeItem(
+            target="L-001", field="description", before=None, after="Best in the world for camping."
+        ),
+        ChangeItem(target="L-002", field="title", before=None, after="Clinically proven sleep pad"),
+        ChangeItem(target="L-003", field="description", before=None, after="全网第一的帐篷"),
+    ]
+    violations = check_guardrails(ChangeKind.LISTING_UPDATE, claims, config)
+    assert len(violations) == 3
+    assert "'description' on L-001 claims 'Best in the world'" in violations[0]
+    assert "全网第一" in violations[2]
+    copy = [ChangeItem(target="C-1", field="copy_text", before=None, after="Risk-free returns!")]
+    assert check_guardrails(ChangeKind.CAMPAIGN, copy, config)
+
+
+def test_checkable_copy_and_other_kinds_pass_the_claims_check(config):
+    plain = [
+        ChangeItem(
+            target="L-001",
+            field="description",
+            before="Best in the world",
+            after="Sleeps six; 4.2 kg packed.",
+        ),
+        ChangeItem(
+            target="L-002", field="title", before=None, after="Trail tent, first-time campers"
+        ),
+    ]
+    assert check_guardrails(ChangeKind.LISTING_UPDATE, plain, config) == []
+    # A promotion's name is not listing copy; the claims check reads copy kinds only.
+    promo = [ChangeItem(target="Best in the world sale", field="price", before=100.0, after=90.0)]
+    assert check_guardrails(ChangeKind.PROMOTION, promo, config) == []
+    relaxed = config.model_copy(update={"blocked_claim_patterns": ()})
+    claim = [ChangeItem(target="L-1", field="title", before=None, after="Number one tent")]
+    assert check_guardrails(ChangeKind.LISTING_UPDATE, claim, relaxed) == []
+
+
+def test_a_blocked_claim_pattern_must_compile():
+    from merchant_agent import MerchantAgentConfig
+
+    with pytest.raises(ValueError):
+        MerchantAgentConfig(blocked_claim_patterns=("(unclosed",))
+
+
 def test_bulk_cap_violation(config):
     violations = check_guardrails(
         ChangeKind.PRICE_UPDATE, _price_items(config.max_items_per_change + 1), config

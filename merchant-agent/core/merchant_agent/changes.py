@@ -7,6 +7,8 @@ build on. Guardrails run when a change is staged and again before it is applied.
 
 from __future__ import annotations
 
+import functools
+import re
 from datetime import UTC, datetime
 
 from commerce_common.fencing import truncate_display
@@ -98,6 +100,16 @@ def check_guardrails(
                     f"restock of {added} units on {item.target} exceeds the "
                     f"{config.max_restock_quantity}-unit per-change limit"
                 )
+        claim = (
+            blocked_claim(item.after, config.blocked_claim_patterns)
+            if kind in _COPY_KINDS and isinstance(item.after, str)
+            else None
+        )
+        if claim:
+            violations.append(
+                f"'{item.field}' on {item.target} claims '{claim}', which the store "
+                "cannot stand behind; state what the record shows in checkable terms"
+            )
         if kind is ChangeKind.CAMPAIGN and field == "budget":
             budget = _as_price(item.after)
             if budget is not None and budget > config.max_campaign_budget:
@@ -106,6 +118,22 @@ def check_guardrails(
                     f"{config.max_campaign_budget:.0f} per-change limit"
                 )
     return violations
+
+
+# The kinds whose text items publish copy: a listing's content and a campaign's message.
+_COPY_KINDS = frozenset({ChangeKind.LISTING_UPDATE, ChangeKind.CAMPAIGN})
+
+
+@functools.cache
+def _claim_pattern(patterns: tuple[str, ...]) -> re.Pattern[str] | None:
+    return re.compile("|".join(f"(?:{p})" for p in patterns), re.IGNORECASE) if patterns else None
+
+
+def blocked_claim(text: str, patterns: tuple[str, ...]) -> str | None:
+    """The first phrase in ``text`` a blocked-claim pattern matches, or None."""
+    pattern = _claim_pattern(patterns)
+    match = pattern.search(text) if pattern else None
+    return match.group(0)[:60] if match else None
 
 
 def _as_price(value: object) -> float | None:

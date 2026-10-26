@@ -34,6 +34,8 @@ executor are its own, and every tool result comes back inside `MERCHANT_FENCE` (
 4. `protected_fields` can never be staged, `price_bearing_fields` are the fields the price cap reads, and
    `listing_update_blocked_fields` may not ride a free-form listing update. A domain that prices under another name
    (a nightly rate, a monthly fee, a tier price) appends to these tuples and never replaces them.
+   `blocked_claim_patterns` refuses listing and campaign copy that makes an absolute, guaranteed, medical, or unsourced
+   claim; a regulated domain appends its own terms the same way.
 5. `require_host_approval` defaults to `True`: `apply_change` succeeds only for an id in `MerchantSessionState.approved_change_ids`,
    which only host code writes. The three surfaces in the repo are the portal's `/changes/{change_id}/apply` route
    (`examples/demo_common/merchant.py`), `MerchantToolset.host_approve` (`merchant_agent_sdk/merchant_tools.py`, prompted

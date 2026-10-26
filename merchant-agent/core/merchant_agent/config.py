@@ -7,7 +7,9 @@
 
 from __future__ import annotations
 
-from pydantic import Field
+import re
+
+from pydantic import Field, field_validator
 
 from commerce_common.config import BaseAgentConfig, ThinkingEffort
 
@@ -64,6 +66,22 @@ class MerchantAgentConfig(BaseAgentConfig):
     )
     price_bearing_fields: tuple[str, ...] = ("price",)
     listing_update_blocked_fields: tuple[str, ...] = ("price", "stock")
+    # Copy staged into a listing or a campaign goes live once approved; text matching one
+    # of these case-insensitive patterns (absolute and superlative claims, guarantees,
+    # medical efficacy, unsourced statistics) is refused with the phrase named. Extended,
+    # never replaced, by a domain with its own regulated terms.
+    blocked_claim_patterns: tuple[str, ...] = (
+        r"\bbest in the (?:world|market|industry|country)\b",
+        r"\bworld'?s (?:best|first|only)\b",
+        r"\bnumber one\b|#\s?1\b|\bno\.\s?1\b",
+        r"\b100\s?% (?:safe|effective|guaranteed|natural|satisfaction)\b",
+        r"\bguaranteed (?:results|to)\b|\brisk[- ]free\b|\bnever fails\b",
+        r"\bcures?\b|\b(?:prevents|treats|heals) (?:disease|illness|infection|pain)\b",
+        r"\b(?:clinically|scientifically|medically) proven\b|\bdoctor[- ]recommended\b",
+        r"\bstudies show\b|\b\d{2,3}\s?% of (?:customers|users|people|experts)\b",
+        r"最(?:好|佳|优|强)|(?:全网|全国|行业|销量)第一|顶级|国家级|万能",
+        r"根治|治愈|100\s?%\s?有效|零风险|无副作用",
+    )
 
     # -- Approval (prompt). With `require_host_approval` on, apply_change succeeds only
     # for ids the host marked on MerchantSessionState.approved_change_ids; a deployment
@@ -72,6 +90,16 @@ class MerchantAgentConfig(BaseAgentConfig):
     # successful stage_* call renders the change preview card itself (prompt and tool
     # text say so); a deployment whose executor events do not reach the operator, the
     # MCP server, turns it off and the model shows the change with present_change_preview.
+    @field_validator("blocked_claim_patterns")
+    @classmethod
+    def _patterns_compile(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        for pattern in value:
+            try:
+                re.compile(pattern)
+            except re.error as error:
+                raise ValueError(f"blocked_claim_patterns: {pattern!r}: {error}") from error
+        return value
+
     require_host_approval: bool = True
     approval_surface: str = "the host application's approval control"
     stage_shows_preview: bool = True

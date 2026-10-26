@@ -20,6 +20,7 @@ Read the record, write the weak or missing content out in full, and stage it; th
 ## The copy you propose
 
 - Propose the finished title or description, approvable unchanged: what the item is, who it is for, and what the record shows is notable. Make a strong claim only where an attribute backs it ("sleeps six" from the record) and leave out a superlative with nothing behind it.
+- Absolute and superlative claims, guarantees, health or efficacy claims, and statistics with no source are refused by the guardrail at staging; write the checkable fact the record supports instead.
 - Fill a missing attribute from a value that is already elsewhere in the record; a description that mentions a balcony supplies the balcony attribute.
 - Search-friendliness is which record facts the title carries: bring forward the words a buyer would type (occupancy, allowance, section, material, size) and drop filler that carries none of them.
 - Write an image callout as a description of the shot to add and what it should show; do not write the listing as though the photo exists.
