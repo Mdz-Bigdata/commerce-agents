@@ -17,10 +17,10 @@ function sectionState(tier: PacingTier | undefined): {
 } {
   if (!tier) {
     // A ticketed section with no live tier row: not on sale.
-    return { fill: "none", fillOpacity: 1, stroke: "var(--line)", strokeDasharray: "3 2.5" };
+    return { fill: "none", fillOpacity: 1, stroke: "var(--ink-faint)", strokeDasharray: "3 2.5" };
   }
   if (tier.remaining === 0) {
-    return { fill: "var(--well)", fillOpacity: 1, stroke: "var(--line)" };
+    return { fill: "var(--ink-faint)", fillOpacity: 0.35, stroke: "var(--line-strong)" };
   }
   // Fill opacity follows the open share.
   let openFrac = 0;
@@ -51,8 +51,8 @@ function SchematicLegend() {
     <div className="at-mono mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-(--ink-soft)">
       <LegendKey swatch="border border-(--accent) bg-(--accent)/60" label={t("open")} />
       <LegendKey swatch="border border-(--accent)/50 bg-(--accent)/20" label={t("selling")} />
-      <LegendKey swatch="border border-(--line) bg-(--well)" label={t("sold out")} />
-      <LegendKey swatch="border border-dashed border-(--line)" label={t("not on sale")} />
+      <LegendKey swatch="border border-(--line-strong) bg-(--ink-faint)/35" label={t("sold out")} />
+      <LegendKey swatch="border border-dashed border-(--ink-faint)" label={t("not on sale")} />
     </div>
   );
 }
