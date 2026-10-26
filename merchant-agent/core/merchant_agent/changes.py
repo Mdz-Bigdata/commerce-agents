@@ -2,14 +2,17 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """The staged-change guardrails and the in-memory ``ChangeLedger`` the example backends
-build on. Guardrails run when a change is staged and again before it is applied.
+build on. Guardrails run when a change is staged and again before it is applied; at
+apply a change must also be inside its time to live and still match the live records.
 """
 
 from __future__ import annotations
 
 import functools
+import math
 import re
-from datetime import UTC, datetime
+from collections.abc import Callable, Mapping
+from datetime import UTC, datetime, timedelta
 
 from commerce_common.fencing import truncate_display
 
@@ -144,6 +147,52 @@ def _as_price(value: object) -> float | None:
     return price if price > 0 else None
 
 
+def expires_at(change: StagedChange, config: MerchantAgentConfig) -> datetime:
+    """When ``change`` expires if it is still unapproved, under the current config."""
+    return change.created_at + timedelta(minutes=config.staged_change_ttl_minutes)
+
+
+def check_drift(change: StagedChange, live: Mapping[tuple[str, str], object]) -> list[str]:
+    """Operator-readable messages for every item whose ``before`` no longer matches the
+    live record; empty when the change still applies to what the operator previewed.
+    ``live`` maps ``(target, field)`` to the current value, and an item it leaves out is
+    not compared. An inventory quantity applies as the staged delta (the restock cap
+    reads it the same way), so a level that moved since staging is not drift."""
+    drifted: list[str] = []
+    for item in change.items:
+        if (item.target, item.field) not in live:
+            continue
+        if change.kind is ChangeKind.INVENTORY_ACTION and _is_quantity(item.before):
+            continue
+        current = live[(item.target, item.field)]
+        if not _same_value(item.before, current):
+            drifted.append(
+                f"'{item.field}' on {item.target} was {_shown(item.before)} when staged "
+                f"and is {_shown(current)} now"
+            )
+    return drifted
+
+
+def _is_quantity(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _same_value(staged: object, current: object) -> bool:
+    numbers = (int, float)
+    if (
+        isinstance(staged, numbers)
+        and isinstance(current, numbers)
+        and not isinstance(staged, bool)
+        and not isinstance(current, bool)
+    ):
+        return math.isclose(staged, current, rel_tol=1e-9, abs_tol=1e-9)
+    return staged == current
+
+
+def _shown(value: object) -> str:
+    return "unset" if value is None else truncate_display(str(value), 60)
+
+
 def _as_quantity(value: object) -> int:
     try:
         return int(value)  # type: ignore[call-overload]
@@ -154,11 +203,18 @@ def _as_quantity(value: object) -> int:
 class ChangeLedger:
     """In-memory staged-change lifecycle a MerchantBackend can build on. ``stage`` checks
     the guardrails and records the actor; ``apply`` and ``discard`` accept only changes
-    that are currently staged; applied and discarded changes stay in the ledger as the
-    audit trail."""
+    that are currently staged; a change left staged past ``staged_change_ttl_minutes``
+    turns expired the next time the ledger is read; applied, discarded, and expired
+    changes stay in the ledger as the audit trail. ``clock`` supplies the current UTC
+    time."""
 
-    def __init__(self, config: MerchantAgentConfig):
+    def __init__(
+        self,
+        config: MerchantAgentConfig,
+        clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+    ):
         self._config = config
+        self._clock = clock
         self._changes: dict[str, StagedChange] = {}
         self._sequence = 0
 
@@ -188,7 +244,7 @@ class ChangeLedger:
             # trimmed rather than refused.
             summary=truncate_display(summary, 200),
             items=items,
-            created_at=datetime.now(UTC),
+            created_at=self._clock(),
             created_by=actor,
             created_by_kind=actor_kind,
             guardrail_notes=guardrail_notes or [],
@@ -201,28 +257,44 @@ class ChangeLedger:
         return change
 
     def get(self, change_id: str) -> StagedChange | None:
+        self._expire_overdue()
         return self._changes.get(change_id)
 
     def pending(self) -> list[StagedChange]:
+        self._expire_overdue()
         return [c for c in self._changes.values() if c.status is ChangeStatus.STAGED]
 
     def applied(self) -> list[StagedChange]:
         return [c for c in self._changes.values() if c.status is ChangeStatus.APPLIED]
 
     def resolved(self) -> list[StagedChange]:
-        """Applied and discarded changes, for a portal's audit view."""
+        """Applied, discarded, and expired changes, for a portal's audit view."""
+        self._expire_overdue()
         return [c for c in self._changes.values() if c.status is not ChangeStatus.STAGED]
 
-    def apply(self, change_id: str, actor: str) -> StagedChange:
+    def apply(
+        self,
+        change_id: str,
+        actor: str,
+        live: Mapping[tuple[str, str], object] | None = None,
+    ) -> StagedChange:
+        """Mark a staged change applied. ``live`` holds the current values the backend
+        read for the change's items (see :func:`check_drift`); a change whose values
+        moved since staging is refused and stays staged."""
         change = self._require_staged(change_id, "apply")
         # Config may have tightened since the change was staged.
         violations = check_guardrails(change.kind, change.items, self._config)
         if violations:
             raise GuardrailViolation(violations)
+        if live is not None and (drifted := check_drift(change, live)):
+            raise ChangeNotApplicable(
+                f"change {change_id} was not applied: {'; '.join(drifted)}. Discard it and "
+                "stage it again from the current values"
+            )
         updated = change.model_copy(
             update={
                 "status": ChangeStatus.APPLIED,
-                "applied_at": datetime.now(UTC),
+                "applied_at": self._clock(),
                 "applied_by": actor,
             }
         )
@@ -236,7 +308,7 @@ class ChangeLedger:
         updated = change.model_copy(
             update={
                 "status": ChangeStatus.DISCARDED,
-                "discarded_at": datetime.now(UTC),
+                "discarded_at": self._clock(),
                 "discarded_by": actor,
                 "discarded_by_kind": actor_kind,
             }
@@ -244,10 +316,29 @@ class ChangeLedger:
         self._changes[change_id] = updated
         return updated
 
+    def _expire_overdue(self) -> None:
+        # Expiry only ever moves a change out of the queue; it never applies one.
+        now = self._clock()
+        for change in self._changes.values():
+            if change.status is ChangeStatus.STAGED and now >= expires_at(change, self._config):
+                self._changes[change.change_id] = change.model_copy(
+                    update={
+                        "status": ChangeStatus.EXPIRED,
+                        "expired_at": expires_at(change, self._config),
+                    }
+                )
+
     def _require_staged(self, change_id: str, action: str) -> StagedChange:
+        self._expire_overdue()
         change = self._changes.get(change_id)
         if change is None:
             raise ChangeNotApplicable(f"no change with id {change_id!r} to {action}")
+        if change.status is ChangeStatus.EXPIRED:
+            raise ChangeNotApplicable(
+                f"change {change_id} expired unapproved after "
+                f"{self._config.staged_change_ttl_minutes} minutes and was not applied — "
+                f"nothing to {action}; stage it again from the current values"
+            )
         if change.status is not ChangeStatus.STAGED:
             raise ChangeNotApplicable(
                 f"change {change_id} is {change.status.value}, not staged — nothing to {action}"

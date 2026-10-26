@@ -5,7 +5,7 @@
 
 import {
   ApproveBar,
-  type ChangeAction,
+  type ChangeActionHandler,
   ChangeStatusPill,
   DiffRows,
   describeProposer,
@@ -29,7 +29,7 @@ export default function ChangePreviewCard({
   onAct,
 }: {
   payload: ChangePreviewPayload;
-  onAct?: (changeId: string, action: ChangeAction) => Promise<StagedChange | null>;
+  onAct?: ChangeActionHandler<StagedChange>;
 }) {
   const t = useT();
   const { change, busy, error, act, canAct } = useChangeActions(payload.change, onAct);

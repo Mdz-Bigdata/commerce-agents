@@ -1,6 +1,8 @@
 # Copyright 2026 Anthropic PBC
 # SPDX-License-Identifier: Apache-2.0
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 
 from merchant_agent import (
@@ -11,8 +13,9 @@ from merchant_agent import (
     ChangeNotApplicable,
     ChangeStatus,
     GuardrailViolation,
+    StagedChange,
 )
-from merchant_agent.changes import check_guardrails
+from merchant_agent.changes import check_drift, check_guardrails
 
 
 def _price_items(count: int, before: float = 100.0, after: float = 110.0) -> list[ChangeItem]:
@@ -436,3 +439,100 @@ def test_discard_records_actor_kind(config):
     assert agent_discard.discarded_by_kind is ActorKind.AGENT
     operator_discard = ledger.discard(second.change_id, actor="demo-operator")
     assert operator_discard.discarded_by_kind is ActorKind.OPERATOR
+
+
+# -- expiry and drift ------------------------------------------------------------------
+
+
+class _Clock:
+    def __init__(self) -> None:
+        self.now = datetime(2026, 9, 1, 9, 0, tzinfo=UTC)
+
+    def __call__(self) -> datetime:
+        return self.now
+
+
+def _stage_price(ledger: ChangeLedger, before: float = 100.0, after: float = 105.0):
+    return ledger.stage(
+        kind=ChangeKind.PRICE_UPDATE,
+        summary="Price move",
+        items=_price_items(1, before=before, after=after),
+        actor="demo-operator",
+    )
+
+
+def test_a_change_past_its_ttl_expires_and_is_never_applied(config):
+    clock = _Clock()
+    ledger = ChangeLedger(config.model_copy(update={"staged_change_ttl_minutes": 60}), clock)
+    change = _stage_price(ledger)
+    clock.now += timedelta(minutes=59)
+    assert ledger.pending() == [change]
+    clock.now += timedelta(minutes=1)
+    with pytest.raises(ChangeNotApplicable, match="expired unapproved after 60 minutes"):
+        ledger.apply(change.change_id, actor="demo-operator")
+    expired = ledger.get(change.change_id)
+    assert expired.status is ChangeStatus.EXPIRED
+    assert expired.expired_at == change.created_at + timedelta(minutes=60)
+    assert expired.applied_at is None and expired.applied_by is None
+    assert ledger.pending() == [] and ledger.applied() == []
+    assert ledger.resolved() == [expired]
+    with pytest.raises(ChangeNotApplicable, match="nothing to discard"):
+        ledger.discard(change.change_id, actor="demo-operator")
+
+
+def test_expiry_is_recorded_on_read_without_an_apply(config):
+    clock = _Clock()
+    ledger = ChangeLedger(config, clock)
+    change = _stage_price(ledger)
+    clock.now += timedelta(minutes=config.staged_change_ttl_minutes)
+    assert ledger.pending() == []
+    assert ledger.get(change.change_id).status is ChangeStatus.EXPIRED
+
+
+def test_apply_refuses_a_change_whose_values_moved_and_keeps_it_staged(config):
+    ledger = ChangeLedger(config)
+    change = _stage_price(ledger, before=100.0)
+    with pytest.raises(ChangeNotApplicable) as refused:
+        ledger.apply(change.change_id, actor="demo-operator", live={("L-000", "price"): 90.0})
+    assert "'price' on L-000 was 100.0 when staged and is 90.0 now" in str(refused.value)
+    assert "stage it again" in str(refused.value)
+    assert ledger.get(change.change_id).status is ChangeStatus.STAGED
+    applied = ledger.apply(change.change_id, actor="demo-operator", live={("L-000", "price"): 100})
+    assert applied.status is ChangeStatus.APPLIED
+
+
+def test_drift_compares_only_the_values_the_backend_read():
+    listing = StagedChange(
+        change_id="chg-0001",
+        kind=ChangeKind.LISTING_UPDATE,
+        summary="Copy",
+        items=[
+            ChangeItem(target="L-001", field="title", before="Planter", after="Tall planter"),
+            ChangeItem(target="L-001", field="material", before=None, after="clay"),
+        ],
+        created_at=datetime.now(UTC),
+        created_by="demo-operator",
+    )
+    assert check_drift(listing, {}) == []
+    assert check_drift(listing, {("L-001", "title"): "Planter", ("L-001", "material"): None}) == []
+    drifted = check_drift(listing, {("L-001", "material"): "stone"})
+    assert drifted == ["'material' on L-001 was unset when staged and is stone now"]
+
+
+def test_an_inventory_quantity_applies_as_a_delta_so_it_never_drifts():
+    restock = StagedChange(
+        change_id="chg-0001",
+        kind=ChangeKind.INVENTORY_ACTION,
+        summary="Restock and pause",
+        items=[
+            ChangeItem(target="L-001", field="stock", before=3, after=27),
+            ChangeItem(target="L-002", field="status", before="active", after="paused"),
+        ],
+        created_at=datetime.now(UTC),
+        created_by="demo-operator",
+    )
+    live = {("L-001", "stock"): 9, ("L-002", "status"): "active"}
+    assert check_drift(restock, live) == []
+    assert check_drift(restock, live | {("L-002", "status"): "paused"}) == [
+        "'status' on L-002 was active when staged and is paused now"
+    ]

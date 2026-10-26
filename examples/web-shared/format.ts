@@ -232,6 +232,7 @@ export function describeResolver(
   },
   t: Translate = english,
 ): string | null {
+  if (change.status === "expired") return t("Expired unapproved");
   if (change.status === "applied" && change.applied_by) return t("Approved by {name}", { name: change.applied_by });
   if (change.status === "discarded" && change.discarded_by) {
     return change.discarded_by_kind === "agent"
@@ -239,6 +240,24 @@ export function describeResolver(
       : t("Dismissed by {name}", { name: change.discarded_by });
   }
   return null;
+}
+
+/** The targets of a change by id: up to three named, the rest counted. */
+function targetList(targets: string[], t: Translate): string {
+  const named = targets.slice(0, 3).join(", ");
+  return targets.length > 3 ? t("{list} and {n} more", { list: named, n: targets.length - 3 }) : named;
+}
+
+/** What approving a staged change does, in one line built from its kind and items. */
+export function describeApply(
+  change: { kind: string; items: { target: string; field: string }[] },
+  t: Translate = english,
+): string {
+  const targets = targetList([...new Set(change.items.map((item) => item.target))], t);
+  const fields = [...new Set(change.items.map((item) => t(humanizeField(item.field)).toLowerCase()))].join(", ");
+  if (change.kind === "promotion") return t("Approving puts {targets} on promotion in the live store.", { targets });
+  if (change.kind === "campaign") return t("Approving sets {fields} on campaign {targets}.", { fields, targets });
+  return t("Approving changes {fields} on {targets} in the live store.", { fields, targets });
 }
 
 /** "Good morning" before noon, "Good afternoon" until six, then "Good evening". */

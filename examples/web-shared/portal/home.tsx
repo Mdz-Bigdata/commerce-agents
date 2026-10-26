@@ -135,7 +135,7 @@ export function RecordList({ rows, mono = false }: { rows: RecordRowData[]; mono
 
 interface ChangeSummary {
   change_id: string;
-  status: "staged" | "applied" | "discarded";
+  status: "staged" | "applied" | "discarded" | "expired";
   summary: string;
   created_by: string;
   created_by_kind?: "operator" | "agent";
@@ -144,6 +144,7 @@ interface ChangeSummary {
   discarded_at?: string | null;
   discarded_by?: string | null;
   discarded_by_kind?: "operator" | "agent" | null;
+  expired_at?: string | null;
 }
 
 /** The last few resolved changes, newest first. */
@@ -155,7 +156,8 @@ export function RecentChanges({ changes, limit = 4 }: { changes: ChangeSummary[]
       <ul className="divide-y divide-(--line) px-[18px] pb-2">
         {changes.slice(0, limit).map((change) => {
           const status = CHANGE_STATUS[change.status];
-          const actedAt = change.status === "applied" ? change.applied_at : change.discarded_at;
+          const actedAt =
+            change.status === "applied" ? change.applied_at : change.status === "expired" ? change.expired_at : change.discarded_at;
           return (
             <li key={change.change_id} className="py-2.5">
               <div className="flex items-start gap-2">

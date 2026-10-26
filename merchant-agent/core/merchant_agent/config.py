@@ -90,6 +90,8 @@ class MerchantAgentConfig(BaseAgentConfig):
     # successful stage_* call renders the change preview card itself (prompt and tool
     # text say so); a deployment whose executor events do not reach the operator, the
     # MCP server, turns it off and the model shows the change with present_change_preview.
+    # A change left unapproved for `staged_change_ttl_minutes` expires: approving it then
+    # is refused and it is never applied.
     @field_validator("blocked_claim_patterns")
     @classmethod
     def _patterns_compile(cls, value: tuple[str, ...]) -> tuple[str, ...]:
@@ -103,6 +105,7 @@ class MerchantAgentConfig(BaseAgentConfig):
     require_host_approval: bool = True
     approval_surface: str = "the host application's approval control"
     stage_shows_preview: bool = True
+    staged_change_ttl_minutes: int = Field(default=1440, ge=1)
 
     # -- Grounding gates (the runtimes read them). Metrics: a performance term plus a
     # question cue forces get_business_snapshot. Follow-through: a change term (or a

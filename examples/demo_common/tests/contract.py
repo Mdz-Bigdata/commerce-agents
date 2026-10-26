@@ -4,6 +4,7 @@
 """Routes, gates, and merchant writes every vertical honors; each test_contract.py star-imports it."""
 
 import asyncio
+import contextlib
 import inspect
 import re
 from collections.abc import Iterable
@@ -372,9 +373,10 @@ def test_overview_and_alerts_carry_the_portal_keys(portal):
 
 
 def test_preview_card_buttons_report_a_hold_apart_from_an_apply(
-    backend, merchant, merchant_identity, operator_session
+    backend, merchant, merchant_identity, operator_session, monkeypatch
 ):
-    """A held call answers ok=false with the reason; only an applied change queues an app event."""
+    """A held call, or a change that cannot go through as it stands, answers ok=false with
+    the reason; a failed call answers 400; only an applied change queues an app event."""
     agent = MerchantAgent(
         backend=merchant, config=merchant.config, memory_store=InMemoryMemoryStore()
     )
@@ -425,7 +427,47 @@ def test_preview_card_buttons_report_a_hold_apart_from_an_apply(
     ]
     assert not record.state.approved_change_ids
     again = client.post(f"/api/merchant/changes/{staged.change_id}/apply", headers=headers)
-    assert again.status_code == 400 and len(stored().pending_app_events) == 1
+    assert again.status_code == 200
+    body = again.json()
+    assert body["ok"] is False and body["change"] is None
+    assert f"change {staged.change_id} is applied, not staged" in body["reason"]
+    assert len(stored().pending_app_events) == 1
+
+    plain = next(listing for listing in merchant.all_listings() if not listing.has_options)
+    first, second = [
+        asyncio.run(
+            merchant.stage_price_update(
+                operator_session,
+                [
+                    PriceUpdateItem(
+                        listing_id=plain.listing_id, new_price=round(plain.price * pct, 2)
+                    )
+                ],
+            )
+        )
+        for pct in (1.02, 1.04)
+    ]
+    record = stored()
+    record.state.remember_change(first)
+    record.state.remember_change(second)
+    sessions.save(record)
+    client.post(f"/api/merchant/changes/{first.change_id}/apply", headers=headers)
+    drifted = client.post(f"/api/merchant/changes/{second.change_id}/apply", headers=headers)
+    assert drifted.status_code == 200
+    body = drifted.json()
+    assert body["ok"] is False and body["change"] is None
+    assert re.search(r"was .* when staged.*stage it again", body["reason"])
+    assert merchant.ledger.get(second.change_id).status is ChangeStatus.STAGED
+    assert len(stored().pending_app_events) == 2
+
+    def unavailable(*_args, **_kwargs):
+        raise ConnectionError("store unreachable")
+
+    monkeypatch.setattr(merchant, "discard_change", unavailable)
+    failed = client.post(f"/api/merchant/changes/{second.change_id}/discard", headers=headers)
+    assert failed.status_code == 400 and "unreachable" not in failed.text
+    assert merchant.ledger.get(second.change_id).status is ChangeStatus.STAGED
+    assert not stored().state.host_action_change_ids
 
 
 def test_orders_route_lists_the_callers_own_orders_newest_first(client):
@@ -606,6 +648,68 @@ async def test_every_staging_path_is_the_agents_proposal_and_applying_is_the_ope
         await merchant.apply_change(operator_session, staged[0].change_id)
     context = await merchant.get_merchant_context(operator_session)
     assert context["operator"] == operator_session.operator
+
+
+async def test_a_change_applies_against_the_values_it_was_staged_from(merchant, operator_session):
+    plain = [listing for listing in merchant.all_listings() if not listing.has_options]
+    priced, promoted, paused = plain[0], plain[1], plain[2]
+    campaign = (await merchant.get_campaign_performance(operator_session))[0]
+    staged = [
+        await merchant.stage_price_update(
+            operator_session,
+            [PriceUpdateItem(listing_id=priced.listing_id, new_price=priced.price)],
+        ),
+        await merchant.stage_listing_update(
+            operator_session, priced.listing_id, {"title": priced.title + " (edited)"}
+        ),
+        await merchant.stage_promotion(
+            operator_session,
+            PromotionDraft(
+                name="Contract",
+                listing_ids=[promoted.listing_id],
+                discount_pct=5,
+                starts="2026-09-01",
+                ends="2026-09-07",
+            ),
+        ),
+        await merchant.stage_campaign(
+            operator_session,
+            CampaignDraft(
+                campaign_id=campaign.campaign_id,
+                name=campaign.name,
+                budget=10.0,
+            ),
+        ),
+    ]
+    with contextlib.suppress(ChangeNotApplicable):  # a vertical that does not pause listings
+        staged.append(
+            await merchant.stage_inventory_action(
+                operator_session,
+                [InventoryActionItem(listing_id=paused.listing_id, action="pause")],
+            )
+        )
+    for change in staged:
+        applied = await merchant.apply_change(operator_session, change.change_id)
+        assert applied.status is ChangeStatus.APPLIED, change.kind
+
+
+async def test_a_change_whose_values_moved_since_staging_is_refused(merchant, operator_session):
+    listing = next(listing for listing in merchant.all_listings() if not listing.has_options)
+    first, second = [
+        await merchant.stage_price_update(
+            operator_session,
+            [
+                PriceUpdateItem(
+                    listing_id=listing.listing_id, new_price=round(listing.price * pct, 2)
+                )
+            ],
+        )
+        for pct in (1.02, 1.04)
+    ]
+    await merchant.apply_change(operator_session, first.change_id)
+    with pytest.raises(ChangeNotApplicable, match=r"was .* when staged.*stage it again"):
+        await merchant.apply_change(operator_session, second.change_id)
+    assert merchant.ledger.get(second.change_id).status is ChangeStatus.STAGED
 
 
 # -- showcase fixtures ---------------------------------------------------------------

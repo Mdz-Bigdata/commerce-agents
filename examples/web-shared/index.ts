@@ -20,7 +20,7 @@ export { AssistantPanel } from "./portal/AssistantPanel";
 export { AssistantRail } from "./portal/AssistantRail";
 export * from "./portal/cards";
 export * from "./portal/home";
-export { type ChangeAction, type MerchantChat, useMerchantChat } from "./portal/merchant";
+export { type ChangeAction, type ChangeActionHandler, type ChangeActionResult, type MerchantChat, useMerchantChat } from "./portal/merchant";
 export { type PortalNavItem, PortalShell } from "./portal/Shell";
 export type * from "./protocol";
 export { QuotedAsData } from "./QuotedAsData";
