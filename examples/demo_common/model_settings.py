@@ -7,6 +7,7 @@
 ``PUT    /api/model-settings``        save provider, endpoint, model names, and optionally a key
 ``DELETE /api/model-settings``        drop the saved settings; the ``.env`` values apply again
 ``POST   /api/model-settings/test``   one short model call under the settings in force
+``POST   /api/model-settings/models`` the models a provider offers, for the panel's pickers
 
 A key goes in and never comes back out: reads say only whether one is set and its last
 four characters when the panel saved it. The settings live in ``model_provider``'s file
@@ -23,6 +24,7 @@ import os
 from typing import Any
 
 import anthropic
+import httpx
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
@@ -33,6 +35,7 @@ from .model_provider import (
     ModelProvider,
     ModelSettings,
     clear_settings,
+    env_value,
     provider_client,
     resolve_provider,
     save_settings,
@@ -53,6 +56,75 @@ class SettingsUpdate(BaseModel):
     base_url: str | None = Field(default=None, max_length=400)
     model: str | None = Field(default=None, max_length=120)
     fast_model: str | None = Field(default=None, max_length=120)
+
+
+class ModelListRequest(BaseModel):
+    """What the panel holds when it asks for a provider's models. A key left out falls back
+    to the one saved for that provider, then to the environment's."""
+
+    provider: str = Field(min_length=1, max_length=40)
+    api_key: str | None = Field(default=None, max_length=400)
+    base_url: str | None = Field(default=None, max_length=400)
+
+
+MAX_MODELS = 500
+ANTHROPIC_API = "https://api.anthropic.com"
+
+
+def listing_target(request: ModelListRequest) -> tuple[str, str, str | None]:
+    """``(provider name, endpoint, key)`` to list models from. Raises ``ValueError`` for an
+    unknown provider or one with no endpoint."""
+    name = request.provider.strip().lower()
+    saved = saved_settings()
+    key = (request.api_key or "").strip() or None
+    if key is None and saved is not None and saved.provider == name:
+        key = saved.api_key
+    in_env = (env_value("MODEL_PROVIDER") or "anthropic").lower() == name
+    base_url = (request.base_url or "").strip() or None
+    if name == "anthropic":
+        key = (
+            key
+            or (env_value("MODEL_API_KEY") if in_env else None)
+            or env_value("ANTHROPIC_API_KEY")
+        )
+        return name, (base_url or ANTHROPIC_API).rstrip("/"), key
+    preset = PRESETS.get(name)
+    if preset is None:
+        raise ValueError("Choose a provider from the list.")
+    key = (
+        key
+        or (env_value("MODEL_API_KEY") if in_env else None)
+        or (env_value(preset.key_env) if preset.key_env else None)
+    )
+    endpoint = base_url or preset.base_url
+    if not endpoint:
+        raise ValueError("This provider needs an endpoint.")
+    return name, endpoint.rstrip("/"), key
+
+
+async def fetch_models(
+    name: str, endpoint: str, key: str | None, transport: httpx.AsyncBaseTransport | None = None
+) -> list[str]:
+    """The model ids the provider's list endpoint returns, sorted: Anthropic's
+    ``/v1/models``, or ``/models`` under an OpenAI-compatible base URL. Raises
+    ``httpx.HTTPStatusError`` for a refusal and ``httpx.HTTPError`` when it cannot be reached."""
+    if name == "anthropic":
+        url = f"{endpoint}/v1/models?limit=1000"
+        headers = {"x-api-key": key or "", "anthropic-version": "2023-06-01"}
+    else:
+        url = f"{endpoint}/models"
+        headers = {"Authorization": f"Bearer {key}"} if key else {}
+    async with httpx.AsyncClient(timeout=15.0, transport=transport) as client:
+        response = await client.get(url, headers=headers)
+        response.raise_for_status()
+        body = response.json()
+    rows = (body.get("data") or body.get("models") or []) if isinstance(body, dict) else body
+    ids = {
+        str(row.get("id") or row.get("name") or row.get("model"))
+        for row in rows
+        if isinstance(row, dict) and (row.get("id") or row.get("name") or row.get("model"))
+    }
+    return sorted(ids)[:MAX_MODELS]
 
 
 def editable() -> bool:
@@ -166,6 +238,29 @@ def install_model_settings_routes(app: FastAPI) -> None:
             raise HTTPException(status_code=403, detail="Model settings are read-only here")
         clear_settings()
         return settings_payload()
+
+    @app.post(f"{PREFIX}/models")
+    async def list_models(request: ModelListRequest) -> dict:
+        """``ok`` with ``models``, or a ``code`` the panel words (``invalid``, ``no_key``,
+        ``auth``, ``status``, ``unreachable``)."""
+        try:
+            name, endpoint, key = listing_target(request)
+        except ValueError as error:
+            return {"ok": False, "code": "invalid", "error": str(error)}
+        label = "Anthropic" if name == "anthropic" else PRESETS[name].label
+        key_required = name == "anthropic" or PRESETS[name].key_required
+        if key_required and not key:
+            return {"ok": False, "code": "no_key", "label": label}
+        try:
+            models = await fetch_models(name, endpoint, key)
+        except httpx.HTTPStatusError as error:
+            status = error.response.status_code
+            code = "auth" if status in (401, 403) else "status"
+            return {"ok": False, "code": code, "label": label, "status": status}
+        except (httpx.HTTPError, ValueError):
+            logger.warning("listing models from %s failed", label, exc_info=True)
+            return {"ok": False, "code": "unreachable", "label": label}
+        return {"ok": True, "label": label, "models": models}
 
     @app.post(f"{PREFIX}/test")
     async def test_settings() -> dict:

@@ -122,7 +122,8 @@ class ModelProvider:
         return bool(self.api_key) or not self.key_required
 
 
-def _env(name: str) -> str | None:
+def env_value(name: str) -> str | None:
+    """An environment variable, stripped, or None when unset or blank."""
     return (os.environ.get(name) or "").strip() or None
 
 
@@ -205,7 +206,7 @@ def resolve_provider(settings: ModelSettings | None = None) -> ModelProvider:
     def value(variable: str) -> str | None:
         if settings is not None:
             return getattr(settings, _FIELDS[variable])
-        return _env(variable)
+        return env_value(variable)
 
     name = (value("MODEL_PROVIDER") or "anthropic").lower()
     if name == "anthropic":
@@ -232,7 +233,7 @@ def resolve_provider(settings: ModelSettings | None = None) -> ModelProvider:
     fast_model = value("MODEL_FAST_NAME") or (
         preset.fast_model if not value("MODEL_NAME") else model
     )
-    key = value("MODEL_API_KEY") or (_env(preset.key_env) if preset.key_env else None)
+    key = value("MODEL_API_KEY") or (env_value(preset.key_env) if preset.key_env else None)
     hint = f"MODEL_API_KEY (or {preset.key_env})" if preset.key_env else "MODEL_API_KEY"
     return ModelProvider(
         name=name,

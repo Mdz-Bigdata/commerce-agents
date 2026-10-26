@@ -10,9 +10,9 @@
  * set and, for a key saved here, its last four characters.
  */
 
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import type { AgentApi } from "./api";
-import { useT } from "./i18n";
+import { type Translate, useT } from "./i18n";
 import { Icon } from "./icons";
 import { Button, Sheet } from "./ui";
 
@@ -52,6 +52,17 @@ interface TestResult {
   error?: string;
 }
 
+interface ModelList {
+  ok: boolean;
+  code?: "invalid" | "no_key" | "auth" | "status" | "unreachable";
+  label?: string;
+  status?: number;
+  models?: string[];
+  error?: string;
+}
+
+type Listing = { state: "idle" | "loading" } | { state: "ok"; models: string[] } | { state: "error"; text: string; noKey?: boolean };
+
 const PATH = "/api/model-settings";
 
 async function call<T>(root: string, method: string, path = "", body?: unknown): Promise<{ data?: T; error?: string }> {
@@ -79,6 +90,54 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   );
 }
 
+/** Why a provider's models did not load, in the page's language. */
+function listingFailure(result: ModelList, t: Translate): string {
+  const vars = { label: result.label ?? "", status: String(result.status ?? "—") };
+  switch (result.code) {
+    case "no_key":
+      return t("Enter the API key to load {label}'s models.", vars);
+    case "auth":
+      return t("{label} rejected the API key.", vars);
+    case "status":
+      return t("{label} could not list its models ({status}); type the model name instead.", vars);
+    case "unreachable":
+      return t("Could not reach {label}; check the endpoint.", vars);
+    default:
+      return t(result.error ?? "");
+  }
+}
+
+/** A model name: picked from the provider's list once it has loaded, typed otherwise. */
+function ModelPicker({
+  value,
+  onChange,
+  models,
+  fallback,
+  disabled,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  models: string[] | null;
+  fallback: string;
+  disabled: boolean;
+}) {
+  const t = useT();
+  if (!models?.length) {
+    return <input value={value} onChange={(event) => onChange(event.target.value)} placeholder={fallback} disabled={disabled} className={INPUT} />;
+  }
+  return (
+    <select value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} className={INPUT}>
+      <option value="">{t("Provider default ({model})", { model: fallback })}</option>
+      {value && !models.includes(value) ? <option value={value}>{value}</option> : null}
+      {models.map((name) => (
+        <option key={name} value={name}>
+          {name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 const INPUT =
   "w-full rounded-[10px] border border-(--line-strong) bg-(--card) px-3 py-[7px] text-[14px] text-(--ink) outline-none placeholder:text-(--ink-faint) focus:border-(--accent) disabled:opacity-60";
 
@@ -93,6 +152,9 @@ function ModelSettingsSheet({ api, onClose }: { api: AgentApi; onClose: () => vo
   const [apiKey, setApiKey] = useState("");
   const [busy, setBusy] = useState<"save" | "test" | "reset" | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
+  const [listing, setListing] = useState<Listing>({ state: "idle" });
+  const [typing, setTyping] = useState(false); // type a model name instead of picking one
+  const listingRun = useRef(0);
 
   const adopt = useCallback((next: Settings) => {
     setSettings(next);
@@ -129,6 +191,30 @@ function ModelSettingsSheet({ api, onClose }: { api: AgentApi; onClose: () => vo
         return t(result.error ?? "");
     }
   };
+  // The provider's models, loaded as soon as there is a key to ask with: the one being typed,
+  // or the one saved here or in .env. A newer request makes an older answer moot.
+  const loadModels = useCallback(async () => {
+    const run = ++listingRun.current;
+    setListing({ state: "loading" });
+    const { data } = await call<ModelList>(api.root, "POST", "/models", {
+      provider,
+      api_key: apiKey.trim() || null,
+      base_url: baseUrl.trim() || null,
+    });
+    if (run !== listingRun.current) return;
+    if (data?.ok) setListing({ state: "ok", models: data.models ?? [] });
+    else setListing({ state: "error", text: data ? listingFailure(data, t) : t("The API is not reachable."), noKey: data?.code === "no_key" });
+  }, [api.root, provider, apiKey, baseUrl, t]);
+
+  useEffect(() => {
+    if (!settings?.editable) return;
+    const key = apiKey.trim();
+    if (key && key.length < 8) return; // still typing
+    const timer = window.setTimeout(loadModels, key ? 600 : 0);
+    return () => window.clearTimeout(timer);
+  }, [settings?.editable, apiKey, loadModels]);
+
+  const models = listing.state === "ok" && !typing ? listing.models : null;
   const errorText = (error?: string) => (error === "unreachable" ? t("The API is not reachable.") : t(error ?? ""));
 
   const save = async () => {
@@ -253,7 +339,18 @@ function ModelSettingsSheet({ api, onClose }: { api: AgentApi; onClose: () => vo
             <p className="text-[13px] text-(--ink-soft)">{t("This API's model is set by its environment (DEMO_MODEL_SETTINGS=0).")}</p>
           ) : null}
           <Field label={t("Provider")}>
-            <select value={provider} onChange={(event) => setProvider(event.target.value)} disabled={!editable} className={INPUT}>
+            <select
+              value={provider}
+              onChange={(event) => {
+                // A key typed for one provider is never sent to another.
+                setProvider(event.target.value);
+                setApiKey("");
+                setModel("");
+                setFastModel("");
+              }}
+              disabled={!editable}
+              className={INPUT}
+            >
               {settings.presets.map((p) => (
                 <option key={p.name} value={p.name}>
                   {p.label}
@@ -294,22 +391,41 @@ function ModelSettingsSheet({ api, onClose }: { api: AgentApi; onClose: () => vo
               className={INPUT}
             />
           </Field>
-          <Field label={t("Model")} hint={t("Leave empty for the provider's default.")}>
-            <input
-              value={model}
-              onChange={(event) => setModel(event.target.value)}
-              placeholder={preset?.model ?? t("default model")}
-              disabled={!editable}
-              className={INPUT}
-            />
+          <Field label={t("Model")}>
+            <ModelPicker value={model} onChange={setModel} models={models} fallback={preset?.model ?? t("default model")} disabled={!editable} />
           </Field>
+          {editable ? (
+            <div className="-mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] leading-snug text-(--ink-soft)">
+              <span className={listing.state === "error" && !listing.noKey ? "text-(--danger)" : ""}>
+                {listing.state === "loading"
+                  ? t("Loading the provider's models…")
+                  : listing.state === "ok"
+                    ? listing.models.length
+                      ? t("{n} models loaded; pick one, or leave the default.", { n: listing.models.length })
+                      : t("The provider listed no models; type the model name.")
+                    : listing.state === "error"
+                      ? listing.text
+                      : t("Leave empty for the provider's default.")}
+              </span>
+              {listing.state === "ok" && listing.models.length ? (
+                <button type="button" onClick={() => setTyping(!typing)} className="font-medium underline-offset-2 hover:text-(--ink) hover:underline">
+                  {typing ? t("Pick from the list") : t("Type a name")}
+                </button>
+              ) : null}
+              {listing.state !== "loading" && !(listing.state === "error" && listing.noKey) ? (
+                <button type="button" onClick={loadModels} className="font-medium underline-offset-2 hover:text-(--ink) hover:underline">
+                  {t("Reload list")}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
           <Field label={t("Memory model")} hint={t("Extracts saved facts after each reply; a smaller model is enough.")}>
-            <input
+            <ModelPicker
               value={fastModel}
-              onChange={(event) => setFastModel(event.target.value)}
-              placeholder={preset?.fast_model ?? (model || t("default model"))}
+              onChange={setFastModel}
+              models={models}
+              fallback={preset?.fast_model ?? (model || preset?.model || t("default model"))}
               disabled={!editable}
-              className={INPUT}
             />
           </Field>
         </>

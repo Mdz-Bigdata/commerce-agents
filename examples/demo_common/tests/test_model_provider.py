@@ -172,3 +172,87 @@ def test_the_settings_routes_take_a_key_and_never_return_it(settings_api, monkey
     monkeypatch.setenv("DEMO_MODEL_SETTINGS", "0")
     assert settings_api.put("/api/model-settings", json={"provider": "ollama"}).status_code == 403
     assert not settings_api.get("/api/model-settings").json()["editable"]
+
+
+async def test_models_come_from_the_providers_list_endpoint():
+    import httpx
+
+    from demo_common.model_settings import fetch_models
+
+    seen = []
+
+    def reply(request: httpx.Request) -> httpx.Response:
+        seen.append((str(request.url), dict(request.headers)))
+        if request.url.host == "api.anthropic.com":
+            return httpx.Response(200, json={"data": [{"id": "model-b"}, {"id": "model-a"}]})
+        return httpx.Response(
+            200, json={"data": [{"id": "chat"}, {"id": "reasoner"}, {"id": "chat"}]}
+        )
+
+    transport = httpx.MockTransport(reply)
+    assert await fetch_models("deepseek", "https://api.example.test/v1", "k1", transport) == [
+        "chat",
+        "reasoner",
+    ]
+    assert seen[0][0] == "https://api.example.test/v1/models"
+    assert seen[0][1]["authorization"] == "Bearer k1"
+    assert await fetch_models("anthropic", "https://api.anthropic.com", "k2", transport) == [
+        "model-a",
+        "model-b",
+    ]
+    assert seen[1][1]["x-api-key"] == "k2"
+
+
+def test_the_models_route_uses_the_typed_key_then_the_saved_or_env_one(settings_api, monkeypatch):
+    import demo_common.model_settings as routes
+
+    calls = []
+
+    async def fake_fetch(name, endpoint, key, transport=None):
+        calls.append((name, endpoint, key))
+        return ["m-1", "m-2"]
+
+    monkeypatch.setattr(routes, "fetch_models", fake_fetch)
+    typed = settings_api.post(
+        "/api/model-settings/models", json={"provider": "deepseek", "api_key": "typed"}
+    )
+    assert typed.json() == {"ok": True, "label": "DeepSeek", "models": ["m-1", "m-2"]}
+    assert calls[-1] == ("deepseek", "https://api.deepseek.com/v1", "typed")
+    missing = settings_api.post("/api/model-settings/models", json={"provider": "deepseek"}).json()
+    assert missing == {"ok": False, "code": "no_key", "label": "DeepSeek"}
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "from-env")
+    settings_api.post("/api/model-settings/models", json={"provider": "deepseek"})
+    assert calls[-1][2] == "from-env"
+    local = settings_api.post(
+        "/api/model-settings/models",
+        json={"provider": "ollama", "base_url": "http://localhost:9/v1/"},
+    )
+    assert local.json()["ok"] and calls[-1] == ("ollama", "http://localhost:9/v1", None)
+    assert (
+        settings_api.post("/api/model-settings/models", json={"provider": "nope"}).json()["code"]
+        == "invalid"
+    )
+
+
+def test_a_refused_or_unreachable_listing_comes_back_as_a_code(settings_api, monkeypatch):
+    import httpx
+
+    import demo_common.model_settings as routes
+
+    async def refused(name, endpoint, key, transport=None):
+        request = httpx.Request("GET", endpoint)
+        raise httpx.HTTPStatusError(
+            "no", request=request, response=httpx.Response(401, request=request)
+        )
+
+    monkeypatch.setattr(routes, "fetch_models", refused)
+    body = {"provider": "openai", "api_key": "k"}
+    assert settings_api.post("/api/model-settings/models", json=body).json()["code"] == "auth"
+
+    async def down(name, endpoint, key, transport=None):
+        raise httpx.ConnectError("refused")
+
+    monkeypatch.setattr(routes, "fetch_models", down)
+    assert (
+        settings_api.post("/api/model-settings/models", json=body).json()["code"] == "unreachable"
+    )
