@@ -16,7 +16,7 @@ your portal  ──user.message──►  hosted agent (agent.yaml: model, syste
 
 | Path | Contents |
 |---|---|
-| `merchant-agent/agent.yaml` | The manifest: 5 skills, 18 merchant tools, 4 presentation tools |
+| `merchant-agent/agent.yaml` | The manifest: 5 skills, 19 merchant tools, 4 presentation tools |
 | `merchant-agent/system.md` | The system prompt, derived from `merchant_agent.prompt.build_static_system`; its header lists what differs |
 | [`merchant-mcp-server/`](merchant-mcp-server/) | The reference MCP server over a `MerchantBackend`; the part you replace |
 | [`scheduled-digest/`](scheduled-digest/) | A headless digest run on the Messages API runtime, for a job scheduler |
@@ -80,7 +80,7 @@ this path's approval surface: the server's `default_config` sets `require_host_a
 and a config you pass to `build_server` has to set it too, or every apply is held. The
 provenance and guardrail checks run on every stage and apply either way.
 
-- **Merchant tools** (from the `merchant` MCP server): `get_business_snapshot`, `query_metrics`, `get_campaign_performance`, `search_listings`, `get_listing`, `get_inventory_alerts`, `get_order_issues`, `get_pricing_context`, `get_pending_changes`, `recall_memories`, `stage_listing_update`, `stage_price_update`, `stage_inventory_action`, `stage_promotion`, `stage_campaign`, `discard_change`, `save_memory`, `apply_change`.
+- **Merchant tools** (from the `merchant` MCP server): `get_business_snapshot`, `query_metrics`, `get_campaign_performance`, `search_listings`, `get_listing`, `get_inventory_alerts`, `get_order_issues`, `get_return_reasons`, `get_pricing_context`, `get_pending_changes`, `recall_memories`, `stage_listing_update`, `stage_price_update`, `stage_inventory_action`, `stage_promotion`, `stage_campaign`, `discard_change`, `save_memory`, `apply_change`.
 - **Presentation tools** (custom tools your portal executes): `present_metrics`, `present_digest`, `present_change_preview`, `present_suggestions`.
 
 Of the built-in agent tools only `read` is enabled; the platform loads skill bodies with it.

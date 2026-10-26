@@ -8,7 +8,7 @@ paths each, four vertical examples, and a Claude Code plugin.
 
 - `commerce-common/commerce_common/`: what both roles share; its `__init__` lists the modules.
 - `shopping-agent/core/shopping_agent/`: types, `StorefrontBackend`, config, prompt, `tools/`, gates, enrichment, executor.
-- `merchant-agent/core/merchant_agent/`: the merchant equivalents, plus `changes.py` and `analysis.py`.
+- `merchant-agent/core/merchant_agent/`: the merchant equivalents, plus `changes.py`, `analysis.py`, and `returns.py`.
 - `*/skills/`: five flows per role, one `SKILL.md` each.
 - `*/runtime-messages-api/`: `ShoppingAgent`, `MerchantAgent`, the merchant analysis delegate.
 - `*/runtime-agent-sdk/`: each agent as `ClaudeAgentOptions`, with a console.

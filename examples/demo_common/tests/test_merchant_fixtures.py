@@ -11,9 +11,11 @@ from demo_common.merchant_fixtures import (
     is_browse,
     load_campaigns,
     load_issues,
+    load_returns,
     metric_window,
     named_ids,
     rebase_daily,
+    returns_in_period,
     snapshot_of,
     stage_campaign,
     staged_promotion_windows,
@@ -27,7 +29,9 @@ from merchant_agent import (
     Listing,
     ListingFilters,
     MerchantAgentConfig,
+    ReturnRecord,
 )
+from shopping_agent import ProductDetails
 
 ROWS = [
     {
@@ -229,3 +233,80 @@ def test_campaign_staging_and_promotion_windows():
             "listing_ids": ["C-1"],
         }
     ]
+
+
+# -- returns ------------------------------------------------------------------------------
+
+
+def returned(n: int, listing_id: str, day: date, variant_of: str | None = None) -> ReturnRecord:
+    return ReturnRecord(
+        return_id=f"R-{n}",
+        listing_id=listing_id,
+        variant_of=variant_of,
+        returned_on=day,
+        reason="defective",
+    )
+
+
+END = date(2026, 6, 25)
+RETURNS = [
+    returned(1, "L-1", END),
+    returned(2, "L-1", END - timedelta(days=6)),
+    returned(3, "L-1", END - timedelta(days=7)),
+    returned(4, "L-2-s", END - timedelta(days=29), variant_of="L-2"),
+    returned(5, "L-2-l", END - timedelta(days=30), variant_of="L-2"),
+    returned(6, "L-3", END - timedelta(days=89)),
+    returned(7, "L-3", END + timedelta(days=1)),
+]
+
+
+@pytest.mark.parametrize(
+    ("period", "label", "ids"),
+    [
+        (None, "2026-05-27/2026-06-25", {"R-1", "R-2", "R-3", "R-4"}),
+        ("last_7_days", "2026-06-19/2026-06-25", {"R-1", "R-2"}),
+        ("last_90_days", "2026-03-28/2026-06-25", {"R-1", "R-2", "R-3", "R-4", "R-5", "R-6"}),
+        ("2026-05-26/2026-06-18", "2026-05-26/2026-06-18", {"R-3", "R-4", "R-5"}),
+        ("not a period", "2026-05-27/2026-06-25", {"R-1", "R-2", "R-3", "R-4"}),
+    ],
+)
+def test_the_returns_window_matches_the_metrics_windows_names(period, label, ids):
+    log = returns_in_period(RETURNS, period, END, None)
+    assert log.period == label
+    assert {record.return_id for record in log.records} == ids
+
+
+def test_a_listing_id_narrows_to_the_listing_or_its_family():
+    family = returns_in_period(RETURNS, "last_90_days", END, "L-2")
+    assert {record.return_id for record in family.records} == {"R-4", "R-5"}
+    variant = returns_in_period(RETURNS, "last_90_days", END, "L-2-s")
+    assert [record.return_id for record in variant.records] == ["R-4"]
+
+
+def test_returns_shift_with_the_issues_and_take_the_catalogs_names(tmp_path):
+    anchor = date.today() - timedelta(weeks=3)
+    (tmp_path / "merchant_returns.json").write_text(
+        json.dumps(
+            {
+                "dates_anchored_to": anchor.isoformat(),
+                "returns": [
+                    {
+                        "return_id": "R-1",
+                        "listing_id": "L-2-s",
+                        "returned_on": (anchor - timedelta(days=2)).isoformat(),
+                        "reason": "runs_small",
+                    }
+                ],
+            }
+        )
+    )
+    catalog = {
+        "L-2-s": ProductDetails(product_id="L-2-s", title="Shell, S", price=10.0, variant_of="L-2")
+    }
+    (loaded,) = load_returns(tmp_path, catalog.get)
+    assert loaded.returned_on == date.today() - timedelta(days=2)
+    assert (loaded.title, loaded.variant_of) == ("Shell, S", "L-2")
+
+    catalog.clear()
+    with pytest.raises(ValueError, match="unknown listing L-2-s"):
+        load_returns(tmp_path, catalog.get)

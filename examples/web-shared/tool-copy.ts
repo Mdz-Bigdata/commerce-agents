@@ -27,6 +27,7 @@ const TOOL_COPY: Record<string, string> = {
   get_listing: "Reading the listing…",
   get_inventory_alerts: "Checking inventory alerts…",
   get_order_issues: "Checking order issues…",
+  get_return_reasons: "Checking return reasons…",
   get_pricing_context: "Reading the pricing context…",
   get_campaign_performance: "Reading campaign performance…",
   get_pending_changes: "Checking pending changes…",

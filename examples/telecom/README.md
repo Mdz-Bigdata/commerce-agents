@@ -78,7 +78,9 @@ Single prompts, each in a fresh session:
 `data/catalog.json`, `users.json`, `orders.json`, `policies.json`, and `memory-seed.json`
 feed the storefront; `merchant_metrics.json` (daily base motion), `merchant_subscribers.json`
 (weekly series per plan, rate card, cohorts), `merchant_inventory.json` (device stock),
-`merchant_campaigns.json`, and `merchant_messages.json` feed the portal.
+`merchant_campaigns.json`, and `merchant_messages.json` feed the portal;
+`merchant_returns.json` (device returns and cancelled lines, each with a reason code and the
+customer's note) feeds `get_return_reasons`.
 
 Sessions and identity are the shared host code in [`../demo_common/`](../demo_common/): a
 session id stands for a demo profile or the one merchant.

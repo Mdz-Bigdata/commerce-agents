@@ -518,6 +518,28 @@ async def test_campaigns_and_issues_land_in_the_same_week_as_the_snapshot(
         assert 0 <= (period_end - issue.opened_at.date()).days < 7, issue.issue_id
 
 
+async def test_returns_cover_the_snapshots_window_and_name_catalog_listings(
+    merchant, operator_session
+):
+    from merchant_agent.returns import summarize_returns
+
+    monthly = await merchant.get_business_snapshot(operator_session, "last_30_days")
+    log = await merchant.get_returns(operator_session, "last_30_days")
+    assert log.period == monthly.period
+    start, end = (date.fromisoformat(day) for day in log.period.split("/"))
+    assert log.records
+    for record in log.records:
+        assert start <= record.returned_on <= end, record.return_id
+        assert record.title, record.return_id
+    summary = summarize_returns(log)
+    assert any(row.by_reason[0].stage != "none" for row in summary.listings)
+    top = summary.listings[0]
+    narrowed = await merchant.get_returns(operator_session, "last_30_days", top.listing_id)
+    assert len(narrowed.records) == top.returns
+    quarter = await merchant.get_returns(operator_session, "last_90_days")
+    assert len(quarter.records) > len(log.records)
+
+
 async def test_listing_ids_resolve_case_insensitively_and_browse_queries_return_the_universe(
     merchant, operator_session
 ):

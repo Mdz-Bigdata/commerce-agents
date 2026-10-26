@@ -19,10 +19,12 @@ from demo_common.merchant_fixtures import (
     is_browse,
     load_campaigns,
     load_issues,
+    load_returns,
     margin_pct,
     metric_window,
     named_ids,
     rebase_daily,
+    returns_in_period,
     snapshot_of,
     stage_campaign,
     staged_promotion_windows,
@@ -51,6 +53,7 @@ from merchant_agent import (
     PriceUpdateItem,
     PricingContext,
     PromotionDraft,
+    ReturnLog,
     StagedChange,
 )
 from shopping_agent import SearchFilters, ShoppingSessionContext
@@ -107,6 +110,7 @@ class MockTravelMerchant(MerchantBackend):
         self._today: dict[str, Any] = occupancy.get("today", {})
         self._campaigns = load_campaigns(data_dir)
         self._issues = load_issues(data_dir)
+        self._returns = load_returns(data_dir, storefront.product)
         # Status and content state per listing, created on first touch.
         self._listing_state: dict[str, dict[str, Any]] = {}
         # Applied promotions, as rate overrides keyed by listing; pending promotions'
@@ -513,6 +517,16 @@ class MockTravelMerchant(MerchantBackend):
     async def get_order_issues(self, session: MerchantSessionContext) -> list[OrderIssue]:
         del session
         return list(self._issues)
+
+    async def get_returns(
+        self,
+        session: MerchantSessionContext,
+        period: str | None = None,
+        listing_id: str | None = None,
+    ) -> ReturnLog:
+        del session
+        end = date.fromisoformat(self._daily[-1]["date"])
+        return returns_in_period(self._returns, period, end, listing_id)
 
     # ------------------------------------------------------------------
     # Pricing

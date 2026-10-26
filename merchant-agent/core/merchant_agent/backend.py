@@ -13,6 +13,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
 
+from .changes import ChangeNotApplicable
 from .types import (
     ActorKind,
     AnalysisTable,
@@ -30,6 +31,7 @@ from .types import (
     PriceUpdateItem,
     PricingContext,
     PromotionDraft,
+    ReturnLog,
     StagedChange,
 )
 
@@ -119,6 +121,22 @@ class MerchantBackend(ABC):
         """Open order exceptions. A platform with no issue object derives them from its
         orders and returns only the kinds it can compute; an empty list means nothing is
         open."""
+
+    async def get_returns(
+        self,
+        session: MerchantSessionContext,
+        period: str | None = None,
+        listing_id: str | None = None,
+    ) -> ReturnLog:
+        """The returns in ``period`` (the last 30 days when None, ending where
+        ``query_metrics`` series end), each with a ``ReturnReason`` code and the buyer's
+        note when there is one; a cancelled booking or line and a refunded or transferred
+        ticket count as returns. ``listing_id`` narrows to one listing, a family's
+        including its variants. Record what the platform holds; the executor computes
+        the counts (``returns.summarize_returns``). The default raises
+        :class:`~merchant_agent.changes.ChangeNotApplicable`: returns are not wired."""
+        del session, period, listing_id
+        raise ChangeNotApplicable("Return reasons are not available to this portal.")
 
     # -- Pricing ------------------------------------------------------------------
 

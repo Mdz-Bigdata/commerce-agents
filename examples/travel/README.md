@@ -78,7 +78,9 @@ Single prompts, each in a fresh session:
 `data/catalog.json`, `users.json`, `orders.json`, `policies.json`, and `memory-seed.json`
 feed the storefront; `merchant_metrics.json`, `merchant_campaigns.json`, and
 `merchant_messages.json` feed the portal; `merchant_occupancy.json` feeds both: the
-portal's calendar and the storefront's remaining-rooms count. The catalog has no photos.
+portal's calendar and the storefront's remaining-rooms count. `merchant_returns.json`
+(cancelled bookings with a reason code and the traveller's note) feeds `get_return_reasons`.
+The catalog has no photos.
 
 Sessions and identity are the shared host code in [`../demo_common/`](../demo_common/): a
 session id stands for a demo profile or the one merchant.

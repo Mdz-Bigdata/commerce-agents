@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """Helpers the mock merchant backends share: fixture loading, the daily-metrics window
-arithmetic, listing lookup and filtering, campaign staging, and the promotion-window
-bookkeeping the portals chart. Vertical arithmetic (what a restock or a promotion means
+arithmetic, the returns window, listing lookup and filtering, campaign staging, and the
+promotion-window bookkeeping the portals chart. Vertical arithmetic (what a restock or a promotion means
 for stock, rooms, lines, or seats) stays in each mock."""
 
 from __future__ import annotations
@@ -30,6 +30,8 @@ from merchant_agent import (
     MerchantAgentConfig,
     OrderIssue,
     PricingContext,
+    ReturnLog,
+    ReturnRecord,
     StagedChange,
 )
 from shopping_agent import ProductDetails
@@ -71,6 +73,60 @@ def load_issues(data_dir: Path) -> list[OrderIssue]:
             issue = issue.model_copy(update={"opened_at": issue.opened_at + delta})
         issues.append(issue)
     return issues
+
+
+def load_returns(
+    data_dir: Path, lookup: Callable[[str], ProductDetails | None]
+) -> list[ReturnRecord]:
+    """``merchant_returns.json`` as records, dates shifted like the issues', each named
+    with its listing's title and, for a variant, its family. An id the catalog does not
+    resolve fails at boot."""
+    raw = load_json(data_dir, "merchant_returns.json")
+    delta = anchored_shift(raw)
+    records = []
+    for row in raw["returns"]:
+        product = lookup(row["listing_id"])
+        if product is None:
+            raise ValueError(f"merchant_returns.json: unknown listing {row['listing_id']}")
+        record = ReturnRecord.model_validate(
+            row | {"title": product.title, "variant_of": product.variant_of}
+        )
+        records.append(record.model_copy(update={"returned_on": record.returned_on + delta}))
+    return records
+
+
+def returns_in_period(
+    records: Iterable[ReturnRecord], period: str | None, end: date, listing_id: str | None
+) -> ReturnLog:
+    """The returns in a period ending on ``end``, the last metrics date, so a window here
+    is the window ``metric_window`` reports for the same name: 30 days unless the period
+    names 7 or 90 days or an ISO date range. A listing id narrows to that listing or
+    family."""
+    days = 30
+    start = None
+    cleaned = (period or "").strip().lower()
+    if cleaned in {"last_7_days", "last 7 days", "7d", "this week"}:
+        days = 7
+    elif cleaned in {"last_90_days", "last 90 days", "90d", "quarter"}:
+        days = 90
+    elif "/" in cleaned:
+        try:
+            start_text, end_text = cleaned.split("/", 1)
+            start, end = (
+                date.fromisoformat(start_text.strip()),
+                date.fromisoformat(end_text.strip()),
+            )
+        except ValueError:
+            start = None
+    if start is None or start > end:
+        start = end - timedelta(days=days - 1)
+    kept = [
+        record
+        for record in records
+        if start <= record.returned_on <= end
+        and (listing_id is None or listing_id in {record.listing_id, record.variant_of})
+    ]
+    return ReturnLog(period=f"{start.isoformat()}/{end.isoformat()}", records=kept)
 
 
 def _rebase(rows: DailyRows, key: str) -> DailyRows:

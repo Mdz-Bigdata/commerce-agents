@@ -184,6 +184,14 @@ def build_server(
     async def get_order_issues(ctx: Context) -> str:
         return await executors.call(ctx, "get_order_issues", {})
 
+    @register("get_return_reasons")
+    async def get_return_reasons(
+        ctx: Context, period: str | None = None, listing_id: str | None = None
+    ) -> str:
+        return await executors.call(
+            ctx, "get_return_reasons", {"period": period, "listing_id": listing_id}
+        )
+
     @register("get_pricing_context")
     async def get_pricing_context(listing_id: str, ctx: Context) -> str:
         return await executors.call(ctx, "get_pricing_context", {"listing_id": listing_id})

@@ -77,7 +77,9 @@ Single prompts, each in a fresh session:
 `venues.json`, `tickets.json` (the wallet), `orders.json`, `policies.json`, `users.json`,
 and `memory-seed.json` feed the storefront; `merchant_metrics.json`,
 `merchant_pacing.json` (allocations, history, baselines), `merchant_campaigns.json`, and
-`merchant_messages.json` feed the portal, whose holds view also reads `venues.json`. The
+`merchant_messages.json` feed the portal, whose holds view also reads `venues.json`;
+`merchant_returns.json` (refunded and transferred tickets, each with a reason code and the
+fan's note) feeds `get_return_reasons`. The
 shows are dated as of `dates_anchored_to` in `catalog.json` and move forward by whole weeks
 at boot, with the pacing book and the order lines that name them, so they stay ahead of the
 clock (`shift_event_dates` in `api/mock_ticketing.py`).

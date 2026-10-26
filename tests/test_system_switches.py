@@ -36,7 +36,12 @@ SHOPPING_SWITCHES = {
 }
 MERCHANT_SWITCHES = {
     "enable_listing_edits": {"stage_listing_update"},
-    "enable_inventory": {"get_inventory_alerts", "get_order_issues", "stage_inventory_action"},
+    "enable_inventory": {
+        "get_inventory_alerts",
+        "get_order_issues",
+        "get_return_reasons",
+        "stage_inventory_action",
+    },
     "enable_pricing": {"get_pricing_context", "stage_price_update", "stage_promotion"},
     "enable_campaigns": {"get_campaign_performance", "stage_campaign"},
 }

@@ -9,7 +9,7 @@ models in their MerchantBackend implementation.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 from typing import Any, Literal
 
@@ -259,6 +259,102 @@ class OrderIssue(BaseModel):
     listing_id: str | None = None
     buyer_message_excerpt: str | None = None
     opened_at: datetime | None = None
+
+
+# ---------------------------------------------------------------------------
+# Returns
+# ---------------------------------------------------------------------------
+
+
+class ReturnReason(StrEnum):
+    """Why a buyer sent an item back or gave up what they bought: a return, a cancelled
+    booking or line, a refunded or transferred ticket. One set for every operation; the
+    stage each code points at is ``returns.REASON_STAGES``."""
+
+    RUNS_SMALL = "runs_small"
+    RUNS_LARGE = "runs_large"
+    NOT_AS_DESCRIBED = "not_as_described"
+    UNEXPECTED_CHARGE = "unexpected_charge"
+    DEFECTIVE = "defective"
+    SCHEDULE_CHANGED = "schedule_changed"
+    COVERAGE_ISSUE = "coverage_issue"
+    MISSING_PART = "missing_part"
+    DAMAGED_IN_TRANSIT = "damaged_in_transit"
+    ARRIVED_LATE = "arrived_late"
+    ACCESS_ISSUE = "access_issue"
+    CHANGED_MIND = "changed_mind"
+    BOOKING_CANCELLED = "booking_cancelled"
+    TICKET_TRANSFERRED = "ticket_transferred"
+    OTHER = "other"
+
+
+ReturnStage = Literal["listing", "product", "fulfilment", "support", "none", "unknown"]
+
+
+class ReturnRecord(BaseModel):
+    """One return with its reason code. ``listing_id`` is a plain listing's id or a
+    variant's, with the family's id in ``variant_of``. ``note`` is customer-authored."""
+
+    return_id: str
+    listing_id: str
+    title: str | None = None
+    variant_of: str | None = None
+    order_id: str | None = None
+    returned_on: date
+    reason: ReturnReason
+    note: str | None = None
+
+
+class ReturnLog(BaseModel):
+    """The returns ``MerchantBackend.get_returns`` found in one window, labeled the way
+    the snapshot labels its period. ``note`` says in a clause what limits the log."""
+
+    period: str
+    records: list[ReturnRecord] = Field(default_factory=list)
+    note: str | None = Field(default=None, max_length=140)
+
+
+class ReasonCount(BaseModel):
+    reason: ReturnReason
+    count: int
+    share_pct: float
+    stage: ReturnStage
+
+
+class ReturnNote(BaseModel):
+    """A buyer's note on one return, clipped; customer-authored text."""
+
+    reason: ReturnReason
+    returned_on: date
+    text: str
+
+
+class ListingReturns(BaseModel):
+    """One listing's returns in the window. A family's row counts its variants' returns,
+    with the per-variant counts in ``variants`` (None for a plain listing)."""
+
+    listing_id: str
+    title: str | None = None
+    returns: int
+    share_of_returns_pct: float
+    by_reason: list[ReasonCount]
+    variants: dict[str, int] | None = None
+    first_returned_on: date
+    last_returned_on: date
+    sample_notes: list[ReturnNote] = Field(default_factory=list)
+
+
+class ReturnsSummary(BaseModel):
+    """What get_return_reasons returns, computed by ``returns.summarize_returns`` from a
+    :class:`ReturnLog`: totals and reason counts for the window, then the listings with
+    the most returns. ``listings_with_returns`` counts every listing, shown or not."""
+
+    period: str
+    total_returns: int
+    by_reason: list[ReasonCount] = Field(default_factory=list)
+    listings: list[ListingReturns] = Field(default_factory=list)
+    listings_with_returns: int = 0
+    note: str | None = None
 
 
 # ---------------------------------------------------------------------------

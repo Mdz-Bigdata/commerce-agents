@@ -60,7 +60,7 @@ Merchant flows:
 
 | Flow | Read and write tools | Presentation tools |
 |---|---|---|
-| `performance-insights` | `get_business_snapshot`, `query_metrics`, `get_campaign_performance`; `run_analysis` when `enable_analysis` is set | `present_metrics` |
+| `performance-insights` | `get_business_snapshot`, `query_metrics`, `get_campaign_performance`, `get_return_reasons`; `run_analysis` when `enable_analysis` is set | `present_metrics` |
 | `catalog-listings` | `search_listings`, `get_listing`, `stage_listing_update` | `present_change_preview` |
 | `inventory-operations` | `get_inventory_alerts`, `get_order_issues`, `get_pending_changes`, `stage_inventory_action` | `present_digest`, `present_change_preview` |
 | `pricing-promotions` | `get_pricing_context`, `stage_price_update`, `stage_promotion` | `present_change_preview`, `present_metrics` |

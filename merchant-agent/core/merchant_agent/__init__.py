@@ -37,6 +37,10 @@ from .types import (
     PriceUpdateItem,
     PricingContext,
     PromotionDraft,
+    ReturnLog,
+    ReturnReason,
+    ReturnRecord,
+    ReturnsSummary,
     StagedChange,
 )
 
@@ -71,6 +75,10 @@ __all__ = [
     "PriceUpdateItem",
     "PricingContext",
     "PromotionDraft",
+    "ReturnLog",
+    "ReturnReason",
+    "ReturnRecord",
+    "ReturnsSummary",
     "StagedChange",
     "check_analysis_sql",
 ]

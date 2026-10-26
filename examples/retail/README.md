@@ -72,7 +72,8 @@ Single prompts, each in a fresh session:
 
 `data/catalog.json`, `users.json`, `orders.json`, `policies.json`, and `memory-seed.json` feed
 the storefront; `merchant_metrics.json`, `merchant_inventory.json`, `merchant_campaigns.json`,
-and `merchant_messages.json` feed the portal. Four products come with options (a mattress by
+and `merchant_messages.json` feed the portal; `merchant_returns.json` (returns with a reason
+code and the buyer's note) feeds `get_return_reasons`. Four products come with options (a mattress by
 size, a pillowcase set by size and color, a tinted moisturizer by shade, a weighted blanket by
 weight): the catalog authors their variants compactly and `demo_common` derives the rest, as
 [`docs/backends.md`](../../docs/backends.md) describes.

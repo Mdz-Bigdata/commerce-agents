@@ -483,6 +483,37 @@ MERCHANT_FIXTURES = (
 )
 
 
+def return_problems(raw: dict[str, Any], catalog_ids: set[str]) -> list[str]:
+    """``merchant_returns.json``: each row names a catalog id and a known reason code,
+    return ids are unique, and no return is dated after the day the file was written for."""
+    from datetime import date
+
+    from merchant_agent import ReturnReason, ReturnRecord
+
+    found: list[str] = []
+    reasons = {reason.value for reason in ReturnReason}
+    anchor = date.fromisoformat(raw["dates_anchored_to"])
+    seen: set[str] = set()
+    for row in raw["returns"]:
+        return_id = row.get("return_id", "?")
+        if return_id in seen:
+            found.append(f"duplicate return id {return_id}")
+        seen.add(return_id)
+        if row.get("listing_id") not in catalog_ids:
+            found.append(f"{return_id}: unknown listing {row.get('listing_id')}")
+        if row.get("reason") not in reasons:
+            found.append(f"{return_id}: unknown reason {row.get('reason')!r}")
+            continue
+        try:
+            record = ReturnRecord.model_validate(row)
+        except ValueError as error:
+            found.append(f"{return_id}: {error}")
+            continue
+        if record.returned_on > anchor:
+            found.append(f"{return_id}: dated after dates_anchored_to")
+    return found
+
+
 def check_merchant_fixtures() -> None:
     from merchant_agent import Campaign, OrderIssue
 
@@ -509,8 +540,12 @@ def check_merchant_fixtures() -> None:
                     problem(
                         f"{spec.vertical} merchant_messages.json: unknown listing {issue.listing_id}"
                     )
+            returns = load_json(data / "merchant_returns.json")
+            for found in return_problems(returns, catalog_ids):
+                problem(f"{spec.vertical} merchant_returns.json: {found}")
             ok(
-                f"{len(daily)} metric days, {extra}, {len(campaigns)} campaigns, {len(issues)} issues validate"
+                f"{len(daily)} metric days, {extra}, {len(campaigns)} campaigns, {len(issues)} issues, "
+                f"{len(returns['returns'])} returns validate"
             )
         except Exception as error:
             problem(f"{spec.vertical} {spec.label} fixtures: {error}")

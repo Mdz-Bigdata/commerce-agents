@@ -45,6 +45,7 @@ from .gates import (
     take_discard_actor_kind,
 )
 from .memory import MERCHANT_MEMORY_EXTRACTION_PROMPT
+from .returns import summarize_returns
 from .serialization import (
     alert_record,
     listing_details_payload,
@@ -151,6 +152,7 @@ class MerchantToolExecutor(BaseToolExecutor):
             "get_listing": self._get_listing,
             "get_inventory_alerts": self._get_inventory_alerts,
             "get_order_issues": self._get_order_issues,
+            "get_return_reasons": self._get_return_reasons,
             "get_pricing_context": self._get_pricing_context,
             "get_pending_changes": self._get_pending_changes,
             "stage_listing_update": self._stage_listing_update,
@@ -217,6 +219,18 @@ class MerchantToolExecutor(BaseToolExecutor):
         issues = await self._backend.get_order_issues(self._session)
         payload = [_record(issue) for issue in issues]
         return self._fenced(payload or {"note": "No open order issues."})
+
+    async def _get_return_reasons(self, tool_input: dict[str, Any]) -> ToolOutcome:
+        log = await self._backend.get_returns(
+            self._session,
+            self._sanitize(tool_input.get("period"), 60) or None,
+            str(tool_input.get("listing_id") or "") or None,
+        )
+        # Headroom for what the fence's sanitizer may add to the buyer notes.
+        summary = summarize_returns(log, max_chars=self._config.max_fenced_chars - 500)
+        if not summary.total_returns:
+            return self._fenced({"period": summary.period, "note": log.note or "No returns."})
+        return self._fenced(_record(summary))
 
     async def _get_pricing_context(self, tool_input: dict[str, Any]) -> ToolOutcome:
         listing_id = str(tool_input.get("listing_id", ""))

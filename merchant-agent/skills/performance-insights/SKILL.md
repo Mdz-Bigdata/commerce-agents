@@ -1,6 +1,6 @@
 ---
 name: performance-insights
-description: Explaining how the business is doing, meaning why a metric moved, which segment drove it, pace against a comparable, progress against goals the operator has stated, and questions over sales, traffic, conversion, and customers or this operation's equivalents that the snapshot alone does not answer. Not needed when the snapshot's headline figures and their change on the prior period answer the question, how a period went included.
+description: Explaining how the business is doing, meaning why a metric moved, which segment drove it, pace against a comparable, progress against goals the operator has stated, which listings are coming back and why or what is wrong with a weak one, and questions over sales, traffic, conversion, and customers or this operation's equivalents that the snapshot alone does not answer. Not needed when the snapshot's headline figures and their change on the prior period answer the question, how a period went included.
 ---
 
 # Performance insights
@@ -34,6 +34,21 @@ Give the operator a takeaway they can act on, the figure behind it, and the comp
 - Check candidate causes against tool data for the same dates: campaign windows from `get_campaign_performance`, stockouts or sell-outs from `get_inventory_alerts` or the listing, price moves from `get_pending_changes` or a change applied this conversation.
 - Call something the cause only when its timing lines up and the movement sits in the segment it would affect; otherwise report a correlation and name the read that would settle it.
 - Grade your confidence in words that match the evidence: a finding when the data shows it, a lead when it partly does, and "not visible in the data" when nothing does.
+
+## Returns and weak listings
+
+A return here is whatever this operation takes back: an item sent back, a cancelled booking or line, a refunded or transferred ticket.
+
+- Read `get_return_reasons` for the period (narrowed to the listing when the question names one), then `get_listing` on each listing you will report, for its return rate when the record carries one, its review snippets, and the copy a fix would change.
+- Turn them into an issue list, one entry per listing and cause, most returns first:
+  - Problem: the listing and what buyers report, in a clause.
+  - Evidence: the reason's count and share as returned, and a sample note quoted briefly and verbatim as buyer text.
+  - How often: the listing's returns in the window with the window's dates, and its return rate from the record.
+  - Stage: the reason's `stage` (listing copy or images, product, fulfilment, support). Read the notes against it and say when they point elsewhere: a part the kit never included is the product, not the packing.
+  - Next step: for the listing stage, the copy fix or image callout, staged through catalog-listings and approved on the preview card; for product, fulfilment, or support, the step and the team that owns it, since these tools change none of them.
+- Reasons with stage `none` (a buyer who changed their plans) are the baseline every listing carries; give them as a share, and raise one as an issue only when a listing's share stands well above the store's.
+- One or two returns for a reason is a lead, not a pattern; give the count and say so. A variant that holds most of a listing's returns (`variants`) is the place to look first.
+- Present the list with `present_digest`, one `order_issue` entry per issue with the listing's id as `ref_id`: the headline carries the problem and its count, why_it_matters the stage and next step. Make the chips the listing-stage fixes, so each leads to a staged change in one tap.
 
 ## Goals and patterns the operator has stated
 

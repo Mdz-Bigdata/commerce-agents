@@ -233,7 +233,12 @@ class MerchantAgentConfig(BaseAgentConfig):
         if not self.enable_listing_edits:
             names.add("stage_listing_update")
         if not self.enable_inventory:
-            names |= {"get_inventory_alerts", "get_order_issues", "stage_inventory_action"}
+            names |= {
+                "get_inventory_alerts",
+                "get_order_issues",
+                "get_return_reasons",
+                "stage_inventory_action",
+            }
         if not self.enable_pricing:
             names |= {"get_pricing_context", "stage_price_update", "stage_promotion"}
         if not self.enable_campaigns:

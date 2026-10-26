@@ -19,6 +19,7 @@ hosted agent  ──MCP (streamable HTTP)──►  merchant_mcp_server.py  ─�
 | `get_listing` | read; records provenance and the full-record read an edit needs |
 | `get_inventory_alerts` | read |
 | `get_order_issues` | read |
+| `get_return_reasons` | read; counts computed in `merchant_agent.returns` |
 | `get_pricing_context` | read |
 | `get_pending_changes` | read; records change provenance |
 | `recall_memories` | read |

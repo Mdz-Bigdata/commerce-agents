@@ -254,6 +254,30 @@ def build_tools(
             ),
             "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
         },
+        {
+            "name": "get_return_reasons",
+            "description": (
+                "Returns over a period, counted per listing and by reason code, with the "
+                "stage each reason usually points at and a few buyer notes per listing. Use "
+                "it for which listings are coming back and why; the counts and shares are "
+                "computed, so quote them as returned."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "period": {
+                        "type": "string",
+                        "description": (
+                            "Reporting period, as for the snapshot; last_30_days when omitted."
+                        ),
+                    },
+                    "listing_id": _listing_id(
+                        "One listing to narrow to, a family with its variants; omit for all."
+                    ),
+                },
+                "additionalProperties": False,
+            },
+        },
         # -- Pricing reads -----------------------------------------------------------
         {
             "name": "get_pricing_context",

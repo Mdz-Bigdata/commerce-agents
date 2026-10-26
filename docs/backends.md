@@ -163,6 +163,7 @@ Never return a stand-in zero. Return `None` and say why in a short note.
 | Campaign | `None` for spend or revenue the channel does not report |
 | Pricing context | `min_price_basis`: whether the floor is the item's cost or a store rule |
 | Inventory alerts, order issues | Alerts and issues derived from stock and orders when the platform has no such object; only the kinds you can compute |
+| Returns | `ReturnReason.OTHER` for a reason outside the set, with the platform's own wording in the note; a `ReturnLog` note when the window is cut short |
 | Merchant context | A `limitations` list (source and one clause each) for store-wide gaps, such as a short order history |
 
 The retail merchant example returns two limitations: a 90-day order history and an email

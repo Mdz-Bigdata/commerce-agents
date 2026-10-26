@@ -72,6 +72,9 @@ tools:
       - name: get_order_issues
         enabled: true
         permission_policy: { type: always_allow }
+      - name: get_return_reasons
+        enabled: true
+        permission_policy: { type: always_allow }
       - name: get_pricing_context
         enabled: true
         permission_policy: { type: always_allow }

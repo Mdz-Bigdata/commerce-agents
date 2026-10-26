@@ -23,6 +23,7 @@ from demo_common.merchant_fixtures import (
     is_browse,
     load_campaigns,
     load_issues,
+    load_returns,
     margin_pct,
     metric_window,
     named_ids,
@@ -30,6 +31,7 @@ from demo_common.merchant_fixtures import (
     rebase_daily,
     refuse_outside_range,
     refuse_shared_content,
+    returns_in_period,
     share_content,
     snapshot_of,
     stage_campaign,
@@ -60,6 +62,7 @@ from merchant_agent import (
     PriceUpdateItem,
     PricingContext,
     PromotionDraft,
+    ReturnLog,
     StagedChange,
     check_analysis_sql,
 )
@@ -93,6 +96,7 @@ class MockRetailMerchant(MerchantBackend):
         self._assert_storefront_consistency()
         self._campaigns = load_campaigns(data_dir)
         self._issues = load_issues(data_dir)
+        self._returns = load_returns(data_dir, storefront.product)
 
     # ------------------------------------------------------------------
     # Listings
@@ -488,6 +492,16 @@ class MockRetailMerchant(MerchantBackend):
     async def get_order_issues(self, session: MerchantSessionContext) -> list[OrderIssue]:
         del session
         return list(self._issues)
+
+    async def get_returns(
+        self,
+        session: MerchantSessionContext,
+        period: str | None = None,
+        listing_id: str | None = None,
+    ) -> ReturnLog:
+        del session
+        end = date.fromisoformat(self._daily[-1]["date"])
+        return returns_in_period(self._returns, period, end, listing_id)
 
     # ------------------------------------------------------------------
     # Pricing
