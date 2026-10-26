@@ -50,7 +50,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body suppressHydrationWarning>
         <LocaleProvider initial={locale} messages={ZH}>
           {/* Page-wide limelight wash. */}
-          <div className="at-house" aria-hidden />
           <div className="relative z-[2] h-full">
             {children}
           </div>

@@ -14,17 +14,7 @@
  */
 
 :root {
-  --ground: #f3ede3; /* page: warm ecru, a shade under the paper */
-  --surface: #f7f3ec; /* paper; also text on ink */
-  --card: #f7f3ec; /* cards, panel, app bar */
-  --chrome: #f7f3ec; /* app bar */
-  --well: #efe8dc; /* wells and shaded cards */
-  --ink: #1f3d33; /* deep pine: text and dark panels */
-  --ink-2: #35524a; /* secondary text that still reads as content */
-  --ink-soft: #4a6157; /* labels and metadata */
-  --ink-faint: #8d9c94; /* hints and placeholders */
-  --line: rgba(31, 61, 51, 0.14);
-  --line-strong: rgba(31, 61, 51, 0.22); /* control borders */
+  /* Page, card, text, rule, and shadow tokens: web-shared/theme.css. */
   --accent: #e0653a; /* persimmon: the one accent, used sparingly */
   --accent-strong: #c65330; /* filled buttons */
   --accent-soft: #f4d9cc;
@@ -41,31 +31,14 @@
   --violet: #6650b0; /* refund requested */
   --violet-soft: #e7e0f1;
   --star: #c99a4b; /* rating stars */
-  --shadow-sm: 0 1px 2px rgba(31, 61, 51, 0.07), 0 1px 1px rgba(31, 61, 51, 0.04);
-  --shadow: 0 2px 24px rgba(31, 61, 51, 0.08), 0 1px 3px rgba(31, 61, 51, 0.06);
-  --shadow-lg: 0 12px 40px -12px rgba(31, 61, 51, 0.3), 0 2px 6px rgba(31, 61, 51, 0.08);
   --radius: 14px;
   --radius-lg: 22px;
 }
 
 body {
-  background-image:
-    radial-gradient(55% 60% at 15% -10%, rgba(201, 216, 211, 0.45), transparent 70%),
-    radial-gradient(45% 50% at 110% 0%, rgba(244, 217, 204, 0.35), transparent 70%);
-  background-attachment: fixed;
   font-family: var(--font-body), "Archivo", ui-sans-serif, system-ui, sans-serif;
   font-size: 16px;
   line-height: 1.55;
-}
-
-/* Grain overlay element (rendered once in layout.tsx). Content sits at z-index 2+. */
-.al-grain {
-  position: fixed;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  opacity: 0.04;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 /* ---------------------------------------------------------------- type kit */

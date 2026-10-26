@@ -7,22 +7,12 @@
 @source "../../../web-shared";
 @import "../../../web-shared/base.css";
 
-/* ACME Mobile design system: an off-white sheet ruled like graph paper, near-black ink,
-   green for live/recommended/verified states, amber for contract and overage warnings.
+/* ACME Mobile design system: the shared light ground, cards, and ink
+   (web-shared/theme.css), green for live/recommended/verified states, amber for contract and overage warnings.
    Data renders in mono with tabular numerals. */
 
 :root {
-  --ground: #f6f7f4; /* the sheet: page */
-  --surface: #f6f7f4; /* text on ink, and the sheet the cards are cut from */
-  --card: #f6f7f4; /* cards, panel, app bar */
-  --chrome: #f6f7f4; /* app bar */
-  --well: #eceee8; /* wells, table stripes, code chips */
-  --ink: #0e1116; /* near-black: text and structure */
-  --ink-2: #2c323b; /* secondary text that still reads as content */
-  --ink-soft: #565d66; /* labels and metadata */
-  --ink-faint: #8f959d; /* hints and placeholders */
-  --line: rgba(14, 17, 22, 0.13);
-  --line-strong: rgba(14, 17, 22, 0.19); /* control borders */
+  /* Page, card, text, rule, and shadow tokens: web-shared/theme.css. */
   --rule: rgba(14, 17, 22, 0.82); /* spec-sheet rules */
   --accent: #00b86b; /* signal green: the assistant's mark, recommended, verified, live */
   --accent-strong: #00a35f; /* filled accent */
@@ -39,9 +29,6 @@
   --info-soft: #e1ecf8;
   --violet: #6547c9; /* return in progress */
   --violet-soft: #ebe7fa;
-  --shadow-sm: 0 1px 2px rgba(14, 17, 22, 0.05), 0 1px 1px rgba(14, 17, 22, 0.03);
-  --shadow: 0 1px 2px rgba(14, 17, 22, 0.05), 0 4px 18px rgba(14, 17, 22, 0.05);
-  --shadow-lg: 0 12px 40px -12px rgba(14, 17, 22, 0.28), 0 2px 6px rgba(14, 17, 22, 0.08);
   --radius: 6px;
   --radius-lg: 10px;
 }
@@ -50,24 +37,6 @@ body {
   font-family: var(--font-body), "Barlow", ui-sans-serif, system-ui, sans-serif;
   font-size: 15px;
   line-height: 1.55;
-}
-
-/* Background grid, rendered once in layout.tsx: 24px ruling with a 120px major line. */
-.am-grid {
-  position: fixed;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background-image:
-    linear-gradient(to right, rgba(14, 17, 22, 0.028) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(14, 17, 22, 0.028) 1px, transparent 1px),
-    linear-gradient(to right, rgba(14, 17, 22, 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(14, 17, 22, 0.05) 1px, transparent 1px);
-  background-size:
-    24px 24px,
-    24px 24px,
-    120px 120px,
-    120px 120px;
 }
 
 /* ---------------------------------------------------------------- type kit */

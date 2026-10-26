@@ -7,47 +7,35 @@
 @source "../../../web-shared";
 @import "../../../web-shared/base.css";
 
-/* ACME Tickets storefront: dark ground, condensed display type, mono tabular numerals.
+/* ACME Tickets storefront: the shared light ground (web-shared/theme.css), condensed
+   display type, mono tabular numerals.
    Magenta marks actions and selection; amber and red mark timers and scarcity; the tier
    palette is separate from both. Cards are framed as ticket stubs. */
 
 :root {
-  --ground: #0f0e15; /* the house: page */
-  --surface: #0f0e15; /* text on ink */
-  --card: #1a1826; /* component cards, panel */
-  --chrome: #16141f; /* app bar */
-  --well: #211e30; /* wells inside cards */
-  --ink: #f3f1fa; /* near-white: text and structure */
-  --ink-2: #d2cee2; /* secondary text that still reads as content */
-  --ink-soft: #a49fb8; /* labels and metadata */
-  --ink-faint: #6f6a86; /* hints and placeholders */
-  --line: rgba(243, 241, 250, 0.13);
-  --line-strong: rgba(243, 241, 250, 0.22); /* control borders */
-  --rule: rgba(243, 241, 250, 0.4); /* disclosure rules */
+  /* Page, card, text, rule, and shadow tokens: web-shared/theme.css. */
+  --rule: rgba(29, 36, 51, 0.35); /* disclosure rules */
   --accent: #ff4d8d; /* limelight: the assistant's mark, actions, selection */
   --accent-strong: #ff4d8d; /* filled buttons */
-  --accent-soft: rgba(255, 77, 141, 0.14);
-  --accent-ink: #ff8fb8; /* text on accent-soft */
+  --accent-soft: rgba(255, 77, 141, 0.12);
+  --accent-ink: #b8155a; /* text on accent-soft */
   --on-accent: #17060d; /* text on accent */
-  --ok: #3ddba0; /* good value, completed steps, on sale */
-  --ok-soft: rgba(61, 219, 160, 0.13);
-  --warn: #ffb84d; /* live time and scarcity states; results held by a safety gate */
-  --warn-soft: rgba(255, 184, 77, 0.14);
-  --danger: #ff6b6b; /* expiring, sold out, errors */
-  --danger-soft: rgba(255, 107, 107, 0.13);
-  --info: #4dc3ff; /* issued, transfers */
-  --info-soft: rgba(77, 195, 255, 0.13);
-  --violet: #a596ff; /* refund in progress */
-  --violet-soft: rgba(143, 123, 255, 0.16);
+  --ok: #128a5e; /* good value, completed steps, on sale */
+  --ok-soft: rgba(18, 138, 94, 0.11);
+  --warn: #b36b00; /* live time and scarcity states; results held by a safety gate */
+  --warn-soft: rgba(230, 150, 20, 0.15);
+  --danger: #d23a3a; /* expiring, sold out, errors */
+  --danger-soft: rgba(210, 58, 58, 0.1);
+  --info: #0a7fbd; /* issued, transfers */
+  --info-soft: rgba(10, 127, 189, 0.1);
+  --violet: #6a54d6; /* refund in progress */
+  --violet-soft: rgba(106, 84, 214, 0.11);
   /* Tier legend palette, disjoint from the urgency hues above. */
-  --tier-1: #8f7bff;
-  --tier-2: #4dc3ff;
-  --tier-3: #3fd6c9;
-  --tier-4: #d98cff;
-  --tier-muted: #4a4757; /* sold-out sections */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 34px rgba(0, 0, 0, 0.38);
-  --shadow-lg: 0 16px 48px -12px rgba(0, 0, 0, 0.7), 0 2px 8px rgba(0, 0, 0, 0.5);
+  --tier-1: #7b66f0;
+  --tier-2: #2fa3e0;
+  --tier-3: #1ab0a3;
+  --tier-4: #bd66e4;
+  --tier-muted: #d6d4de; /* sold-out sections */
   --radius: 7px;
   --radius-lg: 10px;
 }
@@ -56,34 +44,6 @@ body {
   font-family: var(--font-body), "Archivo", ui-sans-serif, system-ui, sans-serif;
   font-size: 15px;
   line-height: 1.55;
-}
-
-/* Fixed page-wide wash behind everything. */
-.at-house {
-  position: fixed;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background:
-    radial-gradient(90rem 40rem at 50% -20rem, rgba(143, 123, 255, 0.13), transparent 60%),
-    radial-gradient(50rem 30rem at 108% 112%, rgba(255, 77, 141, 0.07), transparent 62%);
-}
-
-/* While a venue map is on screen (body.at-stage-lit, set by lib/stage-lights.ts) the
-   page darkens slightly and two spotlight cones fade in. */
-.at-house::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  transition: opacity 900ms ease;
-  background:
-    radial-gradient(34rem 30rem at 32% -8rem, rgba(255, 240, 214, 0.09), transparent 62%),
-    radial-gradient(34rem 30rem at 68% -8rem, rgba(255, 240, 214, 0.07), transparent 62%),
-    rgba(0, 0, 0, 0.08);
-}
-body.at-stage-lit .at-house::after {
-  opacity: 1;
 }
 
 /* ---------------------------------------------------------------- type kit */
@@ -138,7 +98,7 @@ body.at-stage-lit .at-house::after {
 /* Perforation line under a card's header strip, notched at both edges. */
 .at-perf {
   position: relative;
-  border-top: 1.5px dashed rgba(243, 241, 250, 0.22);
+  border-top: 1.5px dashed rgba(29, 36, 51, 0.18);
 }
 .at-perf::before,
 .at-perf::after {
@@ -206,7 +166,7 @@ body.at-stage-lit .at-house::after {
   gap: 8px;
   background: var(--card);
   border: 1px solid var(--line);
-  border-left: 1.5px dashed rgba(243, 241, 250, 0.3);
+  border-left: 1.5px dashed rgba(29, 36, 51, 0.24);
   border-radius: var(--radius);
   padding: 7px 13px;
   font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
@@ -338,7 +298,7 @@ body.at-stage-lit .at-house::after {
   background: linear-gradient(
     100deg,
     var(--well) 35%,
-    rgba(243, 241, 250, 0.09) 50%,
+    rgba(29, 36, 51, 0.07) 50%,
     var(--well) 65%
   );
   background-size: 200% 100%;
@@ -428,7 +388,7 @@ body.at-stage-lit .at-house::after {
 .at-dots {
   flex: 1;
   min-width: 16px;
-  border-bottom: 2px dotted rgba(243, 241, 250, 0.28);
+  border-bottom: 2px dotted rgba(29, 36, 51, 0.22);
   transform: translateY(-4px);
 }
 
@@ -509,9 +469,6 @@ body.at-stage-lit .at-house::after {
   .at-live,
   .at-urgent {
     animation: none;
-  }
-  .at-house::after {
-    transition: none;
   }
 }
 

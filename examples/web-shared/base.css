@@ -2,12 +2,15 @@
  * Copyright 2026 Anthropic PBC
  * SPDX-License-Identifier: Apache-2.0
  *
- * Rules every web app shares. Each app's globals.css defines the tokens these read and imports
+ * Rules every web app shares. The page, card, text, rule, and shadow tokens come from
+ * `theme.css`; each app's globals.css defines the rest of the tokens these read and imports
  * this file after Tailwind. The class hooks shared components render are `.panel-scroll`,
  * `.streaming-caret`, and the `ac-*` motion below, plus `.chip` and `.user-bubble`, which a
  * storefront defines itself and a merchant portal takes from `portal/portal.css`, and
  * `.btn-primary`, the storefront bag's Check out button.
  */
+
+@import "./theme.css";
 
 html,
 body {

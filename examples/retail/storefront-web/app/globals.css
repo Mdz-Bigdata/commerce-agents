@@ -8,22 +8,12 @@
 @import "../../../web-shared/base.css";
 
 /*
- * ACME retail design system: a cool off-white ground with white cards, navy ink and structure,
+ * ACME retail design system: the shared light ground, cards, and ink (web-shared/theme.css),
  * terracotta for the assistant and primary actions, red for sale tags and errors, gold stars.
  */
 
 :root {
-  --ground: #f4f6fa; /* page */
-  --surface: #ffffff; /* text on ink */
-  --card: #ffffff; /* cards, panel, app bar */
-  --chrome: #ffffff; /* app bar */
-  --well: #eef1f5; /* chips, thumbs, hover ground */
-  --ink: #1e2c4f; /* navy: text and structure */
-  --ink-2: #3b4763; /* secondary text that still reads as content */
-  --ink-soft: #5a6679; /* labels and metadata */
-  --ink-faint: #9aa2b5; /* hints and placeholders */
-  --line: rgba(30, 44, 79, 0.12);
-  --line-strong: rgba(30, 44, 79, 0.18); /* control borders */
+  /* Page, card, text, rule, and shadow tokens: web-shared/theme.css. */
   --accent: #d97f5f; /* terracotta: the assistant's mark, primary actions, focus */
   --accent-strong: #c4643f; /* filled buttons */
   --accent-soft: #f9e8e0;
@@ -40,9 +30,6 @@
   --violet: #6b4fd6; /* returns in progress */
   --violet-soft: #eeeafd;
   --star: #f0a500; /* rating stars */
-  --shadow-sm: 0 1px 2px rgba(30, 44, 79, 0.06), 0 1px 1px rgba(30, 44, 79, 0.04);
-  --shadow: 0 1px 2px rgba(30, 44, 79, 0.06), 0 4px 14px -6px rgba(30, 44, 79, 0.14);
-  --shadow-lg: 0 12px 40px -12px rgba(30, 44, 79, 0.28), 0 2px 6px rgba(30, 44, 79, 0.08);
   --radius: 12px;
 }
 

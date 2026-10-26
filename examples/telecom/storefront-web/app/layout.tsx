@@ -35,7 +35,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang={htmlLang(locale)} suppressHydrationWarning className={`${barlow.variable} ${splineSansMono.variable}`}>
       <body suppressHydrationWarning>
         <LocaleProvider initial={locale} messages={ZH}>
-          <div className="am-grid" aria-hidden />
           <div className="relative z-[2] h-full">
             {children}
           </div>

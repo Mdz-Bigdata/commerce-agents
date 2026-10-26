@@ -3,11 +3,10 @@
 
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { formatMoney, useT } from "web-shared";
 import { formatTime, tierColorMap } from "@/lib/format";
 import { useLive } from "@/lib/live";
-import { useStageLights } from "@/lib/stage-lights";
 import type { VenueMapPayload, VenueMapSection } from "@/lib/types";
 import { QueuePosition, RECOMMENDED_LABEL, Stub } from "./shared";
 
@@ -203,8 +202,6 @@ export default function VenueMap({ payload }: { payload: VenueMapPayload }) {
   });
   // Hovering a legend row or a map block highlights the tier in both places.
   const [hoveredTier, setHoveredTier] = useState<string | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
-  useStageLights(rootRef);
   const [quantity, setQuantity] = useState(2);
   const [actionState, setActionState] = useState<"idle" | "busy" | "done" | "queued" | "failed">(
     "idle",
@@ -251,7 +248,7 @@ export default function VenueMap({ payload }: { payload: VenueMapPayload }) {
       component="venue_map"
       label={payload.title ?? t("{venue}: the room", { venue: payload.venue.name })}
     >
-      <div ref={rootRef} className="flex items-baseline justify-between gap-3">
+      <div className="flex items-baseline justify-between gap-3">
         <div className="min-w-0">
           <h4 className="at-display truncate text-[19px] uppercase leading-tight text-(--ink)">
             {payload.venue.name}
@@ -273,7 +270,7 @@ export default function VenueMap({ payload }: { payload: VenueMapPayload }) {
         >
           <defs>
             <pattern id="at-hatch" width="2.4" height="2.4" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
-              <line x1="0" y1="0" x2="0" y2="2.4" stroke="rgba(243,241,250,0.16)" strokeWidth="0.5" />
+              <line x1="0" y1="0" x2="0" y2="2.4" stroke="var(--line-strong)" strokeWidth="0.5" />
             </pattern>
           </defs>
           {sections.map((section) => {
@@ -318,7 +315,7 @@ export default function VenueMap({ payload }: { payload: VenueMapPayload }) {
                   style={{
                     transition: "opacity 160ms ease-out, stroke-width 160ms ease-out",
                     filter: isSelected
-                      ? "drop-shadow(0 0 2.5px rgba(243, 241, 250, 0.6))"
+                      ? "drop-shadow(0 0 2.5px rgba(29, 36, 51, 0.35))"
                       : undefined,
                   }}
                 />
@@ -357,7 +354,7 @@ export default function VenueMap({ payload }: { payload: VenueMapPayload }) {
                     letterSpacing={0.2}
                     fill={
                       section.status === "sold_out"
-                        ? "rgba(243,241,250,0.45)"
+                        ? "rgba(29,36,51,0.45)"
                         : "rgba(15,14,21,0.92)"
                     }
                     transform={

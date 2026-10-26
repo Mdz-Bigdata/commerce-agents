@@ -8,41 +8,28 @@
 @import "../../../web-shared/portal/portal.css";
 
 /*
- * ACME Tickets design system: the dark house as ground, lifted cards, near-white ink,
+ * ACME Tickets design system: the shared light ground, cards, and ink (web-shared/theme.css),
  * limelight pink for the assistant and approvals, condensed display type for the wordmark
  * and event names, mono tabular figures for counts.
  */
 
 :root {
-  --ground: #0f0e15; /* the house: page */
-  --surface: #0f0e15; /* text on ink */
-  --card: #1a1826; /* cards and rail */
-  --chrome: #16141f; /* sidebar and mobile bar */
-  --well: #242134; /* chips, thumbs, hover ground */
-  --ink: #f3f1fa; /* near-white: text and structure */
-  --ink-2: #d2cee2; /* secondary text that still reads as content */
-  --ink-soft: #a49fb8; /* labels and metadata */
-  --ink-faint: #6f6a86; /* hints and placeholders */
-  --line: rgba(243, 241, 250, 0.11);
-  --line-strong: rgba(243, 241, 250, 0.22); /* control borders */
+  /* Page, card, text, rule, and shadow tokens: web-shared/theme.css. */
   --accent: #ff4d8d; /* limelight: the assistant's mark, hover, focus */
   --accent-strong: #ff4d8d; /* approve buttons */
-  --accent-soft: rgba(255, 77, 141, 0.15);
-  --accent-ink: #ff8fb8; /* text on accent-soft */
+  --accent-soft: rgba(255, 77, 141, 0.12);
+  --accent-ink: #b8155a; /* text on accent-soft */
   --on-accent: #16101a; /* text on accent */
-  --ok: #3ddba0; /* applied, positive change */
-  --ok-soft: rgba(61, 219, 160, 0.13);
-  --warn: #ffb84d; /* real scarcity; results held by a safety gate */
-  --warn-soft: rgba(255, 184, 77, 0.14);
-  --danger: #ff6b6b; /* under-pacing, negative change, errors */
-  --danger-soft: rgba(255, 107, 107, 0.14);
-  --info: #4dc3ff; /* fan messages, issued */
-  --info-soft: rgba(77, 195, 255, 0.13);
-  --violet: #a596ff; /* awaiting approval, quoted-as-data */
-  --violet-soft: rgba(143, 123, 255, 0.16);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 18px -8px rgba(0, 0, 0, 0.6);
-  --shadow-lg: 0 16px 48px -12px rgba(0, 0, 0, 0.7), 0 2px 8px rgba(0, 0, 0, 0.5);
+  --ok: #128a5e; /* applied, positive change */
+  --ok-soft: rgba(18, 138, 94, 0.11);
+  --warn: #b36b00; /* real scarcity; results held by a safety gate */
+  --warn-soft: rgba(230, 150, 20, 0.15);
+  --danger: #d23a3a; /* under-pacing, negative change, errors */
+  --danger-soft: rgba(210, 58, 58, 0.1);
+  --info: #0a7fbd; /* fan messages, issued */
+  --info-soft: rgba(10, 127, 189, 0.1);
+  --violet: #6a54d6; /* awaiting approval, quoted-as-data */
+  --violet-soft: rgba(106, 84, 214, 0.11);
   --radius: 7px;
 }
 

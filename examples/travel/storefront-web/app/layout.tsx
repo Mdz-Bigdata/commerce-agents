@@ -37,7 +37,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body suppressHydrationWarning>
         <LocaleProvider initial={locale} messages={ZH}>
           {/* Grain at z-1; content above it at z-2. */}
-          <div className="al-grain" aria-hidden />
           <div className="relative z-[2] h-full">
             {children}
           </div>

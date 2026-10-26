@@ -8,22 +8,12 @@
 @import "../../../web-shared/portal/portal.css";
 
 /*
- * ACME Mobile design system: a cool off-white sheet with a 120px ruling, near-black ink,
+ * ACME Mobile design system: the shared light ground, cards, and ink (web-shared/theme.css),
  * signal green for the assistant and approvals, amber for warnings, tabular mono numerals.
  */
 
 :root {
-  --ground: #eef0eb; /* page */
-  --surface: #f6f7f4; /* text on ink */
-  --card: #f9faf7; /* cards, sidebar, rail */
-  --chrome: #f9faf7; /* sidebar and mobile bar */
-  --well: #e8ebe4; /* chips, thumbs, hover ground */
-  --ink: #0e1116; /* near-black: text and structure */
-  --ink-2: #2c323b; /* secondary text that still reads as content */
-  --ink-soft: #565d66; /* labels and metadata */
-  --ink-faint: #8f959d; /* hints and placeholders */
-  --line: rgba(14, 17, 22, 0.11);
-  --line-strong: rgba(14, 17, 22, 0.19); /* control borders */
+  /* Page, card, text, rule, and shadow tokens: web-shared/theme.css. */
   --accent: #00b86b; /* signal green: the assistant's mark, hover, focus, live */
   --accent-strong: #00a35f; /* approve buttons */
   --accent-soft: #def3e8;
@@ -39,9 +29,6 @@
   --info-soft: #e1ecf8;
   --violet: #6547c9; /* awaiting approval, quoted-as-data */
   --violet-soft: #ebe7fa;
-  --shadow-sm: 0 1px 2px rgba(14, 17, 22, 0.05), 0 1px 1px rgba(14, 17, 22, 0.03);
-  --shadow: 0 1px 2px rgba(14, 17, 22, 0.05), 0 4px 14px -6px rgba(14, 17, 22, 0.14);
-  --shadow-lg: 0 12px 40px -12px rgba(14, 17, 22, 0.28), 0 2px 6px rgba(14, 17, 22, 0.08);
   --radius: 12px;
 }
 
@@ -49,16 +36,6 @@ body {
   font-family: var(--font-body), "Barlow", ui-sans-serif, system-ui, sans-serif;
   font-size: 14px;
   line-height: 1.4;
-}
-
-/* The sheet's ruling, behind the page content. */
-.portal-main {
-  background-image:
-    linear-gradient(to right, rgba(14, 17, 22, 0.035) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(14, 17, 22, 0.035) 1px, transparent 1px);
-  background-size:
-    120px 120px,
-    120px 120px;
 }
 
 /* Prices, counts, ids, and percentages. */

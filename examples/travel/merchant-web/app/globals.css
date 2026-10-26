@@ -8,23 +8,13 @@
 @import "../../../web-shared/portal/portal.css";
 
 /*
- * ACME Travel supplier portal design system: warm paper ground and cards, deep pine ink and
- * structure, persimmon for the assistant and approvals, Fraunces on titles, tabular numerals
+ * ACME Travel supplier portal design system: the shared light ground, cards, and ink
+ * (web-shared/theme.css), persimmon for the assistant and approvals, Fraunces on titles, tabular numerals
  * on data.
  */
 
 :root {
-  --ground: #eee8dd; /* page */
-  --surface: #f7f3ec; /* text on ink */
-  --card: #f7f3ec; /* ecru paper: cards, sidebar, rail */
-  --chrome: #f7f3ec; /* sidebar and mobile bar */
-  --well: #e8e1d3; /* chips, thumbs, hover ground */
-  --ink: #1f3d33; /* deep pine: text and structure */
-  --ink-2: #35524a; /* secondary text that still reads as content */
-  --ink-soft: #4a6157; /* labels and metadata */
-  --ink-faint: #8d9c94; /* hints and placeholders */
-  --line: rgba(31, 61, 51, 0.12);
-  --line-strong: rgba(31, 61, 51, 0.2); /* control borders */
+  /* Page, card, text, rule, and shadow tokens: web-shared/theme.css. */
   --accent: #e0653a; /* persimmon: the assistant's mark, hover, focus */
   --accent-strong: #c65330; /* approve buttons */
   --accent-soft: #f4d9cc;
@@ -40,9 +30,6 @@
   --info-soft: #dbe8ec;
   --violet: #6650b0; /* awaiting approval, quoted-as-data */
   --violet-soft: #e7e0f1;
-  --shadow-sm: 0 1px 2px rgba(31, 61, 51, 0.07), 0 1px 1px rgba(31, 61, 51, 0.04);
-  --shadow: 0 1px 2px rgba(31, 61, 51, 0.07), 0 4px 14px -6px rgba(31, 61, 51, 0.16);
-  --shadow-lg: 0 12px 40px -12px rgba(31, 61, 51, 0.3), 0 2px 6px rgba(31, 61, 51, 0.08);
   --radius: 12px;
 }
 

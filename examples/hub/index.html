@@ -15,30 +15,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ACME Demo Hub</title>
     <style>
+      /* The apps' shared look (web-shared/theme.css). */
       :root {
-        --ground: #f4f4f1;
+        color-scheme: light;
+        --ground: #f4f5f7;
         --card: #ffffff;
         --ink: #1d2433;
         --ink-soft: #5d6577;
         --ink-faint: #9aa0ad;
-        --line: #e3e3de;
-        --well: #ecece7;
-        --ok: #2f9e5b;
+        --line: rgba(29, 36, 51, 0.12);
+        --well: #eef0f3;
+        --ok: #1f8f5f;
         --off: #c9cbd1;
-        --shadow: 0 1px 2px rgba(20, 24, 36, 0.06), 0 6px 24px rgba(20, 24, 36, 0.06);
-      }
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --ground: #14161b;
-          --card: #1c1f26;
-          --ink: #eceef3;
-          --ink-soft: #a3a9b6;
-          --ink-faint: #6c7280;
-          --line: #2a2e37;
-          --well: #252932;
-          --ok: #4cc27f;
-          --off: #4a4f5a;
-        }
+        --shadow: 0 1px 2px rgba(29, 36, 51, 0.05), 0 8px 24px -10px rgba(29, 36, 51, 0.14);
       }
       * { box-sizing: border-box; }
       html, body { height: 100%; margin: 0; }
