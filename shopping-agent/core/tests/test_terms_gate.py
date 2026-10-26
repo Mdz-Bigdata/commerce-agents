@@ -114,8 +114,18 @@ async def test_search_returns_the_current_version_with_its_evidence(clocked, sta
     assert '"source_id": "shop/returns"' in result.result_text
     assert '"version": "2"' in result.result_text
     assert result.evidence == [
-        {"source_id": "shop/returns", "version": "1", "status": SUPERSEDED},
-        {"source_id": "shop/returns", "version": "2", "status": CURRENT},
+        {
+            "source_id": "shop/returns",
+            "version": "1",
+            "effective_at": "2025-06-01",
+            "status": SUPERSEDED,
+        },
+        {
+            "source_id": "shop/returns",
+            "version": "2",
+            "effective_at": "2026-03-01",
+            "status": CURRENT,
+        },
     ]
     assert list(state.seen_policies) == ["returns"]
 

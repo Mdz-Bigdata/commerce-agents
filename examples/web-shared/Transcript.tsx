@@ -4,6 +4,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { evidenceLabel } from "./format";
 import { useT } from "./i18n";
 import { Icon } from "./icons";
 import { AssistantText, ErrorBubble, UserBubble } from "./MessageBubble";
@@ -98,6 +99,23 @@ function ReplyFooter({
   );
 }
 
+/** Under a finished reply that read store terms: each current version it rested on. A card that
+ * cites terms shows them itself, so the line is left out when one did. */
+function SourcesLine({ item }: { item: AssistantChatItem }) {
+  const t = useT();
+  if (!item.sources?.length) return null;
+  const cardCites = item.segments.some((s) => {
+    const payload = s.type === "ui" ? (s.block.payload as { evidence?: unknown[] } | null) : null;
+    return Boolean(payload?.evidence?.length);
+  });
+  if (cardCites) return null;
+  return (
+    <p className="-mt-1 break-words text-[11.5px] leading-snug text-(--ink-faint)">
+      {t("Terms in force")}: {item.sources.map((source) => evidenceLabel(source, t)).join(" · ")}
+    </p>
+  );
+}
+
 /** What shows under a reply while it is being made: the current step, or a shimmer before the first word. */
 export function ActivityLine({ item }: { item: AssistantChatItem }) {
   const t = useT();
@@ -155,6 +173,7 @@ export function Transcript({
           );
         })}
         {item.pending ? renderPending(item) : null}
+        {!item.pending ? <SourcesLine item={item} /> : null}
         {!item.pending ? (
           <ReplyFooter
             item={item}

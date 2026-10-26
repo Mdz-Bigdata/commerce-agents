@@ -231,9 +231,17 @@ class TermsCheck:
         return [(policy, verdict) for policy, verdict in self.verdicts if verdict in WITHHELD]
 
     def evidence(self) -> list[dict[str, Any]]:
-        """The trace entries: one ``{"source_id", "version", "status"}`` per versioned passage."""
+        """The trace entries: one ``{"source_id", "version", "effective_at", "status"}`` per
+        versioned passage, ``effective_at`` as an ISO day."""
         return [
-            {"source_id": policy.source_id, "version": policy.version, "status": verdict}
+            {
+                "source_id": policy.source_id,
+                "version": policy.version,
+                "effective_at": policy.effective_at.date().isoformat()
+                if policy.effective_at
+                else None,
+                "status": verdict,
+            }
             for policy, verdict in self.verdicts
         ]
 

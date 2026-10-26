@@ -111,6 +111,15 @@ export interface AssistantChatItem {
   rating?: "up" | "down";
   /** The support ticket a handoff from this reply opened. */
   ticket?: string;
+  /** The terms versions this reply's reads returned as current (`evidence` on `tool_result`). */
+  sources?: ReplySource[];
+}
+
+/** One current terms version a reply rested on. */
+export interface ReplySource {
+  source_id: string;
+  version: string;
+  effective_at: string;
 }
 
 /** Why the user asked for a person: the reason the operations log counts it under. */

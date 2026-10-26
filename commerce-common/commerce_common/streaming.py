@@ -13,7 +13,8 @@ produces. Hosts render the event types below and ignore any they do not know.
                     "evidence", "no_match"]}``; ``status`` is ``ok``, ``error``, or
                     ``blocked`` (a gate held the call; ``reason`` names the gate);
                     ``evidence`` lists the versioned sources the read returned or withheld,
-                    one ``{"source_id", "version", "status"}`` each; ``no_match`` is
+                    one ``{"source_id", "version", "effective_at", "status"}`` each
+                    (the host shows the current ones as the reply's sources); ``no_match`` is
                     ``true`` when a read found nothing to return.
 ``ui``              ``{"component", "payload"}``: a validated, enriched component.
 ``ui_partial``      The same, plus ``stream_id``, while the call is still being

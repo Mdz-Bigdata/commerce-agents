@@ -18,6 +18,7 @@ import type {
   AssistantSegment,
   ChatItem,
   MemoryFact,
+  ReplySource,
   ToolCallData,
   TraceEntry,
   UIBlock,
@@ -57,6 +58,29 @@ function structuralPrefix(block: UIBlock, count: number): UIBlock {
     }
   }
   return block;
+}
+
+/** The current versions a `tool_result`'s `evidence` lists; withheld and superseded ones are not sources. */
+function readSources(evidence: unknown): ReplySource[] {
+  if (!Array.isArray(evidence)) return [];
+  return evidence
+    .filter((entry) => entry && typeof entry === "object" && entry.status === "current")
+    .map((entry) => ({
+      source_id: String(entry.source_id ?? ""),
+      version: String(entry.version ?? ""),
+      effective_at: String(entry.effective_at ?? ""),
+    }))
+    .filter((source) => source.source_id);
+}
+
+function mergeSources(known: ReplySource[] | undefined, added: ReplySource[]): ReplySource[] {
+  const merged = [...(known ?? [])];
+  for (const source of added) {
+    if (!merged.some((m) => m.source_id === source.source_id && m.version === source.version)) {
+      merged.push(source);
+    }
+  }
+  return merged;
 }
 
 function eventBlock(event: AgentEvent): UIBlock {
@@ -405,6 +429,10 @@ export function useAgentTurn(api: AgentApi, options: AgentTurnOptions): AgentTur
                 ),
               }));
             }
+          }
+          const current = readSources(event.data.evidence);
+          if (current.length) {
+            updateTurn(turn, (item) => ({ ...item, sources: mergeSources(item.sources, current) }));
           }
           appendTrace({
             kind: "tool_result",
