@@ -138,3 +138,49 @@ calls the provider `MODEL_PROVIDER` names in `.env` (`examples/demo_common/model
 with each vertical's own config, one turn per case. `--no-terms-gate` passes every
 version through, so the version gate shows what the terms gate catches. Compare runs
 only at the same case files, clock, and mode.
+
+## Constraint Violation Rate (offline evaluation)
+
+A recommendation that ranks well but breaks a limit the customer stated (a price ceiling,
+a size, a date, stock) is wrong however good it looks. `scripts/eval_constraints.py` checks
+every product a turn shows in a component or puts in the cart against the backend's own
+record of it, not against the answer text.
+
+| Score | 中文 | Counted when |
+|---|---|---|
+| Constraint violation | 约束违背 | a shown or added product breaks a stated constraint and its own card (a pick's `reason`, a comparison entry's pros and cons, a plan step's label and detail) does not mark that miss; a cart add is never a marked miss |
+| Asked or declined | 询问或说明 | nothing in the catalog meets every constraint (the only cases it is scored on), no product breaks one unmarked, and the reply says nothing fits or asks |
+
+**Constraint Violation Rate** (约束违背率) is cases with a violation over cases. The report
+prints it per vertical and in total, beside the item-level count (violating products over
+products checked), the products shown with every miss marked, and the violating products
+by kind of constraint. A family counts through its closest variant, so a "from" price
+under the budget does not clear a required size that costs more.
+
+The cases are `scripts/constraint_cases/<vertical>.yaml`, ten per vertical, judged at
+`2026-10-01T12:00:00+00:00`, with each mock built on that clock so its delivery promises
+and shifted dates are fixed. A case's fields: `q`, the customer's message; `query`, what
+the offline responder searches for; `constraints`, any of `max_price`; `require`, a map from
+an option, an attribute, or a record field such as `category` or `title` to the value the
+product must contain (a record without the field misses it); `deliver_by` (retail's
+delivery promise); `available_on` (travel's availability window); `event_on` and
+`event_by` (the event date); `min_data_gb`; `min_quantity` (tickets left). Every case
+also requires stock. Which products meet every constraint is worked out from the catalog
+on each run and written to `--json` as `fits`; a case with none scores asked or declined.
+
+```bash
+python scripts/eval_constraints.py                     # offline, every vertical
+python scripts/eval_constraints.py --vertical retail --failures
+python scripts/eval_constraints.py --no-filters        # ablation: constraints only in the query
+python scripts/eval_constraints.py --mode live --json results.json
+```
+
+Offline mode runs the real turn loop and mock backends with a scripted responder: it puts
+the stated constraints in search filters, retries once without them when the search comes
+back empty, shows the top three results, and marks a retry's results as missing the
+request. It checks no record itself, so its rate is what the search filters alone
+enforce. The mocks drop an attribute or category filter that would empty a result
+rather than return nothing, so on these cases the responder never retries and never
+declines. `--no-filters` sends the query alone.
+Live mode runs the provider `MODEL_PROVIDER` names, as the go-live evaluation does.
+Compare runs only at the same case files, clock, and mode.

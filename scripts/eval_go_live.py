@@ -259,24 +259,30 @@ def _strings(value: Any, out: list[str]) -> None:
             _strings(item, out)
 
 
-async def run_turn(
-    case: Case, vertical: str, *, mode: str, clock: datetime, client: Any, config: Any
-) -> Turn:
+def build_agent(vertical: str, backend: Any, client: Any, config: Any) -> Any:
+    """The vertical's shopping agent over ``backend``, answering through ``client``."""
     from shopping_agent_runtime import ShoppingAgent
 
     spec = VERTICALS[vertical]
-    backend = load_object(spec.backend)()
-    if case.overlay:
-        # The mocks search their loaded passages; an overlay adds records for this case.
-        backend._policies = [*backend._policies, *map(Policy.model_validate, case.overlay)]
-    agent = ShoppingAgent(
+    return ShoppingAgent(
         backend=backend,
         skills_dir=REPO_ROOT / "shopping-agent" / "skills",
         config=config,
-        client=client if mode == "live" else RetrievalBaseline(case.query or case.question),
+        client=client,
         extra_presentation_tools=[load_object(path)() for path in spec.extensions],
         **({"executor_class": load_object(spec.executor)} if spec.executor else {}),
     )
+
+
+async def run_turn(
+    case: Case, vertical: str, *, mode: str, clock: datetime, client: Any, config: Any
+) -> Turn:
+    backend = load_object(VERTICALS[vertical].backend)()
+    if case.overlay:
+        # The mocks search their loaded passages; an overlay adds records for this case.
+        backend._policies = [*backend._policies, *map(Policy.model_validate, case.overlay)]
+    responder = client if mode == "live" else RetrievalBaseline(case.query or case.question)
+    agent = build_agent(vertical, backend, responder, config)
     session = ShoppingSessionContext(session_id=f"eval-{case.id}", user_id="eval", now=clock)
     messages = [{"role": "user", "content": case.question}]
     text: list[str] = []
@@ -406,32 +412,33 @@ def print_table(title: str, tallies: dict[str, Tally]) -> None:
         print(f"{name:<16}{tally.cases:>6}{cells}")
 
 
-async def _evaluate(args: argparse.Namespace) -> dict[str, Any]:
+def agent_setup(vertical: str, mode: str) -> tuple[Any, Any]:
+    """The model client (None offline) and the vertical's shopping config; live mode reads
+    the provider ``MODEL_PROVIDER`` names in the example's ``.env``."""
     from demo_common import load_demo_env, model_client, model_config_fields
     from demo_common.model_provider import resolve_provider
-    from shopping_agent import ShoppingAgentConfig
 
+    build_config = load_object(f"{vertical}.api.agent_config:build_shopping_config")
+    if mode != "live":
+        return None, build_config()
+    load_demo_env(REPO_ROOT / "examples" / vertical)
+    provider = resolve_provider()
+    if not provider.has_key():
+        raise SystemExit(
+            f"--mode live: no API key for {provider.label}. Set {provider.key_hint} "
+            "in .env (MODEL_PROVIDER picks the provider), or run offline."
+        )
+    return model_client(), build_config().model_copy(update=model_config_fields())
+
+
+async def _evaluate(args: argparse.Namespace) -> dict[str, Any]:
     verticals = list(VERTICALS) if args.vertical == "all" else [args.vertical]
     by_vertical: dict[str, Tally] = {}
     by_category: dict[str, Tally] = {c: Tally() for c in CATEGORIES}
     stages: Counter = Counter()
     rows: list[dict[str, Any]] = []
     for vertical in verticals:
-        example_root = REPO_ROOT / "examples" / vertical
-        client = None
-        config_fields: dict[str, Any] = {}
-        if args.mode == "live":
-            load_demo_env(example_root)
-            provider = resolve_provider()
-            if not provider.has_key():
-                raise SystemExit(
-                    f"--mode live: no API key for {provider.label}. Set {provider.key_hint} "
-                    "in .env (MODEL_PROVIDER picks the provider), or run offline."
-                )
-            client = model_client()
-            config_fields = model_config_fields()
-        build_config = load_object(f"{vertical}.api.agent_config:build_shopping_config")
-        config: ShoppingAgentConfig = build_config().model_copy(update=config_fields)
+        client, config = agent_setup(vertical, args.mode)
         base = load_object(VERTICALS[vertical].backend)()._policies
         tally = by_vertical.setdefault(vertical, Tally())
         cases = load_cases(vertical)[: args.limit or None]

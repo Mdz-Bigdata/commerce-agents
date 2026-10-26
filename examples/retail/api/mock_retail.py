@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -114,7 +114,9 @@ _STORE_OPENS, _STORE_CLOSES = 9, 21
 
 
 class MockRetail(StorefrontBackend):
-    def __init__(self, data_dir: Path = DATA_DIR) -> None:
+    def __init__(self, data_dir: Path = DATA_DIR, today: date | None = None) -> None:
+        """``today`` is for a host that runs on its own clock; the default is the real date."""
+        self.today: date = today or datetime.now().date()
         catalog, self.products, self.variants = load_catalog(data_dir)
         self.store_name: str = catalog.get("store_name", "the store")
         self._users = load_users(data_dir)
@@ -126,14 +128,14 @@ class MockRetail(StorefrontBackend):
         self._stamp_low_stock(data_dir)
 
     def _stamp_delivery_promises(self) -> None:
-        """A "Get it by <day>" attribute on every in-stock product: boot date plus a
+        """A "Get it by <day>" attribute on every in-stock product: ``today`` plus a
         stable 2-4 day offset per product, never a Sunday, so promises stay current and
         a product's promise is the same for the whole run."""
-        boot = datetime.now()
         for product in self.products.values():
             if not product.in_stock:
                 continue
-            promised = boot + timedelta(days=2 + sum(ord(ch) for ch in product.product_id) % 3)
+            offset = 2 + sum(ord(ch) for ch in product.product_id) % 3
+            promised = self.today + timedelta(days=offset)
             if promised.weekday() == 6:
                 promised += timedelta(days=1)
             label = f"Get it by {promised.strftime('%a, %b')} {promised.day}"
