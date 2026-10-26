@@ -371,6 +371,7 @@ def print_table(title: str, tallies: dict[str, Tally]) -> None:
 
 async def _evaluate(args: argparse.Namespace) -> dict[str, Any]:
     from demo_common import load_demo_env, model_client, model_config_fields
+    from demo_common.model_provider import resolve_provider
     from shopping_agent import ShoppingAgentConfig
 
     verticals = list(VERTICALS) if args.vertical == "all" else [args.vertical]
@@ -383,6 +384,12 @@ async def _evaluate(args: argparse.Namespace) -> dict[str, Any]:
         config_fields: dict[str, Any] = {}
         if args.mode == "live":
             load_demo_env(example_root)
+            provider = resolve_provider()
+            if not provider.has_key():
+                raise SystemExit(
+                    f"--mode live: no API key for {provider.label}. Set {provider.key_hint} "
+                    "in .env (MODEL_PROVIDER picks the provider), or run offline."
+                )
             client = model_client()
             config_fields = model_config_fields()
         build_config = load_object(f"{vertical}.api.agent_config:build_shopping_config")
