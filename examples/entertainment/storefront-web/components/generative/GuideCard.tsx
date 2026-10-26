@@ -3,7 +3,7 @@
 
 "use client";
 
-import { useT } from "web-shared";
+import { evidenceLabel, useT } from "web-shared";
 import type { GuidePayload } from "@/lib/types";
 import { Stub } from "./shared";
 
@@ -27,6 +27,16 @@ export default function GuideCard({ payload }: { payload: GuidePayload }) {
           {payload.sources.map((source) => (
             <span key={source} className="at-pill">
               {source}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {payload.evidence?.length ? (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <span className="at-eyebrow">{t("Terms in force")}</span>
+          {payload.evidence.map((e) => (
+            <span key={e.policy_id} className="at-pill">
+              {evidenceLabel(e, t)}
             </span>
           ))}
         </div>

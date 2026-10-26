@@ -5,6 +5,10 @@
 export const SHARED_ZH: Readonly<Record<string, string>> = {
   "Switch language": "切换语言",
 
+  // Terms evidence on cards
+  "Terms in force": "现行条款",
+  "{source} v{version} · effective {date}": "{source} 第 {version} 版 · {date} 起生效",
+
   // Chat, composer, activity
   Activity: "动态",
   Working: "处理中",

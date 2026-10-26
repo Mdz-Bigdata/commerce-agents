@@ -1,7 +1,7 @@
 // Copyright 2026 Anthropic PBC
 // SPDX-License-Identifier: Apache-2.0
 
-import { useT } from "web-shared";
+import { evidenceLabel, useT } from "web-shared";
 import type { GuidePayload } from "@/lib/types";
 import ProductTile from "../ProductTile";
 
@@ -27,6 +27,11 @@ export default function GuideCard({ payload }: { payload: GuidePayload }) {
       ) : null}
       {payload.sources?.length ? (
         <p className="mt-3 break-all text-[11px] text-(--ink-soft)/80">{t("Sources: {sources}", { sources: payload.sources.join(" · ") })}</p>
+      ) : null}
+      {payload.evidence?.length ? (
+        <p className="mt-1 break-all text-[11px] text-(--ink-soft)/80">
+          {t("Terms in force")}: {payload.evidence.map((e) => evidenceLabel(e, t)).join(" · ")}
+        </p>
       ) : null}
     </section>
   );

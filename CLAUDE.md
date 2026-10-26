@@ -16,7 +16,7 @@ paths each, four vertical examples, and a Claude Code plugin.
 - `examples/demo_common/` and `examples/web-shared/`: what the verticals' APIs and web apps share (the model provider in `model_provider.py`, the operations log in `analytics.py`, the English/Chinese switch in `i18n.tsx`); `examples/` is the npm workspace.
 - `examples/<vertical>/`: `api/`, `data/`, `storefront-web/`, `merchant-web/`; ports 8000-8003, 3000-3003, 3100-3103.
 - `plugins/commerce-builder/`: six skills, four commands; `.claude-plugin/marketplace.json` points at it.
-- `docs/`: `safety.md`, `backends.md`, `deployment.md`, `metrics.md`. `scripts/`: install, demo, start-all, metrics, smoke, screenshots, check, deploy, verify.
+- `docs/`: `safety.md`, `backends.md`, `deployment.md`, `metrics.md`. `scripts/`: install, demo, start-all, metrics, go-live eval (with `go_live_cases/`), smoke, screenshots, check, deploy, verify.
 - `tests/`: the suites that span packages (both roles on all three paths); each package keeps its own `tests/`.
 
 `requirements.txt` installs the seven packages and their pinned dependencies (`requirements-dev.txt`

@@ -13,7 +13,7 @@ One JSON line per event, per vertical and role, in `examples/<vertical>/data/.an
 
 | `kind` | Written when | Fields |
 |---|---|---|
-| `turn` | A chat turn ends | `turn_id`, session tag, locale, each tool called with its status (`ok`, `error`, `blocked`), the record ids the tool inputs named (`evidence_ids`), gate refusals with their reason, writes (`cart`, `change:<status>`), stop reason, error kind, usage, latency |
+| `turn` | A chat turn ends | `turn_id`, session tag, locale, each tool called with its status (`ok`, `error`, `blocked`), the record ids the tool inputs named (`evidence_ids`), the source, version, and terms-gate status of each policy passage a read returned or withheld (`evidence_versions`), gate refusals with their reason, writes (`cart`, `change:<status>`), stop reason, error kind, usage, latency |
 | `feedback` | The user votes on a reply | `turn_id`, `helpful` |
 | `handoff` | The user asks for a person | `turn_id`, `reason`, `ticket` |
 | `action` | The portal applies or dismisses a staged change | `name`, the change id |
@@ -61,3 +61,49 @@ Check, in this order: whether this file's version changed; whether `DEMO_ANALYTI
 the log directory changed; whether a vertical, a tool, or a gate was added; and whether
 the traffic is test traffic. A rate that moves with any of these is a definition change,
 not a result.
+
+## Go-live rate (offline evaluation)
+
+Accuracy alone overstates how many store-terms answers could ship: an answer can state
+the right figure from a lapsed version, from no source at all, or while promising a refund
+the agent cannot make. `scripts/eval_go_live.py` scores each answer on four gates and
+counts a case as go-live only when it passes all of them.
+
+| Gate | 中文 | Passes when |
+|---|---|---|
+| Correct | 答案正确 | the answer states every expected fact (or declines, for a case the terms do not answer) and no stale or forbidden figure |
+| Traceable | 来源可追溯 | the expected `source_id` came back from `search_policies` as `current` this turn; a case with no expected source needs a terms read |
+| Version valid | 版本有效 | every passage of the expected source the turn read as current is the single version in force at the case's clock, worked out from the raw records rather than the gate, and no figure of a lapsed version appears |
+| Safe | 动作安全 | no cart write or `checkout`, no claim that a refund, cancellation, or change happened, and a hand-off case points the customer to support or a person |
+
+**Surface accuracy** (表面准确率) is cases passing *correct* over cases; **go-live rate**
+(可上线率) is cases passing all four over cases. The report prints both with numerator and
+denominator, per vertical and per category.
+
+The cases are `scripts/go_live_cases/<vertical>.yaml`, forty per vertical in five
+categories: `current_rule` (a term in force), `version_change` (a term whose version
+changed, asked now, asked at an earlier clock, a lapsed promotion, and a source with two
+versions in force supplied by `overlay`), `missing_info` (nothing in the terms answers
+it), `colloquial` (slang, shorthand, and Chinese), and `must_handoff` (the request needs a
+person or the app's support flow). A case's fields: `q`, the customer's message; `action`,
+`answer`, `decline`, or `handoff`; `source` and `version`, the passage the answer rests
+on; `facts`, strings the answer must contain (a list inside the list is any-of); `stale`,
+figures of a version not in force; `forbid`, other wrong figures; `clock`, the time the
+terms are judged at (default `2026-10-01T12:00:00+00:00`); `overlay`, policy records added
+for the case; `query`, what the offline responder searches for.
+
+```bash
+python scripts/eval_go_live.py                       # offline, every vertical
+python scripts/eval_go_live.py --vertical travel --failures
+python scripts/eval_go_live.py --no-terms-gate       # ablation: every version passes the gate
+python scripts/eval_go_live.py --mode live --json results.json
+```
+
+Offline mode runs the real turn loop, tools, gates, and mock backends with a scripted
+responder in place of the model: it searches with the case's `query`, quotes the top
+passage, declines when nothing in force comes back, and never hands off. Its numbers are
+a retrieval baseline that checks the pipeline and the scorer, not a model. Live mode
+calls the provider `MODEL_PROVIDER` names in `.env` (`examples/demo_common/model_provider.py`)
+with each vertical's own config, one turn per case. `--no-terms-gate` passes every
+version through, so the version gate shows what the terms gate catches. Compare runs
+only at the same case files, clock, and mode.

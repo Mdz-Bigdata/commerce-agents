@@ -267,3 +267,21 @@ export function safeHandoffs(handoffs: HandoffLink[] | undefined): HandoffLink[]
     }
   });
 }
+
+/** A policy passage a card cites: `TermsEvidence` in shopping_agent/types.py. */
+export interface TermsEvidence {
+  policy_id: string;
+  source_id: string;
+  version: string;
+  effective_at: string;
+  expires_at?: string;
+}
+
+/** "retail/returns v2 · effective 2026-03-01": the source, its version, and the day it took effect. */
+export function evidenceLabel(evidence: TermsEvidence, t: Translate = english): string {
+  return t("{source} v{version} · effective {date}", {
+    source: evidence.source_id,
+    version: evidence.version,
+    date: evidence.effective_at.slice(0, 10),
+  });
+}

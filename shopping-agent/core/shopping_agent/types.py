@@ -6,11 +6,11 @@ session records the gates and enrichment read."""
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from commerce_common.types import ClockContext, remember
 
@@ -148,11 +148,68 @@ class Order(BaseModel):
     tracking_url: str | None = None
 
 
+def as_utc(moment: datetime) -> datetime:
+    """A naive timestamp read as UTC, so fixture dates compare with any session clock."""
+    return moment if moment.tzinfo is not None else moment.replace(tzinfo=UTC)
+
+
+class TermsEvidence(BaseModel):
+    """Where a stated term comes from: the passage, its source document and version, and
+    the window that version is in force (open-ended without ``expires_at``)."""
+
+    policy_id: str
+    source_id: str
+    version: str
+    effective_at: datetime
+    expires_at: datetime | None = None
+
+    @field_validator("effective_at", "expires_at")
+    @classmethod
+    def _utc(cls, value: datetime | None) -> datetime | None:
+        return as_utc(value) if value is not None else None
+
+    def in_force(self, now: datetime) -> bool:
+        return self.effective_at <= now and (self.expires_at is None or now < self.expires_at)
+
+
 class Policy(BaseModel):
+    """One help or terms passage. A passage from a versioned source names the source
+    (``source_id``), its ``version``, and when that version took effect (``effective_at``)
+    and lapses (``expires_at``, open-ended when unset); a search may return several
+    versions of one source, and the terms gate (gates.py) passes the one in force at the
+    session clock. A passage without ``source_id`` passes unchecked."""
+
     policy_id: str
     title: str
     category: str | None = None
     content: str
+    source_id: str | None = None
+    version: str | None = None
+    effective_at: datetime | None = None
+    expires_at: datetime | None = None
+
+    @field_validator("effective_at", "expires_at")
+    @classmethod
+    def _utc(cls, value: datetime | None) -> datetime | None:
+        return as_utc(value) if value is not None else None
+
+    @model_validator(mode="after")
+    def _versioned_whole(self) -> Policy:
+        if self.source_id is not None and (self.version is None or self.effective_at is None):
+            raise ValueError(f"{self.policy_id}: a source_id needs a version and effective_at")
+        return self
+
+    def evidence(self) -> TermsEvidence | None:
+        """The passage's evidence record, or None for an unversioned passage."""
+        if self.source_id is None or self.version is None or self.effective_at is None:
+            return None
+        return TermsEvidence(
+            policy_id=self.policy_id,
+            source_id=self.source_id,
+            version=self.version,
+            effective_at=self.effective_at,
+            expires_at=self.expires_at,
+        )
 
 
 class DisclosureRow(BaseModel):
@@ -169,6 +226,9 @@ class Disclosure(BaseModel):
     rows: list[DisclosureRow]
     sources: list[str] = Field(default_factory=list)
     footnotes: list[str] = Field(default_factory=list)
+    # The versioned terms the rows state; the enrichment refuses the box when one is not
+    # in force at the session clock.
+    evidence: list[TermsEvidence] = Field(default_factory=list)
 
 
 class FulfillmentOption(BaseModel):
@@ -193,10 +253,17 @@ class ShoppingSessionContext(ClockContext):
 
 class ShoppingSessionState(BaseModel):
     """Held by the host for the session. ``seen_products`` is the provenance record: cart
-    writes accept only ids in it, and presentation payloads are enriched from it."""
+    writes accept only ids in it, and presentation payloads are enriched from it.
+    ``seen_policies`` holds the passages search_policies returned past the terms gate,
+    which a card's ``policy_ids`` resolve against."""
 
     seen_products: dict[str, Product] = Field(default_factory=dict)
+    seen_policies: dict[str, Policy] = Field(default_factory=dict)
 
     def remember_products(self, products: list[Product]) -> None:
         for product in products:
             remember(self.seen_products, product.product_id, product)
+
+    def remember_policies(self, policies: list[Policy]) -> None:
+        for policy in policies:
+            remember(self.seen_policies, policy.policy_id, policy)

@@ -3,7 +3,7 @@
 
 "use client";
 
-import { useT } from "web-shared";
+import { evidenceLabel, useT } from "web-shared";
 import type { GuidePayload } from "@/lib/types";
 import {
   BODY,
@@ -91,6 +91,11 @@ export default function GuideCard({ payload }: { payload: GuidePayload }) {
               )}
             </span>
           ))}
+        </p>
+      ) : null}
+      {payload.evidence?.length ? (
+        <p className="mt-1 break-all" style={{ fontFamily: BODY, fontSize: 11, color: "var(--ink-soft)" }}>
+          {t("Terms in force")}: {payload.evidence.map((e) => evidenceLabel(e, t)).join(" · ")}
         </p>
       ) : null}
     </section>

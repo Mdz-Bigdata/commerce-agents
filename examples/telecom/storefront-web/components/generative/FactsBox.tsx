@@ -6,7 +6,7 @@
 /** Renders disclosure. */
 
 import { useEffect, useState } from "react";
-import { useT } from "web-shared";
+import { evidenceLabel, useT } from "web-shared";
 import { useCountUp } from "@/lib/motion";
 import type { DisclosurePayload } from "@/lib/types";
 import { Frame } from "./shared";
@@ -142,6 +142,16 @@ export default function FactsBox({ payload }: { payload: DisclosurePayload }) {
             {payload.sources.map((source) => (
               <span key={source} className="am-tag">
                 {source}
+              </span>
+            ))}
+          </div>
+        ) : null}
+        {payload.evidence?.length ? (
+          <div className="am-rule mt-2 flex flex-wrap items-center gap-1.5 pt-2">
+            <span className="am-meta">{t("Terms in force")}</span>
+            {payload.evidence.map((e) => (
+              <span key={e.policy_id} className="am-tag">
+                {evidenceLabel(e, t)}
               </span>
             ))}
           </div>

@@ -3,7 +3,9 @@
 
 """The built-in components: each payload joined to the session's catalog records, the
 cart, or an order before it reaches the host. Ids without session provenance are
-dropped and reported; a component left with nothing canonical to show is refused.
+dropped and reported; a component left with nothing canonical to show is refused. A card
+that cites store terms carries each passage's evidence, and is refused under the terms
+gate when a version it cites is not in force at the session clock.
 """
 
 from __future__ import annotations
@@ -19,7 +21,7 @@ from commerce_common.presentation import (
     PresentSuggestionsPayload,
 )
 
-from .gates import PROVENANCE_GATE
+from .gates import PROVENANCE_GATE, TERMS_GATE, terms_clock, terms_refusal
 from .serialization import cart_payload
 from .tools.presentation import (
     CheckoutPayload,
@@ -30,7 +32,7 @@ from .tools.presentation import (
     PresentPlanPayload,
     PresentProductsPayload,
 )
-from .types import Product, ShoppingSessionState
+from .types import Product, ShoppingSessionState, TermsEvidence
 
 
 def _record(product: Product) -> dict[str, Any]:
@@ -142,11 +144,28 @@ async def enrich_plan(payload: PresentPlanPayload, context: EnrichmentContext) -
     return enriched
 
 
+def _cited_evidence(context: EnrichmentContext, evidence: list[TermsEvidence]) -> None:
+    if refusal := terms_refusal(evidence, terms_clock(context.session)):
+        raise PresentationRefused(refusal, TERMS_GATE)
+
+
 async def enrich_guide(payload: PresentGuidePayload, context: EnrichmentContext) -> dict[str, Any]:
     dropped: list[str] = []
-    enriched = payload.model_dump(exclude_none=True, exclude={"related_product_ids"})
+    enriched = payload.model_dump(exclude_none=True, exclude={"related_product_ids", "policy_ids"})
     enriched["related_products"] = _resolve(context.state, payload.related_product_ids, dropped)
     _note_dropped(context, dropped)
+    unread = [pid for pid in payload.policy_ids if pid not in context.state.seen_policies]
+    if unread:
+        raise PresentationRefused(
+            f"policy_ids not returned by search_policies in this session: {', '.join(unread)}. "
+            "Cite only passages a search returned.",
+            PROVENANCE_GATE,
+        )
+    policies = [context.state.seen_policies[pid] for pid in payload.policy_ids]
+    evidence = [e for policy in policies if (e := policy.evidence()) is not None]
+    _cited_evidence(context, evidence)
+    if evidence:
+        enriched["evidence"] = [e.model_dump(mode="json", exclude_none=True) for e in evidence]
     return enriched
 
 
@@ -187,7 +206,8 @@ async def enrich_disclosure(
         raise PresentationRefused(
             "No disclosure exists for that product — answer from search_policies content instead."
         )
-    return disclosure.model_dump(exclude_none=True)
+    _cited_evidence(context, disclosure.evidence)
+    return disclosure.model_dump(mode="json", exclude_none=True)
 
 
 # -- Partial payloads while a call is still streaming ---------------------------------

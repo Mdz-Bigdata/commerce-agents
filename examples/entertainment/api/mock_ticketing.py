@@ -18,6 +18,7 @@ from commerce_common.streaming import ToolOutcome
 from demo_common.storefront_fixtures import (
     anchored_shift,
     cart_line,
+    cited_evidence,
     example_data_dir,
     find_by_id,
     find_order,
@@ -448,7 +449,6 @@ class MockTicketing(StorefrontBackend):
     ) -> Disclosure | None:
         """The all-in price itemized from the catalog's fee attributes (check.py verifies
         they sum to the price), plus live availability."""
-        del session
         product = self.products.get(product_id)
         if product is None or product.category not in {"tickets", "resale"}:
             return None
@@ -520,16 +520,18 @@ class MockTicketing(StorefrontBackend):
             DisclosureRow(label="Delivery", value="mobile ticket, rotating barcode"),
         ]
 
+        sources = [
+            "all-in-pricing",
+            "ticket-holds",
+            "resale-value-scores" if product.category == "resale" else "mobile-entry",
+            "refunds-event-changes",
+        ]
         return Disclosure(
             title=f"{product.title}: price and terms",
             product_id=product.product_id,
             rows=rows,
-            sources=[
-                "all-in-pricing",
-                "ticket-holds",
-                "resale-value-scores" if product.category == "resale" else "mobile-entry",
-                "refunds-event-changes",
-            ],
+            sources=sources,
+            evidence=cited_evidence(self._policies, session, sources),
             footnotes=[
                 "All prices are all-in: face value plus every fee, itemized above.",
                 "Availability counts are live inventory numbers, never marketing copy.",

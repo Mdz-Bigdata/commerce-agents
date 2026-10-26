@@ -3,6 +3,8 @@
 
 /** Mirrors shopping_agent/types.py and tools/presentation.py; detail extras are the vertical's api/. */
 
+import type { TermsEvidence } from "web-shared";
+
 export interface Product {
   product_id: string;
   title: string;
@@ -121,6 +123,7 @@ export interface GuidePayload {
   sections: { heading: string; body: string }[];
   related_products?: Product[];
   sources?: string[];
+  evidence?: TermsEvidence[];
 }
 
 export interface OrderStatusPayload {
@@ -167,6 +170,7 @@ export interface DisclosurePayload {
   rows: { label: string; value: string; note?: string }[];
   sources?: string[];
   footnotes?: string[];
+  evidence?: TermsEvidence[];
 }
 
 /** present_venue_map (api/venue_map.py). */

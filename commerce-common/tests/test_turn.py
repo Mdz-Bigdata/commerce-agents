@@ -203,7 +203,13 @@ def test_outcome_events_stamp_ui_events_and_summarize_long_results():
     ui, cart, result = outcome_events("tool", "t1", outcome)
     assert ui.data["stream_id"] == "t1" and "stream_id" not in cart.data
     assert result.data["summary"] == "ok" and result.data["excerpt"] == "x" * 500
-    assert result.data["status"] == "ok"
+    assert result.data["status"] == "ok" and "evidence" not in result.data
+
+
+def test_a_reads_evidence_reaches_its_tool_result():
+    evidence = [{"source_id": "shop/returns", "version": "2", "status": "current"}]
+    (result,) = outcome_events("tool", "t1", ToolOutcome("ok", evidence=evidence))
+    assert result.data["evidence"] == evidence
 
 
 def test_held_and_failed_results_keep_their_text():

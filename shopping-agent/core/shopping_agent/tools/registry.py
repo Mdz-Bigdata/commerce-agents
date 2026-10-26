@@ -241,7 +241,9 @@ def build_tools(
             "name": "search_policies",
             "description": (
                 "Search the store's own terms and help content: returns, shipping, "
-                "warranties, membership, fees, and the buying guides."
+                "warranties, membership, fees, and the buying guides. Each passage names "
+                "its source_id, version, and effective_at, and is the version in force "
+                "today; a source with no single version in force is withheld."
             ),
             "input_schema": {
                 "type": "object",
@@ -479,7 +481,7 @@ def build_tools(
             "description": (
                 "Show a how-to, an idea, or an itinerary as a card of short sections. Use "
                 "for guidance that is not a product plan; list sources when web content "
-                "informed it."
+                "informed it, and pass policy_ids when the sections state store terms."
             ),
             "input_schema": {
                 "type": "object",
@@ -519,6 +521,15 @@ def build_tools(
                         "items": {"type": "string"},
                         "maxItems": 5,
                         "description": "Guides or pages the sections were drawn from.",
+                    },
+                    "policy_ids": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "maxItems": 5,
+                        "description": (
+                            "policy_id of each search_policies passage the sections state "
+                            "terms from; the card shows its source and version."
+                        ),
                     },
                 },
                 "required": ["title", "sections"],

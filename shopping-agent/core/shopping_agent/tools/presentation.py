@@ -59,12 +59,14 @@ class GuideSection(BaseModel):
 
 
 class PresentGuidePayload(PresentationPayload):
-    """``related_product_ids`` become ``related_products`` on the host payload."""
+    """``related_product_ids`` become ``related_products`` on the host payload, and
+    ``policy_ids`` become ``evidence``: each passage's source, version, and window."""
 
     title: str = Field(max_length=80)
     sections: list[GuideSection] = Field(min_length=1, max_length=8)
     related_product_ids: list[str] = Field(default_factory=list, max_length=8)
     sources: list[str] = Field(default_factory=list, max_length=5)
+    policy_ids: list[str] = Field(default_factory=list, max_length=5)
 
 
 class PresentOrderStatusPayload(PresentationPayload):

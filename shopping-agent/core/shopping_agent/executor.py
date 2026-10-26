@@ -22,10 +22,14 @@ from .config import ShoppingAgentConfig
 from .enrichment import PRESENTATION_COMPONENTS
 from .fencing import STOREFRONT_FENCE
 from .gates import (
+    TERMS_GATE,
+    check_terms,
     gated_add_to_cart,
     gated_remove_from_cart,
     gated_update_cart_item,
     remember_order_items,
+    terms_clock,
+    terms_withheld_text,
 )
 from .memory import SHOPPING_MEMORY_EXTRACTION_PROMPT
 from .serialization import (
@@ -213,7 +217,18 @@ class ShoppingToolExecutor(BaseToolExecutor):
     async def _search_policies(self, tool_input: dict[str, Any]) -> ToolOutcome:
         query = self._sanitize(tool_input.get("query", ""), 200)
         policies = await self._backend.search_policies(self._session, query)
-        return self._fenced(policies_payload(policies))
+        check = check_terms(policies, terms_clock(self._session))
+        self._state.remember_policies(check.current)
+        if not check.withheld:
+            outcome = self._fenced(policies_payload(check.current))
+        elif not check.current:
+            outcome = ToolOutcome.held(TERMS_GATE, terms_withheld_text(check))
+        else:
+            # The passages in force still answer; the note says which sources did not.
+            outcome = self._fenced(policies_payload(check.current))
+            outcome.result_text = terms_withheld_text(check) + "\n" + outcome.result_text
+        outcome.evidence = check.evidence()
+        return outcome
 
     async def _get_fulfillment_options(self, tool_input: dict[str, Any]) -> ToolOutcome:
         product_ids = [str(pid) for pid in tool_input.get("product_ids") or []][

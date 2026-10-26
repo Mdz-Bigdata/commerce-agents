@@ -227,7 +227,7 @@ def check_storefront_fixtures() -> None:
                             f"{vertical}: order {order['order_id']} references unknown product {item['product_id']}"
                         )
             policies = load_json(data / "policies.json")["policies"]
-            [Policy.model_validate(p) for p in policies]
+            check_policy_versions(vertical, [Policy.model_validate(p) for p in policies])
             seeded = 0
             for user_id, entries in load_json(data / "memory-seed.json").items():
                 for entry in entries:
@@ -242,6 +242,25 @@ def check_storefront_fixtures() -> None:
             )
         except Exception as error:
             problem(f"{vertical} storefront fixtures: {error}")
+
+
+def check_policy_versions(vertical: str, policies: list[Any]) -> None:
+    """Every passage names its source and version, and no two versions of one source are
+    in force at once: the terms gate withholds such a source, so the shipped fixtures
+    never carry one."""
+    windows: dict[str, list[Any]] = {}
+    for policy in policies:
+        if (evidence := policy.evidence()) is None:
+            problem(f"{vertical}: policy {policy.policy_id} has no source_id/version")
+        else:
+            windows.setdefault(evidence.source_id, []).append(evidence)
+    for source, versions in windows.items():
+        versions.sort(key=lambda e: e.effective_at)
+        for earlier, later in zip(versions, versions[1:], strict=False):
+            if earlier.expires_at is None or earlier.expires_at > later.effective_at:
+                problem(
+                    f"{vertical}: {source} versions {earlier.version} and {later.version} overlap"
+                )
 
 
 def require_keys(rows: list[dict[str, Any]], keys: tuple[str, ...], where: str) -> None:

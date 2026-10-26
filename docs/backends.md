@@ -168,6 +168,18 @@ Never return a stand-in zero. Return `None` and say why in a short note.
 The retail merchant example returns two limitations: a 90-day order history and an email
 channel that reports no revenue.
 
+## Step 7: Version your terms
+
+Give each `Policy` the document it quotes: `source_id` (stable across revisions),
+`version`, `effective_at`, and `expires_at` when a version or a promotion lapses. Return
+every stored version of a matched source from `search_policies`; the terms gate in
+`shopping_agent/gates.py` passes the one in force at the session clock, so a dated
+change needs no deploy. A source whose versions overlap in time is withheld from the
+model until the records are fixed, and an unversioned passage passes unchecked. A
+`Disclosure` states the versions its rows rest on in `evidence`. The four verticals'
+`data/policies.json` carry a superseded version and a lapsed promotion each, and
+`scripts/check.py` refuses overlapping versions in them.
+
 ## Where to see it in the examples
 
 - Retail catalog: a mattress by size (one size out of stock, prices that step), a pillowcase

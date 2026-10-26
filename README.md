@@ -31,6 +31,10 @@ switches between English and Chinese from its app bar ([`examples/README.md`](ex
 Every reply carries 👍/👎 and a handoff to a person; the example APIs log each turn's tools,
 evidence ids, and outcome (never its text), and `python scripts/metrics_report.py --lang zh`
 computes resolution, self-service, and handoff rates from that log ([`docs/metrics.md`](docs/metrics.md)).
+Store terms are versioned: each passage carries its `source_id`, `version`, and
+`effective_at`, a gate withholds a lapsed or conflicting version, and
+`python scripts/eval_go_live.py` reports surface accuracy beside the go-live rate (correct,
+traceable, version valid, and safe) over 160 terms cases.
 `scripts/start_all.sh` does the setup above (`.venv`, `.env`, `npm ci`) and starts every
 vertical's API, storefront, and portal at once; name verticals to start only those. The
 verticals are `retail` (:3000, portal :3100), `travel` (:3001, :3101), `telecom` (:3002,
@@ -84,7 +88,7 @@ its analytics, catalog, inventory, pricing, and campaign systems.
 | [`plugins/commerce-builder/`](plugins/commerce-builder/) | The Claude Code plugin | — |
 | [`docs/`](docs/) | `safety.md` (enforced rules), `backends.md` (mapping your systems), `deployment.md` (other platforms), `metrics.md` (operations metrics) | — |
 | [`tests/`](tests/) | Cross-package suites; each package also has its own `tests/` | — |
-| [`scripts/`](scripts/) | `install.sh`, `run_demo.py`, `start_all.sh`, `metrics_report.py`, `smoke_chat.py`, `screenshot_tour.py`, `check.py`, `deploy_managed_agent.sh`, `verify_all.py` | — |
+| [`scripts/`](scripts/) | `install.sh`, `run_demo.py`, `start_all.sh`, `metrics_report.py`, `eval_go_live.py`, `smoke_chat.py`, `screenshot_tour.py`, `check.py`, `deploy_managed_agent.sh`, `verify_all.py` | — |
 
 ## Three ways to run an agent
 

@@ -43,6 +43,20 @@ def test_a_turn_record_holds_evidence_and_outcome_but_no_text(tmp_path):
     assert "private" not in json.dumps(record) and "session-1" not in json.dumps(record)
 
 
+def test_a_terms_read_logs_the_version_of_each_source(tmp_path):
+    log = OperationsLog(tmp_path / "storefront.jsonl", vertical="retail", role="storefront")
+    recorder = log.turn("session-1", None)
+    evidence = [
+        {"source_id": "retail/returns", "version": "1", "status": "superseded"},
+        {"source_id": "retail/returns", "version": "2", "status": "current"},
+    ]
+    recorder.observe(AgentEvent.tool_call("search_policies", "tu-1", {"query": "returns"}))
+    recorder.observe(AgentEvent.tool_result("search_policies", "tu-1", "ok", evidence=evidence))
+    recorder.write()
+    (record,) = lines(log)
+    assert record["evidence_versions"] == evidence
+
+
 def test_votes_and_handoffs_are_accepted_only_for_the_sessions_own_turns(tmp_path):
     log = OperationsLog(tmp_path / "storefront.jsonl", vertical="retail", role="storefront")
     store: SessionStore[ShoppingSessionState] = SessionStore(ShoppingSessionState)

@@ -18,6 +18,7 @@ from typing import Any
 
 from demo_common.storefront_fixtures import (
     SessionCarts,
+    cited_evidence,
     example_data_dir,
     find_order,
     find_product,
@@ -384,7 +385,6 @@ class MockTelecom(StorefrontBackend):
     ) -> Disclosure | None:
         """The service-facts box for a plan or home-internet tier, from the catalog record
         and the fee schedule; devices and add-ons have none."""
-        del session
         product = self.products.get(product_id)
         if product is None or product.category not in {"plans", "home-internet"}:
             return None
@@ -474,16 +474,18 @@ class MockTelecom(StorefrontBackend):
             )
         )
 
+        sources = [
+            "plan-pricing-disclosures",
+            "network-management-disclosure",
+            "data-top-ups-and-overage",
+            "early-termination",
+        ]
         return Disclosure(
             title=f"{product.title}: service facts",
             product_id=product.product_id,
             rows=rows,
-            sources=[
-                "plan-pricing-disclosures",
-                "network-management-disclosure",
-                "data-top-ups-and-overage",
-                "early-termination",
-            ],
+            sources=sources,
+            evidence=cited_evidence(self._policies, session, sources),
             footnotes=[
                 "Prices shown include the AutoPay and paperless billing discount.",
                 "Typical speeds are medians measured across the network in the last quarter.",

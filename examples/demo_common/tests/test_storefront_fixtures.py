@@ -96,6 +96,23 @@ def test_help_search_ignores_function_words_and_weights_headings():
     assert search_help([guide, returns], "the a of") == []
 
 
+def test_help_search_returns_every_version_of_a_matched_source():
+    def version(policy_id: str, number: str, content: str) -> Policy:
+        return Policy(
+            policy_id=policy_id,
+            title="Returns",
+            content=content,
+            source_id="shop/returns",
+            version=number,
+            effective_at="2026-01-01",
+        )
+
+    old = version("r-1", "1", "Returns within 45 days.")
+    new = version("r-2", "2", "Thirty days.")
+    other = Policy(policy_id="s", title="Shipping", content="Returns ship free.")
+    assert search_help([other, new, old], "returns", limit=1) == [new, old]
+
+
 def test_ids_resolve_case_insensitively():
     items = {"AR-1601": object()}
     assert find_by_id(items, "AR-1601") == "AR-1601"

@@ -137,7 +137,7 @@ def orders_payload(orders: Sequence[Order]) -> Any:
 
 
 def policies_payload(policies: Sequence[Policy]) -> Any:
-    return [p.model_dump(exclude_none=True) for p in policies] or {
+    return [p.model_dump(mode="json", exclude_none=True) for p in policies] or {
         "note": "No matching policy content."
     }
 

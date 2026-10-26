@@ -26,6 +26,7 @@ from .types import (
     SearchFilters,
     ShoppingSessionContext,
     ShoppingSessionState,
+    TermsEvidence,
     UserPreferences,
 )
 
@@ -49,6 +50,7 @@ __all__ = [
     "ShoppingSessionContext",
     "ShoppingSessionState",
     "StorefrontBackend",
+    "TermsEvidence",
     "Unavailable",
     "UserPreferences",
     "cart_payload",

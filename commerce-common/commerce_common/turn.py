@@ -514,6 +514,7 @@ def outcome_events(tool: str, tool_use_id: str, outcome: ToolOutcome) -> Iterato
         status="blocked" if outcome.blocked else None,
         reason=outcome.blocked,
         excerpt=None if keep_text else outcome.result_text[:_EXCERPT_MAX_CHARS],
+        evidence=outcome.evidence or None,
     )
 
 

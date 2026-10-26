@@ -22,8 +22,11 @@ from shopping_agent import (
     Product,
     ProductDetails,
     SearchFilters,
+    ShoppingSessionContext,
+    TermsEvidence,
     UserPreferences,
 )
+from shopping_agent.gates import check_terms, terms_clock
 
 _WORD = re.compile(r"[a-z0-9]+")
 _ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
@@ -381,18 +384,39 @@ def _help_terms(text: str) -> set[str]:
 
 
 def search_help(policies: Iterable[Policy], query: str, limit: int = 3) -> list[Policy]:
-    """Help entries ranked by term overlap; a hit in the title or category counts double."""
+    """Help entries ranked by term overlap; a hit in the title or category counts double.
+    ``limit`` counts sources: every stored version of a matched source comes back with
+    it, ranked by its best version, and the terms gate picks the one in force."""
     query_terms = _help_terms(query)
     if not query_terms:
         return []
-    scored = []
+    policies = list(policies)
+    best: dict[str, int] = {}
     for policy in policies:
         heading_hits = len(query_terms & _help_terms(f"{policy.title} {policy.category}"))
         body_hits = len(query_terms & _help_terms(policy.content))
         if points := 2 * heading_hits + body_hits:
-            scored.append((points, policy))
-    scored.sort(key=lambda pair: -pair[0])
-    return [policy for _, policy in scored[:limit]]
+            source = policy.source_id or policy.policy_id
+            best[source] = max(best.get(source, 0), points)
+    ranked = sorted(best, key=lambda source: -best[source])[:limit]
+    return [
+        policy
+        for source in ranked
+        for policy in policies
+        if (policy.source_id or policy.policy_id) == source
+    ]
+
+
+def cited_evidence(
+    policies: Iterable[Policy], session: ShoppingSessionContext, policy_ids: Iterable[str]
+) -> list[TermsEvidence]:
+    """The evidence for the version in force at the session clock of each source the
+    named passages belong to: what a disclosure box cites."""
+    policies = list(policies)
+    wanted = set(policy_ids)
+    sources = {p.source_id for p in policies if p.policy_id in wanted and p.source_id}
+    check = check_terms([p for p in policies if p.source_id in sources], terms_clock(session))
+    return [e for policy in check.current if (e := policy.evidence()) is not None]
 
 
 def orders_for(orders: Iterable[tuple[str, Order]], user_id: str, limit: int) -> list[Order]:

@@ -5,7 +5,7 @@
 
 /** Renders present_guide. */
 
-import { useT } from "web-shared";
+import { evidenceLabel, useT } from "web-shared";
 import PlanTile from "@/components/PlanTile";
 import { formatPriceWithUnit } from "@/lib/format";
 import type { GuidePayload } from "@/lib/types";
@@ -51,6 +51,16 @@ export default function TermsCard({ payload }: { payload: GuidePayload }) {
           {payload.sources.map((source) => (
             <span key={source} className="am-tag">
               {source}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {payload.evidence?.length ? (
+        <div className="am-rule mt-2 flex flex-wrap items-center gap-1.5 pt-2">
+          <span className="am-meta">{t("Terms in force")}</span>
+          {payload.evidence.map((e) => (
+            <span key={e.policy_id} className="am-tag">
+              {evidenceLabel(e, t)}
             </span>
           ))}
         </div>

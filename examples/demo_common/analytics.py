@@ -6,8 +6,9 @@
 person, and per change the portal applies.
 
 A turn record carries the evidence the turn rested on (the tools it called, the record ids
-their inputs named, how each call ended, the gates that refused one) and its outcome (stop
-reason, error kind, usage, latency, the writes it made). No message text, tool result, or
+their inputs named, the source and version of each terms passage a read returned or
+withheld, how each call ended, the gates that refused one) and its outcome (stop reason,
+error kind, usage, latency, the writes it made). No message text, tool result, or
 fact value is written: the log is for counting, and ``docs/safety.md`` keeps conversation
 content out of logs below DEBUG.
 
@@ -81,6 +82,7 @@ class TurnRecorder:
             "locale": locale,
             "tools": [],
             "evidence_ids": [],
+            "evidence_versions": [],
             "blocked": [],
             "writes": [],
             "error": None,
@@ -100,6 +102,16 @@ class TurnRecorder:
             status = data.get("status") or ("error" if data.get("is_error") else "ok")
             if entry is not None:
                 entry["status"] = status
+            versions = self._record["evidence_versions"]
+            for item in data.get("evidence") or []:
+                if len(versions) < _MAX_IDS and isinstance(item, dict):
+                    versions.append(
+                        {
+                            "source_id": str(item.get("source_id"))[:80],
+                            "version": str(item.get("version"))[:20],
+                            "status": item.get("status"),
+                        }
+                    )
             if status == "blocked":
                 self._record["blocked"].append(
                     {"tool": data.get("tool"), "reason": data.get("reason")}
