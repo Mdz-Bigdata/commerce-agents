@@ -101,5 +101,88 @@
       "effective_at": "2026-03-01",
       "expires_at": "2026-06-30"
     }
-  ]
+  ],
+  "synonyms": {
+    "tix": [
+      "tickets"
+    ],
+    "screenshot": [
+      "mobile entry",
+      "barcode"
+    ],
+    "print": [
+      "mobile entry",
+      "barcode"
+    ],
+    "phone died": [
+      "mobile entry",
+      "box office"
+    ],
+    "hidden fees": [
+      "all-in",
+      "fee breakdown"
+    ],
+    "sneak": [
+      "all-in",
+      "fee breakdown"
+    ],
+    "ripoff": [
+      "resale",
+      "value score"
+    ],
+    "resell": [
+      "resale"
+    ],
+    "called off": [
+      "cancelled",
+      "refund"
+    ],
+    "postponed": [
+      "rescheduled"
+    ],
+    "money back": [
+      "refund"
+    ],
+    "give away": [
+      "transfer"
+    ],
+    "wheelchair": [
+      "accessible seating"
+    ],
+    "sold out": [
+      "waitlist"
+    ],
+    "fake": [
+      "guarantee",
+      "valid"
+    ],
+    "门票": [
+      "ticket"
+    ],
+    "截图": [
+      "mobile entry",
+      "barcode"
+    ],
+    "转给": [
+      "transfer"
+    ],
+    "转让": [
+      "transfer"
+    ],
+    "轮椅": [
+      "accessible seating"
+    ],
+    "无障碍": [
+      "accessible seating"
+    ],
+    "退款": [
+      "refund"
+    ],
+    "手续费": [
+      "fee"
+    ],
+    "转售": [
+      "resale"
+    ]
+  }
 }

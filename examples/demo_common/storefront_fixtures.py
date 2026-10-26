@@ -210,6 +210,12 @@ def load_policies(data_dir: Path) -> list[Policy]:
     ]
 
 
+def load_help_synonyms(data_dir: Path) -> dict[str, list[str]]:
+    """The terminology map in ``policies.json``: a customer's word or phrase -> the words
+    the policies use for it, which ``search_help`` puts in its place in a query."""
+    return dict(load_json(data_dir, "policies.json").get("synonyms", {}))
+
+
 def weeks_since(authored_today: date, today: date | None = None) -> timedelta:
     """The whole weeks from the day a fixture was written for to today. Fixture dates
     move forward by this, so their spacing and weekdays survive and every file authored
@@ -383,11 +389,41 @@ def _help_terms(text: str) -> set[str]:
     return {stem(t) for t in tokens(text) if t not in _HELP_STOPWORDS}
 
 
-def search_help(policies: Iterable[Policy], query: str, limit: int = 3) -> list[Policy]:
+def _help_query_terms(query: str, synonyms: Mapping[str, list[str]]) -> set[str]:
+    """The query's terms with each synonym key it contains replaced by the key's policy
+    words, so "send back" counts as "return" and its "send" no longer matches an unrelated
+    passage. An ASCII key matches as a run of whole stemmed words ("send back" in "can I
+    send back shoes", not in "send it back"); any other key, such as a Chinese one,
+    matches as a substring, since the tokenizer keeps only ASCII words."""
+    terms = _help_terms(query)
+    words = f" {' '.join(stem(t) for t in tokens(query))} "
+    lowered = query.lower()
+    replaced: set[str] = set()
+    added: set[str] = set()
+    for phrase, targets in synonyms.items():
+        if phrase.isascii():
+            if f" {' '.join(stem(t) for t in tokens(phrase))} " not in words:
+                continue
+            replaced |= _help_terms(phrase)
+        elif phrase.lower() not in lowered:
+            continue
+        added |= _help_terms(" ".join(targets))
+    return (terms - replaced) | added
+
+
+def search_help(
+    policies: Iterable[Policy],
+    query: str,
+    limit: int = 3,
+    *,
+    synonyms: Mapping[str, list[str]] | None = None,
+) -> list[Policy]:
     """Help entries ranked by term overlap; a hit in the title or category counts double.
-    ``limit`` counts sources: every stored version of a matched source comes back with
-    it, ranked by its best version, and the terms gate picks the one in force."""
-    query_terms = _help_terms(query)
+    ``synonyms`` (from ``load_help_synonyms``) swaps policy words in for the customer
+    words a query contains. ``limit`` counts sources: every stored version of a matched source
+    comes back with it, ranked by its best version, and the terms gate picks the one in
+    force."""
+    query_terms = _help_query_terms(query, synonyms or {})
     if not query_terms:
         return []
     policies = list(policies)

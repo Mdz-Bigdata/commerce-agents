@@ -119,5 +119,94 @@
       "effective_at": "2026-01-15",
       "expires_at": "2026-07-01"
     }
-  ]
+  ],
+  "synonyms": {
+    "go over": [
+      "overage",
+      "allowance"
+    ],
+    "throttle": [
+      "reduced speed",
+      "deprioritized"
+    ],
+    "extra data": [
+      "data top-up"
+    ],
+    "more data": [
+      "data top-up"
+    ],
+    "ditch": [
+      "without"
+    ],
+    "cracked": [
+      "screen",
+      "damage",
+      "protection"
+    ],
+    "smashed": [
+      "screen",
+      "damage",
+      "protection"
+    ],
+    "insurance": [
+      "device protection"
+    ],
+    "quit": [
+      "cancelling",
+      "service",
+      "early termination"
+    ],
+    "etf": [
+      "early termination fee"
+    ],
+    "pay off": [
+      "installment",
+      "paying off"
+    ],
+    "old phone": [
+      "trade-in"
+    ],
+    "downgrade": [
+      "change",
+      "plan",
+      "lower-priced"
+    ],
+    "home internet": [
+      "home fiber"
+    ],
+    "wifi": [
+      "home fiber"
+    ],
+    "流量": [
+      "data"
+    ],
+    "流量包": [
+      "data top-up"
+    ],
+    "解约": [
+      "cancelling",
+      "early termination"
+    ],
+    "套餐": [
+      "plan"
+    ],
+    "换机": [
+      "upgrade"
+    ],
+    "以旧换新": [
+      "trade-in"
+    ],
+    "碎屏": [
+      "screen",
+      "damage"
+    ],
+    "宽带": [
+      "home fiber",
+      "internet"
+    ],
+    "多少钱": [
+      "fee",
+      "price"
+    ]
+  }
 }

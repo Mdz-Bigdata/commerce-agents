@@ -10,6 +10,7 @@ from demo_common.storefront_fixtures import (
     find_product,
     keyword_score,
     load_catalog,
+    load_help_synonyms,
     option_text,
     rank_products,
     redate_in_flight_orders,
@@ -94,6 +95,41 @@ def test_help_search_ignores_function_words_and_weights_headings():
     )
     assert search_help([guide, returns], "how do returns work") == [returns, guide]
     assert search_help([guide, returns], "the a of") == []
+
+
+RETURNS = Policy(policy_id="r", title="Returns", category="returns", content="Return in 30 days.")
+DAMAGED = Policy(
+    policy_id="d", title="Damaged items", category="returns", content="We send a replacement."
+)
+ENTRY = Policy(policy_id="e", title="Mobile entry", content="The barcode rotates.")
+SYNONYMS = {"send back": ["return"], "screenshot": ["barcode"], "退货": ["return"]}
+
+
+def test_help_search_expands_a_customer_phrase_into_policy_words():
+    assert search_help([ENTRY], "screenshot ok?") == []
+    assert search_help([ENTRY], "screenshot ok?", synonyms=SYNONYMS) == [ENTRY]
+    assert search_help([ENTRY, RETURNS], "退货期限", synonyms=SYNONYMS) == [RETURNS]
+
+
+def test_help_search_synonym_phrase_replaces_its_own_words():
+    # Both share the "returns" category; kept beside "return", the damaged entry's "send"
+    # would tie the two and the damaged entry, listed first, would rank first.
+    assert search_help([DAMAGED, RETURNS], "send back shoes", synonyms=SYNONYMS)[0] == RETURNS
+
+
+def test_help_search_matches_an_ascii_key_only_as_whole_words_in_order():
+    assert search_help([ENTRY], "screenshots", synonyms=SYNONYMS) == [ENTRY]
+    assert search_help([RETURNS], "send it back", synonyms=SYNONYMS) == []
+    assert search_help([RETURNS], "sendback", synonyms=SYNONYMS) == []
+
+
+def test_help_synonyms_load_from_the_terms_file(tmp_path):
+    (tmp_path / "policies.json").write_text(json.dumps({"policies": []}))
+    assert load_help_synonyms(tmp_path) == {}
+    (tmp_path / "policies.json").write_text(
+        json.dumps({"policies": [], "synonyms": SYNONYMS}, ensure_ascii=False), encoding="utf-8"
+    )
+    assert load_help_synonyms(tmp_path) == SYNONYMS
 
 
 def test_help_search_returns_every_version_of_a_matched_source():

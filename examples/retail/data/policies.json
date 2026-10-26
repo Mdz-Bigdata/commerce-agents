@@ -119,5 +119,90 @@
       "effective_at": "2025-11-01",
       "expires_at": "2026-02-01"
     }
-  ]
+  ],
+  "synonyms": {
+    "send back": [
+      "return",
+      "returned"
+    ],
+    "take back": [
+      "return"
+    ],
+    "exchange": [
+      "return"
+    ],
+    "swap": [
+      "return"
+    ],
+    "money back": [
+      "refund"
+    ],
+    "busted": [
+      "damaged"
+    ],
+    "broken": [
+      "damaged"
+    ],
+    "cracked": [
+      "damaged"
+    ],
+    "showed up": [
+      "arrive"
+    ],
+    "never came": [
+      "missing"
+    ],
+    "stolen": [
+      "porch theft"
+    ],
+    "delivery": [
+      "shipping"
+    ],
+    "how fast": [
+      "shipping",
+      "arrive"
+    ],
+    "go bad": [
+      "expire"
+    ],
+    "giftcard": [
+      "gift card"
+    ],
+    "member": [
+      "membership",
+      "subscription"
+    ],
+    "undo": [
+      "cancel",
+      "order"
+    ],
+    "cheaper": [
+      "price match",
+      "lower price"
+    ],
+    "退货": [
+      "return",
+      "refund"
+    ],
+    "退款": [
+      "refund"
+    ],
+    "运费": [
+      "shipping"
+    ],
+    "会员": [
+      "membership",
+      "subscription"
+    ],
+    "礼品卡": [
+      "gift card"
+    ],
+    "保修": [
+      "warranty"
+    ],
+    "多少钱": [
+      "cost",
+      "price"
+    ]
+  }
 }

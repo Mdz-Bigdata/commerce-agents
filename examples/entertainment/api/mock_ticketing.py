@@ -23,6 +23,7 @@ from demo_common.storefront_fixtures import (
     find_by_id,
     find_order,
     keyword_score,
+    load_help_synonyms,
     load_json,
     load_orders,
     load_policies,
@@ -192,6 +193,7 @@ class MockTicketing(StorefrontBackend):
             for item in order.items:
                 item.title = redate(item.title)
         self._policies = load_policies(data_dir)
+        self._help_synonyms = load_help_synonyms(data_dir)
         inventory = {
             row["product_id"]: row for row in load_json(data_dir, "inventory.json")["inventory"]
         }
@@ -549,7 +551,7 @@ class MockTicketing(StorefrontBackend):
 
     async def search_policies(self, session: ShoppingSessionContext, query: str) -> list[Policy]:
         del session
-        return search_help(self._policies, query)
+        return search_help(self._policies, query, synonyms=self._help_synonyms)
 
     async def get_fulfillment_options(
         self, session: ShoppingSessionContext, product_ids: list[str]

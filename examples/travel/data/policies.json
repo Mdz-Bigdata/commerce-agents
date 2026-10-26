@@ -92,5 +92,100 @@
       "effective_at": "2026-05-01",
       "expires_at": "2026-09-01"
     }
-  ]
+  ],
+  "synonyms": {
+    "bail": [
+      "cancel",
+      "cancelled"
+    ],
+    "back out": [
+      "cancel",
+      "cancelled"
+    ],
+    "call off": [
+      "cancel"
+    ],
+    "money back": [
+      "refund"
+    ],
+    "nonrefundable": [
+      "non-refundable"
+    ],
+    "reschedule": [
+      "change",
+      "date"
+    ],
+    "move my dates": [
+      "change",
+      "date"
+    ],
+    "push back": [
+      "change",
+      "date"
+    ],
+    "luggage": [
+      "baggage",
+      "bag"
+    ],
+    "suitcase": [
+      "baggage",
+      "checked bag"
+    ],
+    "price jumped": [
+      "price",
+      "increased",
+      "revalidation"
+    ],
+    "price went up": [
+      "price",
+      "increased",
+      "revalidation"
+    ],
+    "charge my card": [
+      "charged",
+      "payment"
+    ],
+    "pending charge": [
+      "verification",
+      "hold"
+    ],
+    "typo": [
+      "name",
+      "correction"
+    ],
+    "member": [
+      "membership",
+      "subscription"
+    ],
+    "护照": [
+      "passport"
+    ],
+    "签证": [
+      "visa"
+    ],
+    "有效": [
+      "valid"
+    ],
+    "取消": [
+      "cancel"
+    ],
+    "退款": [
+      "refund"
+    ],
+    "改期": [
+      "change",
+      "date"
+    ],
+    "改日期": [
+      "change",
+      "date"
+    ],
+    "行李": [
+      "baggage",
+      "bag"
+    ],
+    "要钱": [
+      "fee"
+    ]
+  }
 }

@@ -21,6 +21,7 @@ from demo_common.storefront_fixtures import (
     find_product,
     keyword_score,
     load_catalog,
+    load_help_synonyms,
     load_orders,
     load_policies,
     load_users,
@@ -119,6 +120,7 @@ class MockRetail(StorefrontBackend):
         self._users = load_users(data_dir)
         self._orders = load_orders(data_dir)
         self._policies = load_policies(data_dir)
+        self._help_synonyms = load_help_synonyms(data_dir)
         self._carts = SessionCarts()
         self._stamp_delivery_promises()
         self._stamp_low_stock(data_dir)
@@ -337,7 +339,7 @@ class MockRetail(StorefrontBackend):
 
     async def search_policies(self, session: ShoppingSessionContext, query: str) -> list[Policy]:
         del session
-        return search_help(self._policies, query)
+        return search_help(self._policies, query, synonyms=self._help_synonyms)
 
     @staticmethod
     def _pickup_eta(now: datetime) -> str:

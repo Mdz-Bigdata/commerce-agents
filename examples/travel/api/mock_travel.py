@@ -24,6 +24,7 @@ from demo_common.storefront_fixtures import (
     find_product,
     keyword_score,
     load_catalog,
+    load_help_synonyms,
     load_json,
     load_orders,
     load_policies,
@@ -168,6 +169,7 @@ class MockTravel(StorefrontBackend):
         self._users = load_users(data_dir)
         self._orders = load_orders(data_dir)
         self._policies = load_policies(data_dir)
+        self._help_synonyms = load_help_synonyms(data_dir)
         # The supplier's occupancy fixture is also the storefront's remaining-rooms
         # source, so both sides quote one count.
         occupancy = load_occupancy(data_dir, self.today)
@@ -361,7 +363,7 @@ class MockTravel(StorefrontBackend):
 
     async def search_policies(self, session: ShoppingSessionContext, query: str) -> list[Policy]:
         del session
-        return search_help(self._policies, query)
+        return search_help(self._policies, query, synonyms=self._help_synonyms)
 
     async def get_fulfillment_options(
         self, session: ShoppingSessionContext, product_ids: list[str]

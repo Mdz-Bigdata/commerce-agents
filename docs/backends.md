@@ -178,7 +178,10 @@ change needs no deploy. A source whose versions overlap in time is withheld from
 model until the records are fixed, and an unversioned passage passes unchecked. A
 `Disclosure` states the versions its rows rest on in `evidence`. The four verticals'
 `data/policies.json` carry a superseded version and a lapsed promotion each, and
-`scripts/check.py` refuses overlapping versions in them.
+`scripts/check.py` refuses overlapping versions in them. Each file's `synonyms` map
+takes a customer's word or phrase (slang, shorthand, Chinese) to the words the policies
+use, and `search_help` in `demo_common/storefront_fixtures.py` swaps it in before ranking,
+so "send back" finds the returns policy.
 
 ## Where to see it in the examples
 

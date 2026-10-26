@@ -226,8 +226,10 @@ def check_storefront_fixtures() -> None:
                         problem(
                             f"{vertical}: order {order['order_id']} references unknown product {item['product_id']}"
                         )
-            policies = load_json(data / "policies.json")["policies"]
+            terms = load_json(data / "policies.json")
+            policies = terms["policies"]
             check_policy_versions(vertical, [Policy.model_validate(p) for p in policies])
+            check_help_synonyms(vertical, terms.get("synonyms", {}))
             seeded = 0
             for user_id, entries in load_json(data / "memory-seed.json").items():
                 for entry in entries:
@@ -261,6 +263,23 @@ def check_policy_versions(vertical: str, policies: list[Any]) -> None:
                 problem(
                     f"{vertical}: {source} versions {earlier.version} and {later.version} overlap"
                 )
+
+
+def check_help_synonyms(vertical: str, synonyms: Any) -> None:
+    """The terminology map ``search_help`` expands queries with: customer word -> a list
+    of policy words, all strings."""
+    if not isinstance(synonyms, dict):
+        problem(f"{vertical}: policies.json synonyms is not an object")
+        return
+    for word, targets in synonyms.items():
+        if not (
+            isinstance(word, str)
+            and word.strip()
+            and isinstance(targets, list)
+            and targets
+            and all(isinstance(t, str) and t.strip() for t in targets)
+        ):
+            problem(f"{vertical}: policies.json synonym {word!r} is not a word -> list of words")
 
 
 def require_keys(rows: list[dict[str, Any]], keys: tuple[str, ...], where: str) -> None:
