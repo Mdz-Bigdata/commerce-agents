@@ -99,7 +99,11 @@ def settings_payload() -> dict[str, Any]:
         "base_url": provider.base_url if provider else None,
         "model": provider.model if provider else None,
         "fast_model": provider.fast_model if provider else None,
-        "has_key": bool(provider and provider.has_key()),
+        # A key the provider does not need is reported as not set, beside key_required.
+        "has_key": bool(
+            provider and provider.has_key() and (provider.api_key or provider.is_anthropic)
+        ),
+        "key_required": provider.key_required if provider else True,
         "key_hint": provider.key_hint if provider else None,
         "key_preview": f"…{saved_key[-4:]}" if saved_key and len(saved_key) > 8 else None,
         "source": provider.source if provider else ("page" if saved else "env"),
@@ -165,13 +169,23 @@ def install_model_settings_routes(app: FastAPI) -> None:
 
     @app.post(f"{PREFIX}/test")
     async def test_settings() -> dict:
+        """``ok`` with the model that answered, or a ``code`` the panel words in the page's
+        language (``invalid``, ``no_key``, ``auth``, ``status``, ``unreachable``) plus an
+        English ``error``."""
         try:
             provider = resolve_provider()
         except ValueError as error:
-            return {"ok": False, "error": str(error)}
+            return {"ok": False, "code": "invalid", "error": _panel_wording(str(error))}
+        label = provider.label
         if not provider.has_key() and provider.key_required:
-            return {"ok": False, "error": f"No API key is set for {provider.label}."}
+            return {
+                "ok": False,
+                "code": "no_key",
+                "label": label,
+                "error": f"No API key is set for {label}.",
+            }
         model = _test_model(provider)
+        failure: dict[str, Any] | None = None
         try:
             await provider_client(provider, timeout=30.0).messages.create(
                 model=model,
@@ -179,20 +193,21 @@ def install_model_settings_routes(app: FastAPI) -> None:
                 messages=[{"role": "user", "content": "Reply with the word ok."}],
             )
         except (anthropic.AuthenticationError, ModelAuthenticationError):
-            return {"ok": False, "model": model, "error": f"{provider.label} rejected the API key."}
-        except (anthropic.APIStatusError, ModelProviderError) as failure:
-            status = getattr(failure, "status_code", None) or getattr(failure, "status", None)
-            return {
-                "ok": False,
-                "model": model,
-                "error": f"{provider.label} returned an error ({status or 'no status'}); "
+            failure = {"code": "auth", "error": f"{label} rejected the API key."}
+        except (anthropic.APIStatusError, ModelProviderError) as error:
+            status = getattr(error, "status_code", None) or getattr(error, "status", None)
+            failure = {
+                "code": "status",
+                "status": status,
+                "error": f"{label} returned an error ({status or 'no status'}); "
                 "check the model name and endpoint.",
             }
         except Exception:  # a connection failure or anything else: the log keeps the detail
             logger.exception("model settings test failed")
-            return {
-                "ok": False,
-                "model": model,
-                "error": f"Could not reach {provider.label}; check the endpoint.",
+            failure = {
+                "code": "unreachable",
+                "error": f"Could not reach {label}; check the endpoint.",
             }
-        return {"ok": True, "model": model, "label": provider.label}
+        if failure is not None:
+            return {"ok": False, "label": label, "model": model, **failure}
+        return {"ok": True, "label": label, "model": model}

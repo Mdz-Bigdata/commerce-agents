@@ -165,7 +165,9 @@ def test_the_settings_routes_take_a_key_and_never_return_it(settings_api, monkey
     bad = settings_api.put("/api/model-settings", json={"provider": "openai-compatible"})
     assert bad.status_code == 422 and bad.json()["detail"] == "This provider needs an endpoint."
     test = settings_api.post("/api/model-settings/test").json()
-    assert not test["ok"] and "No API key" in test["error"]
+    assert not test["ok"] and test["code"] == "no_key" and "No API key" in test["error"]
+    keyless = settings_api.put("/api/model-settings", json={"provider": "ollama", "model": "m"})
+    assert not keyless.json()["has_key"] and not keyless.json()["key_required"]
     assert settings_api.delete("/api/model-settings").json()["source"] == "env"
     monkeypatch.setenv("DEMO_MODEL_SETTINGS", "0")
     assert settings_api.put("/api/model-settings", json={"provider": "ollama"}).status_code == 403

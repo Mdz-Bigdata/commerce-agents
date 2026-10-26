@@ -23,6 +23,8 @@ export const SHARED_ZH: Readonly<Record<string, string>> = {
   "From the .env files": "来自 .env 文件",
   "API key set": "已设置 API 密钥",
   "No API key": "未设置 API 密钥",
+  "No API key needed": "无需 API 密钥",
+  "Not needed for this provider": "该服务商无需密钥",
   "Not set": "未设置",
   "Paste the key for this provider": "粘贴该服务商的密钥",
   "Saved ({preview}); leave empty to keep it": "已保存（{preview}）；留空则保留",
@@ -41,6 +43,10 @@ export const SHARED_ZH: Readonly<Record<string, string>> = {
   "This provider needs an endpoint.": "该服务商需要填写接口地址。",
   "This provider needs a model name.": "该服务商需要填写模型名称。",
   "Choose a provider from the list.": "请从列表中选择服务商。",
+  "No API key is set for {label}.": "尚未为 {label} 设置 API 密钥。",
+  "{label} rejected the API key.": "{label} 拒绝了这个 API 密钥。",
+  "{label} returned an error ({status}); check the model name and endpoint.": "{label} 返回了错误（{status}），请检查模型名称和接口地址。",
+  "Could not reach {label}; check the endpoint.": "无法连接到 {label}，请检查接口地址。",
   "This API's model is set by its environment (DEMO_MODEL_SETTINGS=0).": "此 API 的模型由环境变量决定（DEMO_MODEL_SETTINGS=0），无法在页面修改。",
 
   // Terms evidence on cards

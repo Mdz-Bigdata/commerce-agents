@@ -32,6 +32,7 @@ interface Settings {
   model: string | null;
   fast_model: string | null;
   has_key: boolean;
+  key_required: boolean;
   key_hint: string | null;
   key_preview: string | null;
   source: "page" | "env";
@@ -41,6 +42,15 @@ interface Settings {
 }
 
 type Notice = { tone: "ok" | "error"; text: string } | null;
+
+interface TestResult {
+  ok: boolean;
+  code?: "invalid" | "no_key" | "auth" | "status" | "unreachable";
+  label?: string;
+  model?: string;
+  status?: number | null;
+  error?: string;
+}
 
 const PATH = "/api/model-settings";
 
@@ -91,7 +101,9 @@ function ModelSettingsSheet({ api, onClose }: { api: AgentApi; onClose: () => vo
     // A value equal to the preset's default shows as the placeholder, not as an override.
     setBaseUrl(next.base_url && next.base_url !== preset?.base_url ? next.base_url : "");
     setModel(next.model && next.model !== preset?.model ? next.model : "");
-    setFastModel(next.fast_model && next.fast_model !== preset?.fast_model ? next.fast_model : "");
+    // The memory model defaults to the preset's, or to the main model once that is set.
+    const fastDefault = next.fast_model === preset?.fast_model || next.fast_model === next.model;
+    setFastModel(next.fast_model && !fastDefault ? next.fast_model : "");
     setApiKey("");
   }, []);
 
@@ -102,6 +114,21 @@ function ModelSettingsSheet({ api, onClose }: { api: AgentApi; onClose: () => vo
   const preset = settings?.presets.find((p) => p.name === provider);
   const sameProvider = settings?.provider === provider;
   const editable = settings?.editable ?? false;
+  const testFailure = (result: TestResult) => {
+    const vars = { label: result.label ?? "", status: String(result.status ?? "—") };
+    switch (result.code) {
+      case "no_key":
+        return t("No API key is set for {label}.", vars);
+      case "auth":
+        return t("{label} rejected the API key.", vars);
+      case "status":
+        return t("{label} returned an error ({status}); check the model name and endpoint.", vars);
+      case "unreachable":
+        return t("Could not reach {label}; check the endpoint.", vars);
+      default:
+        return t(result.error ?? "");
+    }
+  };
   const errorText = (error?: string) => (error === "unreachable" ? t("The API is not reachable.") : t(error ?? ""));
 
   const save = async () => {
@@ -141,12 +168,12 @@ function ModelSettingsSheet({ api, onClose }: { api: AgentApi; onClose: () => vo
   const test = async () => {
     setBusy("test");
     setNotice(null);
-    const { data, error } = await call<{ ok: boolean; model?: string; label?: string; error?: string }>(api.root, "POST", "/test");
+    const { data, error } = await call<TestResult>(api.root, "POST", "/test");
     setBusy(null);
     if (data?.ok) {
       setNotice({ tone: "ok", text: t("Connected: {label} answered with {model}.", { label: data.label ?? "", model: data.model ?? "" }) });
     } else {
-      setNotice({ tone: "error", text: data?.error ?? errorText(error) });
+      setNotice({ tone: "error", text: data ? testFailure(data) : errorText(error) });
     }
   };
 
@@ -163,7 +190,9 @@ function ModelSettingsSheet({ api, onClose }: { api: AgentApi; onClose: () => vo
     }
   };
 
-  const keyPlaceholder = !sameProvider
+  const keyPlaceholder = preset && !preset.key_required
+    ? t("Not needed for this provider")
+    : !sameProvider
     ? t("Paste the key for this provider")
     : settings?.key_preview
       ? t("Saved ({preview}); leave empty to keep it", { preview: settings.key_preview })
@@ -211,7 +240,7 @@ function ModelSettingsSheet({ api, onClose }: { api: AgentApi; onClose: () => vo
             <div className="text-(--ink-soft)">
               {settings.source === "page" ? t("Saved from this panel") : t("From the .env files")}
               {" · "}
-              {settings.has_key ? t("API key set") : t("No API key")}
+              {!settings.key_required ? t("No API key needed") : settings.has_key ? t("API key set") : t("No API key")}
             </div>
             {settings.problem ? <div className="mt-1 text-(--danger)">{settings.problem}</div> : null}
           </div>
