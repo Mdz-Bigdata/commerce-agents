@@ -32,6 +32,9 @@ examples = [
   # POST out of the demo APIs.
   "fastapi>=0.132",
   "uvicorn>=0.30",
+  # uvicorn's reloader watches data and skill files, not only Python, with it
+  # (scripts/start_all.sh runs the APIs with --reload).
+  "watchfiles>=1.0",
   "python-dotenv>=1.0",
 ]
 

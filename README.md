@@ -39,8 +39,12 @@ Store terms are versioned: each passage carries its `source_id`, `version`, and
 traceable, version valid, and safe) over 160 terms cases. `python scripts/eval_constraints.py`
 reports the Constraint Violation Rate: how often a turn shows or adds a product that breaks
 a budget, option, date, or stock constraint the customer stated, over 40 cases.
-`scripts/start_all.sh` does the setup above (`.venv`, `.env`, `npm ci`) and starts every
-vertical's API, storefront, and portal at once; name verticals to start only those. The
+`./start.command` (or a double-click on it in Finder) is the one-click start: it runs
+`scripts/start_all.sh --open`, which does the setup above (`.venv`, `.env`, `npm ci`, again
+whenever the pinned dependencies change), stops this checkout's servers from an earlier run,
+starts every vertical's API, storefront, and portal on the code on disk with APIs that
+reload when their code or data changes, and opens the retail storefront and portal; name
+verticals to start only those, and `scripts/start_all.sh --stop` stops everything. The
 verticals are `retail` (:3000, portal :3100), `travel` (:3001, :3101), `telecom` (:3002,
 :3102), and `entertainment` (:3003, :3103); each README lists prompts to try on both surfaces.
 

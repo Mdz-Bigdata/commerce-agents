@@ -14,7 +14,10 @@ Boots uvicorn and the Next.js dev server(s), waits until they answer, prints the
 stops everything on Ctrl-C. Python packages and the examples/ npm workspace are installed on
 first run. Ports are preferences: this vertical's API already running on its port is reused;
 any other busy port moves the server to the next free one, and the web apps are pointed at
-wherever the API is. Chat credentials come from the environment, the vertical's .env, the
+wherever the API is. ``--restart`` first stops this checkout's own servers for the vertical
+(an API or web app another program or checkout runs is left alone), ``--stop`` only stops
+them, and ``--reload`` restarts the API whenever its Python, data, or skill files change.
+Requests to localhost always bypass an HTTP proxy the environment sets. Chat credentials come from the environment, the vertical's .env, the
 repo-root .env (MODEL_PROVIDER picks Anthropic or an OpenAI-compatible provider; see
 .env.example), then the SDK's credential chain; browsing and /showcase need none.
 """
@@ -26,6 +29,7 @@ import contextlib
 import importlib.util
 import json
 import os
+import shutil
 import signal
 import socket
 import subprocess
@@ -66,6 +70,88 @@ PYTHON_MODULES = (
 )
 
 GREEN, YELLOW, DIM, RESET = "\033[32m", "\033[33m", "\033[2m", "\033[0m"
+
+
+# Where a moved server may have landed: start_all.sh takes API ports from :8010, and a busy
+# web port moves the web app up by one at a time.
+API_PORT_RANGE = range(8010, 8020)
+WEB_PORT_SPAN = 10
+_LOCAL_HOSTS = ("localhost", "127.0.0.1", "::1")
+
+
+def bypass_proxy_for_localhost(env: dict[str, str]) -> None:
+    """Add the loopback names to NO_PROXY/no_proxy, so an HTTP proxy the shell exports never
+    carries the web apps' calls to the API or the API's calls to a local model server."""
+    for name in ("NO_PROXY", "no_proxy"):
+        present = [item.strip() for item in env.get(name, "").split(",") if item.strip()]
+        env[name] = ",".join(present + [host for host in _LOCAL_HOSTS if host not in present])
+
+
+def _lines(command: list[str]) -> list[str]:
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=5, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+    return [line for line in result.stdout.splitlines() if line.strip()]
+
+
+def listening_pids(port: int) -> list[int]:
+    return [int(pid) for pid in _lines(["lsof", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN", "-t"])]
+
+
+def process_owner(pid: int) -> tuple[str, str]:
+    """``(command line, working directory)`` of a process, empty where unknown."""
+    command = " ".join(_lines(["ps", "-o", "command=", "-p", str(pid)]))
+    cwd = next(
+        (
+            line[1:]
+            for line in _lines(["lsof", "-a", "-p", str(pid), "-d", "cwd", "-Fn"])
+            if line.startswith("n")
+        ),
+        "",
+    )
+    return command, cwd
+
+
+def ours(pid: int, vertical: str) -> bool:
+    """True for this checkout's API or web app of ``vertical``: the API by its module and app
+    directory, a web app by its working directory."""
+    command, cwd = process_owner(pid)
+    if f"{vertical}.api.main" in command:
+        return str(EXAMPLES_DIR) in command or cwd == str(REPO_ROOT)
+    apps = {str(EXAMPLES_DIR / vertical / name) for name in ("storefront-web", "merchant-web")}
+    return cwd in apps
+
+
+def stop_servers(vertical: str) -> list[int]:
+    """Stop this checkout's servers for ``vertical`` on its own ports and the ports a moved
+    server may have taken; the ports they held."""
+    if not shutil.which("lsof"):
+        print(f"{YELLOW}lsof is not installed; earlier servers are not stopped.{RESET}")
+        return []
+    api_port = int(VERTICALS[vertical]["api_port"])  # type: ignore[arg-type]
+    web_port = api_port - 5000
+    ports = [api_port, *API_PORT_RANGE]
+    ports += [
+        port for base in (web_port, web_port + 100) for port in range(base, base + WEB_PORT_SPAN)
+    ]
+    freed: list[int] = []
+    for port in ports:
+        pids = [pid for pid in listening_pids(port) if ours(pid, vertical)]
+        for pid in pids:
+            with contextlib.suppress(ProcessLookupError, PermissionError):
+                os.killpg(os.getpgid(pid), signal.SIGTERM)
+        if pids:
+            freed.append(port)
+    deadline = time.monotonic() + 10
+    while any(port_in_use(port) for port in freed) and time.monotonic() < deadline:
+        time.sleep(0.3)
+    for port in freed:
+        for pid in listening_pids(port):
+            if ours(pid, vertical):
+                with contextlib.suppress(ProcessLookupError, PermissionError):
+                    os.killpg(os.getpgid(pid), signal.SIGKILL)
+    return freed
 
 
 def port_in_use(port: int) -> bool:
@@ -185,7 +271,27 @@ def spawn(command: list[str], cwd: Path, env: dict[str, str] | None = None) -> s
     )
 
 
-def start_api(vertical: str, port: int, federated: bool) -> subprocess.Popen:
+def reload_options(vertical: str) -> list[str]:
+    """uvicorn's reloader over the packages, the shared host code, and this vertical's API and
+    data: Python, JSON, and skill files. Dot-files (the memory store, the settings file) are
+    runtime writes and never trigger it."""
+    watched = [
+        REPO_ROOT / "commerce-common",
+        REPO_ROOT / "shopping-agent",
+        REPO_ROOT / "merchant-agent",
+        EXAMPLES_DIR / "demo_common",
+        EXAMPLES_DIR / vertical / "api",
+        EXAMPLES_DIR / vertical / "data",
+    ]
+    options = ["--reload"]
+    for directory in watched:
+        options += ["--reload-dir", str(directory)]
+    for pattern in ("*.py", "*.json", "*.yaml", "SKILL.md"):
+        options += ["--reload-include", pattern]
+    return options + ["--reload-exclude", ".*"]
+
+
+def start_api(vertical: str, port: int, federated: bool, reload: bool = False) -> subprocess.Popen:
     env = os.environ.copy()
     if federated:
         env["COMMERCE_DEMO_AUTH"] = "sdk"
@@ -199,6 +305,7 @@ def start_api(vertical: str, port: int, federated: bool) -> subprocess.Popen:
         str(EXAMPLES_DIR),
         "--port",
         str(port),
+        *(reload_options(vertical) if reload else []),
     ]
     return spawn(command, REPO_ROOT, env)
 
@@ -255,6 +362,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--no-reuse", action="store_true", help="always boot a fresh API")
     parser.add_argument(
+        "--restart",
+        action="store_true",
+        help="stop this checkout's servers for the vertical first (implies --no-reuse)",
+    )
+    parser.add_argument(
+        "--stop", action="store_true", help="stop this checkout's servers for the vertical and exit"
+    )
+    parser.add_argument(
+        "--reload", action="store_true", help="restart the API when its code or data changes"
+    )
+    parser.add_argument(
         "--fresh-memory",
         action="store_true",
         help="delete the vertical's persisted memory files first (implies --no-reuse)",
@@ -282,6 +400,18 @@ def main() -> int:
         raise KeyboardInterrupt
 
     signal.signal(signal.SIGTERM, terminate)
+    bypass_proxy_for_localhost(os.environ)  # type: ignore[arg-type]
+
+    if args.stop or args.restart:
+        freed = stop_servers(args.vertical)
+        if freed:
+            ports = ", ".join(f":{port}" for port in freed)
+            print(f"{DIM}Stopped the earlier {args.vertical} servers on {ports}.{RESET}")
+        elif args.stop:
+            print(f"{DIM}No {args.vertical} servers from this checkout were running.{RESET}")
+        if args.stop:
+            return 0
+        args.no_reuse = True
 
     config = VERTICALS[args.vertical]
     store = str(config["store"])
@@ -331,7 +461,7 @@ def main() -> int:
     try:
         if run_api and not reuse_api:
             ensure_python_deps(install=not args.no_install)
-            api = start_api(args.vertical, api_port, args.federated)
+            api = start_api(args.vertical, api_port, args.federated, args.reload)
             processes.append(("api", api))
             pipe_output(api, f"{args.vertical}-api")
             if not wait_for(f"http://localhost:{api_port}/api/health", 90, api):
