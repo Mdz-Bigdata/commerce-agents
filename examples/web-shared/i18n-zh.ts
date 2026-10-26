@@ -116,6 +116,7 @@ export const SHARED_ZH: Readonly<Record<string, string>> = {
   "Searching the listings…": "正在搜索商品列表…",
   "Reading the listing…": "正在查看商品信息…",
   "Checking inventory alerts…": "正在检查库存预警…",
+  "Checking return reasons…": "正在查看退货原因…",
   "Checking order issues…": "正在检查订单问题…",
   "Reading the pricing context…": "正在查看定价背景…",
   "Reading campaign performance…": "正在查看活动表现…",
