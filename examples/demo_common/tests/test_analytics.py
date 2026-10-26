@@ -280,3 +280,53 @@ def test_logging_can_be_switched_off(tmp_path, monkeypatch):
     log = OperationsLog.for_example(tmp_path / "retail", "storefront")
     log.feedback("s", "t", True)
     assert log.path is None and not (tmp_path / "retail").exists()
+
+
+def test_a_turn_record_names_its_model_and_provider(tmp_path):
+    log = OperationsLog(tmp_path / "storefront.jsonl", vertical="retail", role="storefront")
+    log.turn("session-1", None, model="deepseek-chat", provider="deepseek").write()
+    log.turn("session-1", None).write()
+    named, unnamed = lines(log)
+    assert (named["provider"], named["model"]) == ("deepseek", "deepseek-chat")
+    assert (unnamed["provider"], unnamed["model"]) == (None, None)
+
+
+def test_a_streamed_turn_logs_the_settings_model_but_no_key_or_endpoint(tmp_path, monkeypatch):
+    from commerce_common.testing import FakeClient
+    from demo_common.host import stream_turn
+    from demo_common.model_provider import ModelSettings, save_settings
+    from shopping_agent import ShoppingAgentConfig
+    from shopping_agent_runtime import ShoppingAgent
+
+    monkeypatch.setenv("DEMO_MODEL_SETTINGS_FILE", str(tmp_path / "model-settings.json"))
+    save_settings(
+        ModelSettings(
+            provider="openai-compatible",
+            api_key="sk-acme-secret",
+            base_url="https://user:pass@llm.acme.test/v1",
+            model="acme-chat",
+        )
+    )
+
+    class Agent(ShoppingAgent):
+        async def stream_turn(self, messages, session, state):
+            yield AgentEvent.turn_complete("end_turn", {"input_tokens": 1}, 10, 0)
+
+        async def update_memory(self, messages, session):
+            return None
+
+    agent = Agent(backend=None, config=ShoppingAgentConfig(), client=FakeClient([]))
+    log = OperationsLog(tmp_path / "storefront.jsonl", vertical="retail", role="storefront")
+    store: SessionStore[ShoppingSessionState] = SessionStore(ShoppingSessionState)
+    record = store.start("u-1")
+    app = FastAPI()
+
+    @app.get("/chat")
+    def chat():
+        return stream_turn(agent, store, record, None, env_hint=".env", log=log)
+
+    assert "turn_complete" in TestClient(app).get("/chat").text
+    (logged,) = lines(log)
+    assert (logged["provider"], logged["model"]) == ("openai-compatible", "acme-chat")
+    text = json.dumps(logged)
+    assert "sk-acme-secret" not in text and "acme.test" not in text and "pass" not in text

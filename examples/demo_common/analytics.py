@@ -5,13 +5,15 @@
 ``docs/metrics.md``): one JSON line per chat turn, per feedback vote, per handoff to a
 person, and per change the portal applies.
 
-A turn record carries the evidence the turn rested on (the tools it called, the record ids
-their inputs named, the source and version of each terms passage a read returned or
-withheld, how each call ended, the gates that refused one), why it fell back, if it did
-(``fallback_reason``, read from those events), and its outcome (stop reason, error kind,
-usage, latency, the writes it made). No tool result or fact value is written, and the
-only message text is a handoff's ``request``: the log is for counting, and
-``docs/safety.md`` keeps conversation content out of logs below DEBUG.
+A turn record carries the model that produced the reply (``provider``, the name
+``model_provider.resolve_provider`` resolved, and ``model``; never a key or an endpoint),
+the evidence the turn rested on (the tools it called, the record ids their inputs named,
+the source and version of each terms passage a read returned or withheld, how each call
+ended, the gates that refused one), why it fell back, if it did (``fallback_reason``, read
+from those events), and its outcome (stop reason, error kind, usage, latency, the writes
+it made). No tool result or fact value is written, and the only message text is a
+handoff's ``request``: the log is for counting, and ``docs/safety.md`` keeps conversation
+content out of logs below DEBUG.
 
 A handoff record carries the ticket's brief (``OperationsLog.brief``), so the person who
 takes it starts from what the agent already did.
@@ -62,6 +64,8 @@ REQUEST_MAX_CHARS = 200
 _IDENTIFIER = re.compile(
     "|".join(f"(?:{p})" for p in (r"(?:\d[ .()-]{0,2}){8,}\d", *DEFAULT_BLOCKED_PATTERNS[1:]))
 )
+# A model name as the settings panel accepts it (``ModelSettings.model``).
+_MAX_MODEL = 120
 
 
 def _now() -> str:
@@ -124,7 +128,15 @@ class TurnRecorder:
     turn ends. ``observe`` returns the event to send, with ``turn_id`` stamped on
     ``turn_complete`` so the client can vote on that turn."""
 
-    def __init__(self, log: "OperationsLog", session_id: str, locale: str | None) -> None:
+    def __init__(
+        self,
+        log: "OperationsLog",
+        session_id: str,
+        locale: str | None,
+        *,
+        model: str | None = None,
+        provider: str | None = None,
+    ) -> None:
         self.log = log
         self.session_id = session_id
         self.turn_id = f"t_{uuid.uuid4().hex[:16]}"
@@ -133,6 +145,8 @@ class TurnRecorder:
             "turn_id": self.turn_id,
             "session": session_tag(session_id),
             "locale": locale,
+            "provider": provider,
+            "model": model[:_MAX_MODEL] if model else None,
             "tools": [],
             "evidence_ids": [],
             "evidence_versions": [],
@@ -290,8 +304,17 @@ class OperationsLog:
             return "rule_triggered"
         return requested
 
-    def turn(self, session_id: str, locale: str | None) -> TurnRecorder:
-        return TurnRecorder(self, session_id, locale)
+    def turn(
+        self,
+        session_id: str,
+        locale: str | None,
+        *,
+        model: str | None = None,
+        provider: str | None = None,
+    ) -> TurnRecorder:
+        """A recorder for one turn; ``model`` is the name the turn loop calls and
+        ``provider`` the resolved provider's name (``anthropic``, ``deepseek``, ...)."""
+        return TurnRecorder(self, session_id, locale, model=model, provider=provider)
 
     def feedback(self, session_id: str, turn_id: str, helpful: bool) -> None:
         self.write(

@@ -28,6 +28,7 @@ def turn(
     blocked=(),
     versions=(),
     fallback=None,
+    model=("anthropic", "acme-large"),
 ):
     return {
         "kind": "turn",
@@ -41,6 +42,8 @@ def turn(
         "error": error,
         "evidence_versions": list(versions),
         "fallback_reason": fallback,
+        "provider": model[0],
+        "model": model[1],
         "elapsed_ms": elapsed,
         "usage": {"input_tokens": 100, "output_tokens": 20},
     }
@@ -86,6 +89,24 @@ def test_rates_follow_the_definitions(tmp_path):
     assert metrics["errors"] == {"no_key": 1}
     assert metrics["gate_refusals"] == {"add_to_cart: provenance": 1}
     assert metrics["tokens_per_turn"] == 120
+    assert metrics["models"] == {"anthropic/acme-large": 5}
+
+
+def test_turns_are_counted_by_the_model_that_produced_them(tmp_path):
+    older = turn("s1", "t0")
+    del older["provider"], older["model"]
+    records = [
+        older,
+        turn("s1", "t1", model=("deepseek", "deepseek-chat")),
+        turn("s1", "t2", model=("deepseek", "deepseek-chat")),
+        turn("s2", "t3", model=("ollama", None)),
+    ]
+    path = tmp_path / "storefront.jsonl"
+    path.write_text("\n".join(json.dumps(r) for r in records))
+    metrics = report.compute(report.load([path])[("retail", "storefront")])
+    assert metrics["models"] == {"unknown": 1, "deepseek/deepseek-chat": 2, "ollama/?": 1}
+    rendered = report.render(("retail", "storefront"), metrics, zh=False)
+    assert "Models: deepseek/deepseek-chat 2, ollama/? 1, unknown 1" in rendered
 
 
 def test_the_review_sample_puts_dislikes_errors_and_refusals_first(tmp_path):

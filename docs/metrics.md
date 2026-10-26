@@ -13,14 +13,19 @@ One JSON line per event, per vertical and role, in `examples/<vertical>/data/.an
 
 | `kind` | Written when | Fields |
 |---|---|---|
-| `turn` | A chat turn ends | `turn_id`, session tag, locale, each tool called with its status (`ok`, `error`, `blocked`), the record ids the tool inputs named (`evidence_ids`), the source, version, and terms-gate status of each policy passage a read returned or withheld (`evidence_versions`), gate refusals with their reason, why the turn fell back (`fallback_reason`), writes (`cart`, `change:<status>`), stop reason, error kind, usage, latency |
+| `turn` | A chat turn ends | `turn_id`, session tag, locale, the `provider` and `model` that produced the reply, each tool called with its status (`ok`, `error`, `blocked`), the record ids the tool inputs named (`evidence_ids`), the source, version, and terms-gate status of each policy passage a read returned or withheld (`evidence_versions`), gate refusals with their reason, why the turn fell back (`fallback_reason`), writes (`cart`, `change:<status>`), stop reason, error kind, usage, latency |
 | `feedback` | The user votes on a reply | `turn_id`, `helpful` |
 | `handoff` | The user asks for a person | `turn_id`, `reason` (the UI's, or `rule_triggered`), `ticket`, and the ticket's brief: `request`, `tried` (`tools`, `held`, `fallbacks`), `evidence_versions` |
 | `action` | The portal applies or dismisses a staged change | `name`, the change id |
 
 No tool result or memory value is written, and the only message text is a handoff's
 `request`; the session appears as the same hashed tag the model-call log uses.
-`DEMO_ANALYTICS=0` turns the log off and `DEMO_ANALYTICS_DIR` moves it.
+`provider` is the resolved provider's name (`anthropic`, `deepseek`, `openai-compatible`,
+...) and `model` the name the turn loop called, both read from the model settings in force
+when the turn started (`examples/demo_common/model_provider.py`); no key or endpoint is
+written. With the label the chat panels show ("AI assistant", 「AI 助手」), they are the
+record that a reply was machine-generated and by which model. `DEMO_ANALYTICS=0` turns the
+log off and `DEMO_ANALYTICS_DIR` moves it.
 
 A handoff's brief is what the person taking the ticket starts from, and the handoff
 response returns it to the UI. `OperationsLog.brief` builds it from the session's last 20
@@ -66,7 +71,8 @@ Handoffs are split by reason: `user_requested` (the button with no prior signal)
 button under a reply that ended in an error) come from the UI; `rule_triggered` replaces
 the first two when the reply's turn has a `fallback_reason`, decided by the API from the
 turn it logged (`OperationsLog.handoff_reason`). System errors are split by kind
-(`no_key`, `auth_failed`, `provider_error`, `generic`) and gate refusals by tool and reason.
+(`no_key`, `auth_failed`, `provider_error`, `generic`), gate refusals by tool and reason,
+and turns by `provider/model` (`unknown` for a record without them).
 
 A severe-error rate needs a reviewer's judgment, which no log supplies: `--sample N` lists
 the turns to review first (every 👎, then system errors, then gate refusals, then a seeded

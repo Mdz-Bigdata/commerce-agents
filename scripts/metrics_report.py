@@ -136,6 +136,15 @@ def percentile(values: list[int], q: float) -> int | None:
     return round(statistics.quantiles(values, n=100, method="inclusive")[int(q) - 1])
 
 
+def model_of(turn: dict[str, Any]) -> str:
+    """``provider/model`` as the turn record names them; a record without them (written
+    before they were logged) counts as ``unknown``."""
+    provider, model = turn.get("provider"), turn.get("model")
+    if not provider and not model:
+        return "unknown"
+    return f"{provider or '?'}/{model or '?'}"
+
+
 def compute(sessions: dict[str, Session]) -> dict[str, Any]:
     effective = [s for s in sessions.values() if s.effective()]
     turns = [turn for s in sessions.values() for turn in s.turns]
@@ -173,6 +182,7 @@ def compute(sessions: dict[str, Session]) -> dict[str, Any]:
         "latency_p50_ms": percentile(latencies, 50),
         "latency_p95_ms": percentile(latencies, 95),
         "tokens_per_turn": round(statistics.mean(tokens)) if tokens else None,
+        "models": dict(Counter(model_of(turn) for turn in turns)),
         "terms_gaps": terms_gaps(sessions),
     }
 
@@ -248,6 +258,7 @@ def render(group: tuple[str, str], metrics: dict[str, Any], zh: bool) -> str:
         ("转人工原因" if zh else "Handoff reasons", metrics["handoff_reasons"]),
         ("系统异常" if zh else "System errors", metrics["errors"]),
         ("门禁拦截" if zh else "Gate refusals", metrics["gate_refusals"]),
+        ("生成模型" if zh else "Models", metrics["models"]),
     ):
         if counts:
             labels = {k: v[index] for k, v in HANDOFF_REASONS.items()}

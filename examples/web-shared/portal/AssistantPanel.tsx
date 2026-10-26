@@ -9,7 +9,7 @@ import { Composer, type Prefill } from "../Composer";
 import { useT } from "../i18n";
 import { Icon } from "../icons";
 import { useStickToBottom } from "../scroll";
-import { LatestPill, Transcript, type TranscriptProps } from "../Transcript";
+import { AiLabel, LatestPill, Transcript, type TranscriptProps } from "../Transcript";
 import type { AgentTurn } from "../turn";
 import { IconButton } from "../ui";
 
@@ -75,7 +75,10 @@ export function AssistantPanel({
           <Icon name="spark" size={15} />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[14px] font-semibold leading-tight text-(--ink)">{copy.title}</div>
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="truncate text-[14px] font-semibold leading-tight text-(--ink)">{copy.title}</span>
+            <AiLabel />
+          </div>
           <div className="truncate text-[11.5px] text-(--ink-soft)">{t("You approve every change")}</div>
         </div>
         <ActivityButton streaming={chat.streaming} newMemoryCount={newMemoryCount} onClick={onOpenActivity} />

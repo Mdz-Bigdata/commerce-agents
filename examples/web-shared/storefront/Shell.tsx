@@ -11,6 +11,7 @@ import type { AgentApi } from "../api";
 import { Composer } from "../Composer";
 import { Icon, type IconName } from "../icons";
 import { Inspector } from "../Inspector";
+import { AiLabel } from "../Transcript";
 import type { AgentTurn } from "../turn";
 import { Avatar } from "../ui";
 import { FrameContext } from "./frame";
@@ -152,6 +153,7 @@ export function StoreShell<V extends string>({
             })}
           </nav>
           <div className="ml-auto flex items-center gap-2">
+            <AiLabel compact />
             <ModelSettingsButton api={api} />
             <LanguageToggle />
             <ActivityButton
