@@ -112,22 +112,24 @@ function ModelPicker({
   value,
   onChange,
   models,
-  fallback,
+  placeholder,
+  defaultLabel,
   disabled,
 }: {
   value: string;
   onChange: (value: string) => void;
   models: string[] | null;
-  fallback: string;
+  /** The typed field's placeholder; `defaultLabel` is the picker's empty choice. */
+  placeholder: string;
+  defaultLabel: string;
   disabled: boolean;
 }) {
-  const t = useT();
   if (!models?.length) {
-    return <input value={value} onChange={(event) => onChange(event.target.value)} placeholder={fallback} disabled={disabled} className={INPUT} />;
+    return <input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} disabled={disabled} className={INPUT} />;
   }
   return (
     <select value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} className={INPUT}>
-      <option value="">{t("Provider default ({model})", { model: fallback })}</option>
+      <option value="">{defaultLabel}</option>
       {value && !models.includes(value) ? <option value={value}>{value}</option> : null}
       {models.map((name) => (
         <option key={name} value={name}>
@@ -215,6 +217,17 @@ function ModelSettingsSheet({ api, onClose }: { api: AgentApi; onClose: () => vo
   }, [settings?.editable, apiKey, loadModels]);
 
   const models = listing.state === "ok" && !typing ? listing.models : null;
+  // Anthropic and the named presets have a default model; an open endpoint needs one chosen.
+  const needsModel = provider !== "anthropic" && !preset?.model;
+  const modelDefault = needsModel
+    ? t("Choose a model")
+    : t("Provider default ({model})", { model: preset?.model ?? t("default model") });
+  // Memory extraction runs on the preset's small model, else on the main model.
+  const fastDefault = preset?.fast_model
+    ? t("Provider default ({model})", { model: preset.fast_model })
+    : model
+      ? t("Same as the model ({model})", { model })
+      : t("Same as the model");
   const errorText = (error?: string) => (error === "unreachable" ? t("The API is not reachable.") : t(error ?? ""));
 
   const save = async () => {
@@ -392,7 +405,14 @@ function ModelSettingsSheet({ api, onClose }: { api: AgentApi; onClose: () => vo
             />
           </Field>
           <Field label={t("Model")}>
-            <ModelPicker value={model} onChange={setModel} models={models} fallback={preset?.model ?? t("default model")} disabled={!editable} />
+            <ModelPicker
+              value={model}
+              onChange={setModel}
+              models={models}
+              placeholder={preset?.model ?? (needsModel ? t("Model name") : t("default model"))}
+              defaultLabel={modelDefault}
+              disabled={!editable}
+            />
           </Field>
           {editable ? (
             <div className="-mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] leading-snug text-(--ink-soft)">
@@ -401,11 +421,15 @@ function ModelSettingsSheet({ api, onClose }: { api: AgentApi; onClose: () => vo
                   ? t("Loading the provider's models…")
                   : listing.state === "ok"
                     ? listing.models.length
-                      ? t("{n} models loaded; pick one, or leave the default.", { n: listing.models.length })
+                      ? needsModel
+                        ? t("{n} models loaded; pick the one to use.", { n: listing.models.length })
+                        : t("{n} models loaded; pick one, or leave the default.", { n: listing.models.length })
                       : t("The provider listed no models; type the model name.")
                     : listing.state === "error"
                       ? listing.text
-                      : t("Leave empty for the provider's default.")}
+                      : needsModel
+                        ? t("This endpoint has no default; name the model.")
+                        : t("Leave empty for the provider's default.")}
               </span>
               {listing.state === "ok" && listing.models.length ? (
                 <button type="button" onClick={() => setTyping(!typing)} className="font-medium underline-offset-2 hover:text-(--ink) hover:underline">
@@ -424,7 +448,8 @@ function ModelSettingsSheet({ api, onClose }: { api: AgentApi; onClose: () => vo
               value={fastModel}
               onChange={setFastModel}
               models={models}
-              fallback={preset?.fast_model ?? (model || preset?.model || t("default model"))}
+              placeholder={preset?.fast_model ?? (model || preset?.model || t("default model"))}
+              defaultLabel={fastDefault}
               disabled={!editable}
             />
           </Field>
