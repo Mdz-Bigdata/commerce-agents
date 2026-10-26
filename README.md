@@ -44,8 +44,8 @@ a budget, option, date, or stock constraint the customer stated, over 40 cases.
 whenever the pinned dependencies change), stops this checkout's servers from an earlier run,
 starts every vertical's API, storefront, and portal on the code on disk with APIs that
 reload when their code or data changes, and opens the demo hub at :3200
-([`examples/hub/`](examples/hub/)), which runs every storefront and portal in one page, one
-at a time or a vertical's two side by side; name verticals to start only those, and
+([`examples/hub/`](examples/hub/)), which runs every storefront and portal in one page: an
+overview grid of the apps you tick, one app, or a vertical's two side by side; name verticals to start only those, and
 `scripts/start_all.sh --stop` stops everything. The
 verticals are `retail` (:3000, portal :3100), `travel` (:3001, :3101), `telecom` (:3002,
 :3102), and `entertainment` (:3003, :3103); each README lists prompts to try on both surfaces.
