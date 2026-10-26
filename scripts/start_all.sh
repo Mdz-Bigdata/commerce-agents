@@ -7,7 +7,7 @@
 #   scripts/start_all.sh                       # all four verticals: APIs :8000-8003,
 #                                              # storefronts :3000-3003, portals :3100-3103
 #   scripts/start_all.sh retail travel         # only the verticals named
-#   scripts/start_all.sh --open                # and open the first storefront and portal
+#   scripts/start_all.sh --open                # and open the demo hub (every app, one page)
 #   scripts/start_all.sh --stop                # stop what an earlier run left behind, and exit
 #   scripts/start_all.sh --no-reload           # an API that does not restart on code changes
 #   scripts/start_all.sh --prod --fresh-memory # other flags pass through to scripts/run_demo.py
@@ -20,7 +20,8 @@
 # servers from an earlier run (anything else on a port is left alone and the server moves to
 # the next free port), so what starts is always the code on disk, and runs each vertical
 # under scripts/run_demo.py --all with an API that restarts when its Python, data, or skill
-# files change. Requests to localhost bypass any HTTP proxy the shell exports. Ctrl-C stops
+# files change. The demo hub (examples/hub/index.html, :3200) shows every storefront and
+# portal in one page. Requests to localhost bypass any HTTP proxy the shell exports. Ctrl-C stops
 # everything. The web apps bundle with webpack by default: Turbopack cannot load
 # next/font/google files that Google Fonts serves from /l/font?kit=... URLs.
 
@@ -107,6 +108,15 @@ echo "  ${DIM}$("$PYTHON" --version) at .venv${RESET}"
 step "Stopping earlier servers"
 for vertical in "${VERTICALS[@]}"; do
   "$PYTHON" scripts/run_demo.py "$vertical" --stop | sed 's/^/  /'
+done
+# The demo hub's static server from an earlier run: matched by the directory it serves.
+HUB_DIR="$REPO_ROOT/examples/hub"
+for port in $(seq 3200 3209); do
+  for pid in $(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null); do
+    if ps -o command= -p "$pid" | grep -q -- "--directory $HUB_DIR"; then
+      kill "$pid" 2>/dev/null && echo "  ${DIM}Stopped the earlier demo hub on :$port.${RESET}"
+    fi
+  done
 done
 [[ $STOP_ONLY -eq 0 ]] || exit 0
 
@@ -198,17 +208,23 @@ for i in "${!VERTICALS[@]}"; do
   PIDS+=("$!")
 done
 
-# --open: the first vertical's storefront and portal, once each answers.
+# The demo hub: one static page that frames every storefront and portal at their live ports.
+HUB_PORT=3200
+while port_busy "$HUB_PORT"; do HUB_PORT=$((HUB_PORT + 1)); done
+"$PYTHON" -m http.server "$HUB_PORT" --bind 127.0.0.1 --directory "$HUB_DIR" >/dev/null 2>&1 &
+PIDS+=("$!")
+echo "  ${GREEN}demo hub${RESET}         http://localhost:$HUB_PORT  ${DIM}(every storefront and portal in one page)${RESET}"
+
+# --open: the hub, once the first vertical's storefront answers.
 if [[ $OPEN -eq 1 ]]; then
   first_web=$(( $(default_port "${VERTICALS[0]}") - 5000 ))
   (
-    for url in "http://localhost:$first_web" "http://localhost:$((first_web + 100))"; do
-      for _ in $(seq 1 240); do
-        curl -s -o /dev/null -m 2 "$url" && break
-        sleep 1
-      done
-      if command -v open >/dev/null 2>&1; then open "$url"; elif command -v xdg-open >/dev/null 2>&1; then xdg-open "$url"; fi
+    for _ in $(seq 1 240); do
+      curl -s -o /dev/null -m 2 "http://localhost:$first_web" && break
+      sleep 1
     done
+    url="http://localhost:$HUB_PORT"
+    if command -v open >/dev/null 2>&1; then open "$url"; elif command -v xdg-open >/dev/null 2>&1; then xdg-open "$url"; fi
   ) &
   OPENER="$!"
 fi

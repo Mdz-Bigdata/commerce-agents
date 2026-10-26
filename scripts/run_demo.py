@@ -45,6 +45,8 @@ if hasattr(sys.stdout, "reconfigure"):
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES_DIR = REPO_ROOT / "examples"
 NEXT = EXAMPLES_DIR / "node_modules" / ".bin" / "next"
+# Where each running vertical records its ports for the demo hub (examples/hub/index.html).
+HUB_RUNTIME = EXAMPLES_DIR / "hub" / "runtime"
 
 VERTICALS: dict[str, dict[str, object]] = {
     "retail": {
@@ -321,6 +323,17 @@ def start_web(
     return spawn([str(NEXT), "dev", *bundler, "--port", str(port)], app_dir, env)
 
 
+def record_ports(vertical: str, api_port: int, webs: list[tuple[str, Path, int]]) -> Path:
+    """The vertical's live ports, for the hub page to point its frames at."""
+    HUB_RUNTIME.mkdir(parents=True, exist_ok=True)
+    path = HUB_RUNTIME / f"{vertical}.json"
+    ports = {"api": api_port}
+    for _, app_dir, port in webs:
+        ports["storefront" if app_dir.name == "storefront-web" else "portal"] = port
+    path.write_text(json.dumps(ports) + "\n", encoding="utf-8")
+    return path
+
+
 def reset_persisted_memory(vertical: str) -> str:
     files = VERTICALS[vertical].get("memory_files")
     if not files:
@@ -458,6 +471,7 @@ def main() -> int:
         )
 
     processes: list[tuple[str, subprocess.Popen]] = []
+    recorded: Path | None = None
     try:
         if run_api and not reuse_api:
             ensure_python_deps(install=not args.no_install)
@@ -475,6 +489,7 @@ def main() -> int:
             if not wait_for(f"http://localhost:{port}", 180, process):
                 raise RuntimeError(f"The {label} didn't come up on :{port} — see output above.")
 
+        recorded = record_ports(args.vertical, api_port, webs)
         print(f"\n{GREEN}✓ {args.vertical} demo is up{RESET}")
         for label, app_dir, port in webs:
             print(f"  {label:<16} http://localhost:{port}")
@@ -499,6 +514,8 @@ def main() -> int:
         print("\nShutting down…")
         return 0
     finally:
+        if recorded is not None and processes:
+            recorded.unlink(missing_ok=True)
         for _, process in processes:
             if process.poll() is None:
                 with contextlib.suppress(ProcessLookupError, PermissionError):

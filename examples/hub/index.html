@@ -1,0 +1,345 @@
+<!doctype html>
+<!-- Copyright 2026 Anthropic PBC -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!--
+  The demo hub: every vertical's storefront and merchant portal in one page. Each app runs
+  whole in its own frame (sessions, chat, cart, approvals, model settings), and a frame stays
+  alive while another is shown. scripts/start_all.sh serves this directory; the ports come from
+  runtime/<vertical>.json, which scripts/run_demo.py writes once a vertical is up.
+-->
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ACME Demo Hub</title>
+    <style>
+      :root {
+        --ground: #f4f4f1;
+        --card: #ffffff;
+        --ink: #1d2433;
+        --ink-soft: #5d6577;
+        --ink-faint: #9aa0ad;
+        --line: #e3e3de;
+        --well: #ecece7;
+        --accent: #3a5bd9;
+        --ok: #2f9e5b;
+        --off: #c9cbd1;
+        --shadow: 0 1px 2px rgba(20, 24, 36, 0.06), 0 6px 24px rgba(20, 24, 36, 0.06);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --ground: #14161b;
+          --card: #1c1f26;
+          --ink: #eceef3;
+          --ink-soft: #a3a9b6;
+          --ink-faint: #6c7280;
+          --line: #2a2e37;
+          --well: #252932;
+          --accent: #7c96ff;
+          --ok: #4cc27f;
+          --off: #4a4f5a;
+        }
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body {
+        background: var(--ground);
+        color: var(--ink);
+        font: 14px/1.4 ui-sans-serif, -apple-system, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+        display: grid;
+        grid-template-columns: 236px 1fr;
+        grid-template-rows: 52px 1fr;
+        grid-template-areas: "bar bar" "side main";
+      }
+      header {
+        grid-area: bar;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 14px;
+        border-bottom: 1px solid var(--line);
+        background: var(--card);
+      }
+      .brand { display: flex; align-items: center; gap: 9px; font-weight: 700; letter-spacing: -0.01em; }
+      .mark {
+        display: grid; place-items: center; width: 26px; height: 26px; border-radius: 7px;
+        background: var(--ink); color: var(--card); font-size: 13px; font-weight: 800;
+      }
+      .current { margin-left: 8px; color: var(--ink-soft); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .tools { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+      button, .linkbtn {
+        font: inherit; font-size: 13px; color: var(--ink); background: var(--card);
+        border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; cursor: pointer;
+        text-decoration: none; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+      }
+      button:hover, .linkbtn:hover { background: var(--well); }
+      button[aria-pressed="true"] { background: var(--ink); color: var(--card); border-color: var(--ink); }
+      nav {
+        grid-area: side; overflow-y: auto; padding: 12px 10px; border-right: 1px solid var(--line);
+        background: var(--card);
+      }
+      .group { margin-bottom: 14px; }
+      .group h2 {
+        margin: 0 0 4px; padding: 0 8px; font-size: 11.5px; font-weight: 600; color: var(--ink-faint);
+        text-transform: uppercase; letter-spacing: 0.04em;
+      }
+      .app {
+        width: 100%; display: flex; align-items: center; gap: 9px; border: 0; border-radius: 8px;
+        padding: 7px 8px; background: transparent; text-align: left;
+      }
+      .app:hover { background: var(--well); }
+      .app[aria-current="true"] { background: var(--well); font-weight: 600; }
+      .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--off); flex: none; }
+      .dot.on { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 20%, transparent); }
+      .app .port { margin-left: auto; color: var(--ink-faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+      main { grid-area: main; position: relative; padding: 10px; min-width: 0; min-height: 0; }
+      .stage { display: grid; gap: 10px; height: 100%; grid-template-columns: 1fr; }
+      .stage.split { grid-template-columns: 1fr 1fr; }
+      .pane {
+        position: relative; min-width: 0; min-height: 0; border-radius: 12px; overflow: hidden;
+        background: var(--card); box-shadow: var(--shadow); border: 1px solid var(--line);
+      }
+      .pane .label {
+        position: absolute; top: 0; left: 0; right: 0; height: 30px; z-index: 2; display: flex;
+        align-items: center; gap: 8px; padding: 0 10px; font-size: 12px; font-weight: 600;
+        color: var(--ink-soft); background: var(--well); border-bottom: 1px solid var(--line);
+      }
+      .pane .label a { margin-left: auto; font-weight: 400; color: var(--ink-soft); text-decoration: none; }
+      .pane .label a:hover { color: var(--ink); text-decoration: underline; }
+      iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: var(--card); }
+      .stage.split iframe, .stage.split .offline { top: 30px; height: calc(100% - 30px); }
+      .pane[hidden], .label[hidden], .offline[hidden] { display: none; }
+      .offline {
+        position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
+        color: var(--ink-soft); padding: 24px; z-index: 1; background: var(--card);
+      }
+      .offline code { background: var(--well); padding: 2px 6px; border-radius: 6px; }
+      @media (max-width: 860px) {
+        body { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr; grid-template-areas: "bar" "side" "main"; }
+        nav { border-right: 0; border-bottom: 1px solid var(--line); display: flex; gap: 6px; overflow-x: auto; padding: 8px; }
+        .group { margin: 0; display: flex; gap: 4px; align-items: center; }
+        .group h2 { display: none; }
+        .app { width: auto; white-space: nowrap; }
+        .app .port, .current { display: none; }
+        .stage.split { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="brand"><span class="mark">A</span><span data-t="hub">演示中心</span></div>
+      <span class="current" id="current"></span>
+      <div class="tools">
+        <button id="split" type="button" aria-pressed="false" data-t="split">并排：店铺 + 门户</button>
+        <button id="reload" type="button" data-t="reload">刷新</button>
+        <a id="newtab" class="linkbtn" target="_blank" rel="noopener" data-t="newtab">新标签页打开</a>
+        <button id="lang" type="button" title="Switch language">EN</button>
+      </div>
+    </header>
+    <nav id="nav" aria-label="Apps"></nav>
+    <main><div class="stage" id="stage"></div></main>
+
+    <script>
+      // The four verticals, their default ports (run_demo.py's), and the two surfaces each runs.
+      const VERTICALS = [
+        { id: "retail", name: { zh: "零售 · ACME", en: "Retail · ACME" }, api: 8000, storefront: 3000, portal: 3100 },
+        { id: "travel", name: { zh: "旅行 · ACME Travel", en: "Travel · ACME Travel" }, api: 8001, storefront: 3001, portal: 3101 },
+        { id: "telecom", name: { zh: "电信 · ACME Mobile", en: "Telecom · ACME Mobile" }, api: 8002, storefront: 3002, portal: 3102 },
+        { id: "entertainment", name: { zh: "票务 · ACME Tickets", en: "Tickets · ACME Tickets" }, api: 8003, storefront: 3003, portal: 3103 },
+      ];
+      const SURFACES = ["storefront", "portal"];
+      const TEXT = {
+        zh: {
+          hub: "演示中心", split: "并排：店铺 + 门户", reload: "刷新", newtab: "新标签页打开",
+          storefront: "店铺", portal: "商家门户", offline: "{app} 没有在运行",
+          start: "在仓库根目录运行 <code>./start.command</code> 启动全部，或 <code>scripts/start_all.sh {id}</code> 只启动这一个。",
+          retry: "运行后这里会自动连上。",
+        },
+        en: {
+          hub: "Demo Hub", split: "Side by side: store + portal", reload: "Reload", newtab: "Open in new tab",
+          storefront: "Storefront", portal: "Merchant portal", offline: "{app} is not running",
+          start: "Run <code>./start.command</code> at the repo root to start everything, or <code>scripts/start_all.sh {id}</code> for this one.",
+          retry: "This pane connects as soon as it is up.",
+        },
+      };
+
+      // The web apps read the same cookie (web-shared/locale.ts); cookies ignore the port.
+      const LOCALE_COOKIE = "acme-locale";
+      const readLocale = () => (document.cookie.match(/(?:^|; )acme-locale=([^;]*)/) || [])[1] === "en" ? "en" : "zh";
+      let locale = readLocale();
+      const t = (key, vars = {}) => TEXT[locale][key].replace(/\{(\w+)\}/g, (_, name) => vars[name] ?? "");
+
+      const ports = Object.fromEntries(VERTICALS.map((v) => [v.id, { storefront: v.storefront, portal: v.portal }]));
+      const online = {};
+      const frames = {}; // "<vertical>:<surface>" -> iframe, created on first view and kept
+      let state = parseHash();
+
+      function parseHash() {
+        const [key, flag] = location.hash.replace(/^#/, "").split("/");
+        const [vertical, surface] = (key || "retail:portal").split(":");
+        const known = VERTICALS.some((v) => v.id === vertical) && SURFACES.includes(surface);
+        return { vertical: known ? vertical : "retail", surface: known ? surface : "portal", split: flag === "split" };
+      }
+      function writeHash() {
+        history.replaceState(null, "", `#${state.vertical}:${state.surface}${state.split ? "/split" : ""}`);
+      }
+      const urlOf = (vertical, surface) => `http://localhost:${ports[vertical][surface]}`;
+      const keyOf = (vertical, surface) => `${vertical}:${surface}`;
+      const appName = (vertical, surface) =>
+        `${VERTICALS.find((v) => v.id === vertical).name[locale]} · ${t(surface)}`;
+
+      function renderNav() {
+        const nav = document.getElementById("nav");
+        nav.innerHTML = "";
+        for (const vertical of VERTICALS) {
+          const group = document.createElement("div");
+          group.className = "group";
+          group.innerHTML = `<h2>${vertical.name[locale]}</h2>`;
+          for (const surface of SURFACES) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "app";
+            const key = keyOf(vertical.id, surface);
+            const current = state.vertical === vertical.id && (state.split || state.surface === surface);
+            button.setAttribute("aria-current", String(current));
+            button.innerHTML =
+              `<span class="dot ${online[key] ? "on" : ""}"></span>` +
+              `<span>${window.innerWidth <= 860 ? appName(vertical.id, surface) : t(surface)}</span>` +
+              `<span class="port">:${ports[vertical.id][surface]}</span>`;
+            button.onclick = () => {
+              state = { ...state, vertical: vertical.id, surface };
+              writeHash();
+              render();
+            };
+            group.appendChild(button);
+          }
+          nav.appendChild(group);
+        }
+      }
+
+      // One pane per app, created on first view and never moved (a moved iframe reloads):
+      // switching apps only shows and hides panes, so each app keeps its session and state.
+      const panes = {};
+      function paneFor(vertical, surface) {
+        const key = keyOf(vertical, surface);
+        if (panes[key]) return panes[key];
+        const pane = document.createElement("div");
+        pane.className = "pane";
+        const label = document.createElement("span");
+        label.className = "label";
+        const notice = document.createElement("div");
+        notice.className = "offline";
+        const frame = document.createElement("iframe");
+        frame.allow = "clipboard-read; clipboard-write";
+        frame.src = urlOf(vertical, surface) + "/";
+        pane.append(label, notice, frame);
+        document.getElementById("stage").appendChild(pane);
+        frames[key] = frame;
+        panes[key] = pane;
+        return pane;
+      }
+
+      function render() {
+        document.documentElement.lang = locale === "zh" ? "zh-CN" : "en";
+        document.querySelectorAll("[data-t]").forEach((node) => (node.textContent = t(node.dataset.t)));
+        document.getElementById("lang").textContent = locale === "zh" ? "EN" : "中文";
+        document.getElementById("split").setAttribute("aria-pressed", String(state.split));
+        const shown = state.split ? SURFACES.map((s) => [state.vertical, s]) : [[state.vertical, state.surface]];
+        document.getElementById("current").textContent = shown.map(([v, s]) => appName(v, s)).join("  |  ");
+        document.getElementById("newtab").href = urlOf(state.vertical, state.surface);
+        document.getElementById("stage").className = "stage" + (state.split ? " split" : "");
+
+        const visible = new Set(shown.map(([v, s]) => keyOf(v, s)));
+        shown.forEach(([vertical, surface]) => paneFor(vertical, surface));
+        for (const [key, pane] of Object.entries(panes)) {
+          const [vertical, surface] = key.split(":");
+          pane.hidden = !visible.has(key);
+          pane.style.order = String(SURFACES.indexOf(surface));
+          const [label, notice, frame] = pane.children;
+          label.hidden = !state.split;
+          label.innerHTML =
+            `<span>${t(surface)}</span>` +
+            `<a href="${urlOf(vertical, surface)}" target="_blank" rel="noopener">${t("newtab")} ↗</a>`;
+          frame.title = appName(vertical, surface);
+          if (!frame.src.startsWith(urlOf(vertical, surface))) frame.src = urlOf(vertical, surface) + "/";
+          notice.hidden = online[key] !== false;
+          notice.innerHTML =
+            `<div><p><strong>${t("offline", { app: appName(vertical, surface) })}</strong></p>` +
+            `<p>${t("start", { id: vertical })}</p><p>${t("retry")}</p></div>`;
+        }
+        renderNav();
+      }
+
+      // Liveness: a no-cors fetch resolves when the server answers and rejects when the port is closed.
+      async function probe(vertical, surface) {
+        try {
+          await fetch(urlOf(vertical, surface) + "/favicon.ico", { mode: "no-cors", cache: "no-store" });
+          return true;
+        } catch {
+          return false;
+        }
+      }
+      async function refresh() {
+        await Promise.all(
+          VERTICALS.map(async (vertical) => {
+            try {
+              const response = await fetch(`runtime/${vertical.id}.json?ts=${Date.now()}`, { cache: "no-store" });
+              if (response.ok) {
+                const live = await response.json();
+                for (const surface of SURFACES) if (live[surface]) ports[vertical.id][surface] = live[surface];
+              }
+            } catch {}
+          }),
+        );
+        let changed = false;
+        await Promise.all(
+          VERTICALS.flatMap((vertical) =>
+            SURFACES.map(async (surface) => {
+              const key = keyOf(vertical.id, surface);
+              const up = await probe(vertical.id, surface);
+              if (online[key] !== up) {
+                // A frame that loaded while its server was down reloads once it answers.
+                if (up && online[key] === false && frames[key]) frames[key].src = urlOf(vertical.id, surface) + "/";
+                online[key] = up;
+                changed = true;
+              }
+            }),
+          ),
+        );
+        if (changed) render();
+      }
+
+      document.getElementById("split").onclick = () => {
+        state = { ...state, split: !state.split };
+        writeHash();
+        render();
+      };
+      document.getElementById("reload").onclick = () => {
+        const shown = state.split ? SURFACES : [state.surface];
+        for (const surface of shown) {
+          const frame = frames[keyOf(state.vertical, surface)];
+          if (frame) frame.src = urlOf(state.vertical, surface) + "/";
+        }
+      };
+      document.getElementById("lang").onclick = () => {
+        locale = locale === "zh" ? "en" : "zh";
+        document.cookie = `${LOCALE_COOKIE}=${locale}; path=/; max-age=31536000; samesite=lax`;
+        // Every app reads the cookie when it loads, so the open frames reload in the new language.
+        Object.entries(frames).forEach(([key, frame]) => {
+          const [vertical, surface] = key.split(":");
+          frame.src = urlOf(vertical, surface) + "/";
+        });
+        render();
+      };
+      window.addEventListener("hashchange", () => {
+        state = parseHash();
+        render();
+      });
+      window.addEventListener("resize", renderNav);
+
+      render();
+      refresh();
+      setInterval(refresh, 4000);
+    </script>
+  </body>
+</html>

@@ -643,8 +643,26 @@ def check_verification_wiring() -> None:
         elif missing := set(VERTICALS) - keys:
             problem(f"scripts/{script}: {name} missing verticals: {sorted(missing)}")
             clean = False
+    # The demo hub frames each vertical at run_demo.py's default ports until the vertical
+    # records its live ones.
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("run_demo", REPO_ROOT / "scripts" / "run_demo.py")
+    assert spec and spec.loader
+    run_demo = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(run_demo)
+    hub = (REPO_ROOT / "examples" / "hub" / "index.html").read_text(encoding="utf-8")
+    for vertical, config in run_demo.VERTICALS.items():
+        api = int(config["api_port"])
+        row = f'id: "{vertical}"'
+        expected = f"api: {api}, storefront: {api - 5000}, portal: {api - 4900}"
+        if row not in hub or expected not in hub.split(row, 1)[1].split("\n", 1)[0]:
+            problem(
+                f"examples/hub/index.html: {vertical} is not at run_demo.py's ports ({expected})"
+            )
+            clean = False
     if clean:
-        ok(f"all {len(VERTICALS)} verticals in every table")
+        ok(f"all {len(VERTICALS)} verticals in every table and in the demo hub")
 
 
 PACKAGE_DIRS = (
