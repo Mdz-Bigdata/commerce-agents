@@ -35,6 +35,8 @@ class HostedAppAlias {
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ["web-shared"],
+  // No AGENTS.md or CLAUDE.md written into this directory on start; the repo's CLAUDE.md applies.
+  agentRules: false,
   // The hosted apps live beside this one under examples/.
   experimental: { externalDir: true },
   // A hosted app's "@/" paths mean its own directory, which one tsconfig cannot express; each

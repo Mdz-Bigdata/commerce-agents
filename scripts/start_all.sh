@@ -2,12 +2,14 @@
 # Copyright 2026 Anthropic PBC
 # SPDX-License-Identifier: Apache-2.0
 #
-# Set up the repository and start every vertical: each API, storefront, and merchant portal.
+# Set up the repository and start the demo: every vertical's API and the unified app, the one
+# web page to open.
 #
-#   scripts/start_all.sh                       # all four verticals: APIs :8000-8003,
-#                                              # storefronts :3000-3003, portals :3100-3103
+#   scripts/start_all.sh                       # APIs :8000-8003 and the unified app :3300
 #   scripts/start_all.sh retail travel         # only the verticals named
-#   scripts/start_all.sh --open                # and open the unified app (five apps, one app)
+#   scripts/start_all.sh --open                # and open the unified app
+#   scripts/start_all.sh --separate-apps       # also each storefront (:3000-3003), each portal
+#                                              # (:3100-3103), and the demo hub (:3200)
 #   scripts/start_all.sh --stop                # stop what an earlier run left behind, and exit
 #   scripts/start_all.sh --no-reload           # an API that does not restart on code changes
 #   scripts/start_all.sh --prod --fresh-memory # other flags pass through to scripts/run_demo.py
@@ -18,12 +20,13 @@
 # package's pyproject changes, copies .env.example to .env when there is none, and reruns
 # `npm ci` in examples/ whenever package-lock.json changes. It then stops this checkout's
 # servers from an earlier run (anything else on a port is left alone and the server moves to
-# the next free port), so what starts is always the code on disk, and runs each vertical
-# under scripts/run_demo.py --all with an API that restarts when its Python, data, or skill
-# files change. The unified app (examples/unified-web, :3300) runs the retail storefront and
-# portal, the travel storefront, and the telecom and ticketing portals as one app; the demo
-# hub (examples/hub/index.html, :3200) shows every storefront and portal in one page. Requests to localhost bypass any HTTP proxy the shell exports. Ctrl-C stops
-# everything. The web apps bundle with webpack by default: Turbopack cannot load
+# the next free port), so what starts is always the code on disk, and runs each vertical's API
+# under scripts/run_demo.py, restarting when its Python, data, or skill files change. The
+# unified app (examples/unified-web, :3300) runs the retail storefront and portal, the travel
+# storefront, and the telecom and ticketing portals as one app against those APIs. With
+# --separate-apps each vertical runs its own storefront and portal too, and the demo hub
+# (examples/hub/index.html, :3200) shows them in one page. Requests to localhost bypass any
+# HTTP proxy the shell exports. Ctrl-C stops everything. The web apps bundle with webpack by default: Turbopack cannot load
 # next/font/google files that Google Fonts serves from /l/font?kit=... URLs.
 
 set -euo pipefail
@@ -43,6 +46,7 @@ BUNDLER=(--webpack)
 RELOAD=(--reload)
 STOP_ONLY=0
 OPEN=0
+SEPARATE=0
 for arg in "$@"; do
   case "$arg" in
     -h|--help) usage; exit 0 ;;
@@ -50,6 +54,7 @@ for arg in "$@"; do
     --no-reload) RELOAD=() ;;
     --stop) STOP_ONLY=1 ;;
     --open) OPEN=1 ;;
+    --separate-apps) SEPARATE=1 ;;
     --no-reuse|--restart|--reload) ;;  # what this script always does
     --merchant|--all|--api-only|--web-only|--api-port|--api-port=*|--no-install)
       die "$arg is set per vertical by this script; use scripts/run_demo.py for it" ;;
@@ -219,20 +224,25 @@ stop_all() {
 trap stop_all EXIT
 trap 'exit 130' INT TERM
 
+# Each vertical's API; its own storefront and portal only with --separate-apps.
+SURFACES=(--api-only)
+[[ $SEPARATE -eq 0 ]] || SURFACES=(--all)
 step "Starting ${VERTICALS[*]}"
 for i in "${!VERTICALS[@]}"; do
-  "$PYTHON" scripts/run_demo.py "${VERTICALS[$i]}" --all --no-install --no-reuse \
+  "$PYTHON" scripts/run_demo.py "${VERTICALS[$i]}" "${SURFACES[@]}" --no-install --no-reuse \
     --api-port "${API_PORTS[$i]}" ${RELOAD[@]+"${RELOAD[@]}"} \
     ${BUNDLER[@]+"${BUNDLER[@]}"} ${DEMO_FLAGS[@]+"${DEMO_FLAGS[@]}"} &
   PIDS+=("$!")
 done
 
-# The demo hub: one static page that frames every storefront and portal at their live ports.
-HUB_PORT=3200
-while port_busy "$HUB_PORT"; do HUB_PORT=$((HUB_PORT + 1)); done
-"$PYTHON" -m http.server "$HUB_PORT" --bind 127.0.0.1 --directory "$HUB_DIR" >/dev/null 2>&1 &
-PIDS+=("$!")
-echo "  ${GREEN}demo hub${RESET}         http://localhost:$HUB_PORT  ${DIM}(every storefront and portal in one page)${RESET}"
+# The demo hub, with the separate apps: one static page that frames them at their live ports.
+if [[ $SEPARATE -eq 1 ]]; then
+  HUB_PORT=3200
+  while port_busy "$HUB_PORT"; do HUB_PORT=$((HUB_PORT + 1)); done
+  "$PYTHON" -m http.server "$HUB_PORT" --bind 127.0.0.1 --directory "$HUB_DIR" >/dev/null 2>&1 &
+  PIDS+=("$!")
+  echo "  ${GREEN}demo hub${RESET}         http://localhost:$HUB_PORT  ${DIM}(every storefront and portal in one page)${RESET}"
+fi
 
 # The unified app: the five hosted apps behind one rail, each talking to its vertical's API at
 # the port assigned above (a vertical not started here shows as unreachable inside it).
@@ -264,7 +274,7 @@ if [[ $OPEN -eq 1 ]]; then
   OPENER="$!"
 fi
 
-echo "${DIM}Each vertical prints its URLs when it is up; Ctrl-C stops everything, and"
+echo "${DIM}Each vertical prints its API's URL when it is up; Ctrl-C stops everything, and"
 echo "scripts/start_all.sh --stop stops servers a closed terminal left running.${RESET}"
 # A vertical that fails stops the rest; one that exits cleanly (everything reused) is dropped.
 while [[ ${#PIDS[@]} -gt 0 ]]; do

@@ -46,11 +46,13 @@ starts every vertical's API, storefront, and portal on the code on disk with API
 reload when their code or data changes, and opens the unified app at :3300
 ([`examples/unified-web/`](examples/unified-web/)): the retail storefront and portal, the
 travel storefront, and the telecom and ticketing portals as one app behind a navigation rail.
-The demo hub at :3200 ([`examples/hub/`](examples/hub/)) shows every storefront and portal in
-one page: an overview grid of the apps you tick, one app, or a vertical's two side by side.
-Name verticals to start only those; `scripts/start_all.sh --stop` stops everything. The
-verticals are `retail` (:3000, portal :3100), `travel` (:3001, :3101), `telecom` (:3002,
-:3102), and `entertainment` (:3003, :3103); each README lists prompts to try on both surfaces.
+The unified app is the one web page it starts. `--separate-apps` also starts each vertical's
+own storefront and portal, `retail` (:3000, portal :3100), `travel` (:3001, :3101), `telecom`
+(:3002, :3102), and `entertainment` (:3003, :3103), and the demo hub at :3200
+([`examples/hub/`](examples/hub/)), which shows them in one page: an overview grid of the apps
+you tick, one app, or a vertical's two side by side. Name verticals to start only those;
+`scripts/start_all.sh --stop` stops everything. Each vertical's README lists prompts to try on
+both surfaces.
 
 ## Quick start: build your own
 
