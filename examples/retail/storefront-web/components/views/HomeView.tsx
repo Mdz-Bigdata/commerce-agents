@@ -11,12 +11,13 @@ import {
   greeting,
   HomeSection,
   type Order,
-  plural,
   type Starter,
   Starters,
   upcoming,
   useCatalogIndex,
+  useLocale,
   useStoreFrame,
+  useT,
 } from "web-shared";
 import { fetchProducts } from "@/lib/api";
 import { NOUNS, OrderThumb } from "@/lib/orders";
@@ -39,15 +40,17 @@ function featured(catalog: Record<string, Product>): Product[] {
 }
 
 function Brief({ orders }: { orders: Order[] | null }) {
-  if (!orders) return <>Ask about a product, a project, an order, or a return.</>;
+  const t = useT();
+  if (!orders) return <>{t("Ask about a product, a project, an order, or a return.")}</>;
   const open = upcoming(orders);
-  if (!open.length) return <>Nothing on the way right now. Ask about a product, a project, or a return.</>;
+  if (!open.length) return <>{t("Nothing on the way right now. Ask about a product, a project, or a return.")}</>;
   const late = open.filter((order) => order.status === "delayed");
   const next = estimateOf(open.find((order) => order.status !== "delayed") ?? open[0])?.date;
+  const head = t(open.length === 1 ? "{count} order on the way" : "{count} orders on the way", { count: open.length });
   return (
     <>
-      {plural(open.length, "order")} on the way{next ? `; the next arrives ${next}` : ""}.{" "}
-      {late.length ? <span className="font-semibold text-(--warn)">{late.length === 1 ? "One is" : `${late.length} are`} running late.</span> : null}
+      {next ? t("{head}; the next arrives {date}.", { head, date: next }) : t("{head}.", { head })}{" "}
+      {late.length ? <span className="font-semibold text-(--warn)">{late.length === 1 ? t("One is running late.") : t("{count} are running late.", { count: late.length })}</span> : null}
     </>
   );
 }
@@ -70,6 +73,8 @@ export default function HomeView({
   ordersFailed: boolean;
   onSeeOrders: () => void;
 }) {
+  const t = useT();
+  const { locale } = useLocale();
   const { ask } = useStoreFrame();
   const catalog = useCatalogIndex(fetchProducts);
   const picks = featured(catalog);
@@ -77,18 +82,18 @@ export default function HomeView({
   return (
     <div className="flex flex-col gap-4">
       <Greeting
-        eyebrow={now ? now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) : "\u00a0"}
-        title={<h1 className="text-[28px] font-semibold leading-tight tracking-[-0.02em] text-(--ink)">{`${now ? greeting(now) : "Hello"}, ${shopperName}`}</h1>}
+        eyebrow={now ? now.toLocaleDateString(locale === "zh" ? "zh-CN" : "en-US", { weekday: "long", month: "long", day: "numeric" }) : "\u00a0"}
+        title={<h1 className="text-[28px] font-semibold leading-tight tracking-[-0.02em] text-(--ink)">{t("{greeting}, {name}", { greeting: t(now ? greeting(now) : "Hello"), name: shopperName })}</h1>}
       >
         <Brief orders={orders} />
       </Greeting>
-      <Starters items={STARTERS} />
+      <Starters items={STARTERS.map((starter) => ({ ...starter, prompt: t(starter.prompt) }))} />
       <ArrivingPanel orders={orders} failed={ordersFailed} nouns={NOUNS} thumb={(order) => <OrderThumb order={order} />} onSeeAll={onSeeOrders} />
       {picks.length ? (
-        <HomeSection title="Popular right now" subtitle="Bestsellers and new arrivals; open one to ask about it">
+        <HomeSection title={t("Popular right now")} subtitle={t("Bestsellers and new arrivals; open one to ask about it")}>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {picks.map((product) => (
-              <ProductTile key={product.product_id} product={product} fluid onOpen={(item) => ask(`Tell me about the ${item.title}.`)} />
+              <ProductTile key={product.product_id} product={product} fluid onOpen={(item) => ask(t("Tell me about the {title}.", { title: item.title }))} />
             ))}
           </div>
         </HomeSection>

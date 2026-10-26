@@ -4,9 +4,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useStoreFrame } from "web-shared";
+import { useStoreFrame, useT } from "web-shared";
+import { Rich } from "@/lib/i18n-helpers";
 import { useCountdown } from "@/lib/live";
 import type { WalletTicket } from "@/lib/types";
+import { transferAsk } from "@/lib/wallet";
 import { CountdownArc } from "./generative/shared";
 
 function seatTriplet(seat: string): { sec: string; row: string; seat: string } {
@@ -25,6 +27,7 @@ function EntryCode({
   rotatesS: number;
   onExpired?: () => void;
 }) {
+  const t = useT();
   // A zero or negative window would divide by zero below.
   const windowS = Math.max(1, rotatesS);
   const [deadline, setDeadline] = useState<number>(() => Date.now() + windowS * 1000);
@@ -72,7 +75,7 @@ function EntryCode({
           refreshedBeat ? "font-semibold text-(--ok)" : "text-(--ink-soft)"
         }`}
       >
-        {refreshedBeat ? "New code. The old one won't scan." : "The entry code refreshes on its own, so a screenshot won't scan."}
+        {refreshedBeat ? t("New code. The old one won't scan.") : t("The entry code refreshes on its own, so a screenshot won't scan.")}
       </p>
     </div>
   );
@@ -80,6 +83,7 @@ function EntryCode({
 
 /** One ticket as it sits in the wallet; grouped by show, so it carries seat and code, not the event. */
 export default function WalletPass({ ticket, onRefresh }: { ticket: WalletTicket; onRefresh?: () => void }) {
+  const t = useT();
   const { ask } = useStoreFrame();
   const triplet = seatTriplet(ticket.seat);
   const pending = ticket.status === "transfer_pending";
@@ -99,8 +103,8 @@ export default function WalletPass({ ticket, onRefresh }: { ticket: WalletTicket
   return (
     <div className="overflow-hidden rounded-(--radius) border border-(--line) bg-(--well)/60">
       <div className="flex items-center justify-between gap-2 px-3 pt-2.5">
-        <p className="at-eyebrow">{ticket.tier ?? "Ticket"}</p>
-        {pending ? <span className="at-pill at-pill--scarce">Transfer pending</span> : null}
+        <p className="at-eyebrow">{ticket.tier ?? t("Ticket")}</p>
+        {pending ? <span className="at-pill at-pill--scarce">{t("Transfer pending")}</span> : null}
       </div>
       <div className="mx-3 mt-1.5 grid grid-cols-3 gap-2">
         {(
@@ -111,7 +115,7 @@ export default function WalletPass({ ticket, onRefresh }: { ticket: WalletTicket
           ] as const
         ).map(([label, value]) => (
           <div key={label}>
-            <p className="at-eyebrow">{label}</p>
+            <p className="at-eyebrow">{t(label)}</p>
             <p className="at-mono text-[20px] font-bold leading-tight text-(--ink)">{value}</p>
           </div>
         ))}
@@ -129,10 +133,16 @@ export default function WalletPass({ ticket, onRefresh }: { ticket: WalletTicket
               </p>
             )}
             <p className="text-[11px] leading-snug">
-              <span className="at-mono font-bold uppercase tracking-[0.1em] text-(--danger)">Voided</span>
               <span className="text-(--ink-soft)">
-                {" "}
-                and reissued to {ticket.transfer_recipient ?? "the recipient"}. The new code is on their phone; this one won&apos;t scan.
+                <Rich
+                  text="{voided} and reissued to {recipient}. The new code is on their phone; this one won't scan."
+                  vars={{
+                    voided: (
+                      <span className="at-mono font-bold uppercase tracking-[0.1em] text-(--danger)">{t("Voided")}</span>
+                    ),
+                    recipient: ticket.transfer_recipient ?? t("the recipient"),
+                  }}
+                />
               </span>
             </p>
           </div>
@@ -146,10 +156,10 @@ export default function WalletPass({ ticket, onRefresh }: { ticket: WalletTicket
         {pending ? null : (
           <button
             type="button"
-            onClick={() => ask(`Help me transfer my ${ticket.event ?? "upcoming"} tickets to a friend.`)}
+            onClick={() => ask(transferAsk(ticket, t))}
             className="at-btn-ghost shrink-0 !px-2.5 !py-1 !text-[11px]"
           >
-            Transfer
+            {t("Transfer")}
           </button>
         )}
       </div>

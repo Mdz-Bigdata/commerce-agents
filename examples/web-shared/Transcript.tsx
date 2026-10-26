@@ -4,6 +4,8 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useT } from "./i18n";
+import { Icon } from "./icons";
 import { AssistantText, ErrorBubble, UserBubble } from "./MessageBubble";
 import type { AssistantChatItem, ChatItem, UISegment } from "./protocol";
 import { Suggestions } from "./Suggestions";
@@ -19,10 +21,86 @@ export interface TranscriptProps {
   /** Components that may extend past the text measure when the page has room. */
   wide?: ReadonlySet<string>;
   gap?: string;
+  /** Votes on a finished reply; without it no vote buttons show. */
+  onRate?: (turn: number, helpful: boolean) => void;
+  /** Asks for a person from the latest reply; without it no handoff button shows. */
+  onHandoff?: (turn: number) => void;
+  /** The handoff button's label ("Talk to a person"); translated here. */
+  handoffLabel?: string;
+}
+
+/** Under a finished reply: the vote, a person to hand off to, or the ticket a handoff opened. */
+function ReplyFooter({
+  item,
+  latest,
+  onRate,
+  onHandoff,
+  handoffLabel = "Talk to a person",
+}: {
+  item: AssistantChatItem;
+  latest: boolean;
+  onRate?: TranscriptProps["onRate"];
+  onHandoff?: TranscriptProps["onHandoff"];
+  handoffLabel?: string;
+}) {
+  const t = useT();
+  if (item.ticket) {
+    return (
+      <p role="status" className="flex items-center gap-2 text-[13px] text-(--ink-soft)">
+        <Icon name="headset" size={15} />
+        {t("A person will pick this up from here. Ticket {ticket}.", { ticket: item.ticket })}
+      </p>
+    );
+  }
+  const canRate = Boolean(onRate && item.turnId);
+  const canHandOff = Boolean(onHandoff && latest);
+  if (!canRate && !canHandOff) return null;
+  const vote = (helpful: boolean, icon: "thumb-up" | "thumb-down", label: string) => {
+    const chosen = item.rating === (helpful ? "up" : "down");
+    return (
+      <button
+        type="button"
+        onClick={() => onRate?.(item.turn, helpful)}
+        aria-label={t(label)}
+        aria-pressed={chosen}
+        title={t(label)}
+        className={`grid h-7 w-7 place-items-center rounded-md transition-colors hover:bg-(--well) ${
+          chosen ? "text-(--ink)" : "text-(--ink-faint)"
+        }`}
+      >
+        <Icon name={icon} size={15} />
+      </button>
+    );
+  };
+  return (
+    <div className="-mt-1 flex items-center gap-1 text-[12.5px]">
+      {canRate ? (
+        <>
+          {vote(true, "thumb-up", "Helpful")}
+          {vote(false, "thumb-down", "Not helpful")}
+        </>
+      ) : null}
+      {canHandOff ? (
+        <button
+          type="button"
+          onClick={() => onHandoff?.(item.turn)}
+          className={`ml-1 inline-flex h-7 items-center gap-1.5 rounded-md px-2 transition-colors hover:bg-(--well) ${
+            item.rating === "down" || item.segments.some((s) => s.type === "error")
+              ? "text-(--ink)"
+              : "text-(--ink-faint)"
+          }`}
+        >
+          <Icon name="headset" size={15} />
+          {t(handoffLabel)}
+        </button>
+      ) : null}
+    </div>
+  );
 }
 
 /** What shows under a reply while it is being made: the current step, or a shimmer before the first word. */
 export function ActivityLine({ item }: { item: AssistantChatItem }) {
+  const t = useT();
   if (item.activity) {
     return (
       <div role="status" className="flex items-center gap-2 text-[13px] text-(--ink-soft)">
@@ -33,7 +111,7 @@ export function ActivityLine({ item }: { item: AssistantChatItem }) {
   }
   if (item.segments.length) return null;
   return (
-    <div role="status" aria-label="Working" className="flex flex-col gap-2">
+    <div role="status" aria-label={t("Working")} className="flex flex-col gap-2">
       <div className="ac-skeleton h-4 w-3/5 rounded" />
       <div className="ac-skeleton h-4 w-2/5 rounded" />
     </div>
@@ -49,6 +127,9 @@ export function Transcript({
   suggestionFilter,
   wide,
   gap = "gap-3",
+  onRate,
+  onHandoff,
+  handoffLabel,
 }: TranscriptProps) {
   return items.map((item, index) =>
     item.kind === "user" ? (
@@ -74,6 +155,15 @@ export function Transcript({
           );
         })}
         {item.pending ? renderPending(item) : null}
+        {!item.pending ? (
+          <ReplyFooter
+            item={item}
+            latest={index === items.length - 1}
+            onRate={onRate}
+            onHandoff={onHandoff}
+            handoffLabel={handoffLabel}
+          />
+        ) : null}
         {!item.pending && index === items.length - 1 ? (
           <Suggestions
             suggestions={suggestionFilter ? item.suggestions.filter(suggestionFilter) : item.suggestions}
@@ -87,6 +177,7 @@ export function Transcript({
 }
 
 export function LatestPill({ onClick }: { onClick: () => void }) {
+  const t = useT();
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center">
       <button
@@ -94,7 +185,7 @@ export function LatestPill({ onClick }: { onClick: () => void }) {
         onClick={onClick}
         className="pointer-events-auto rounded-full border border-(--line) bg-(--card) px-3.5 py-1.5 text-[13px] font-semibold text-(--ink) shadow-md transition hover:border-(--accent)"
       >
-        ↓ Latest
+        ↓ {t("Latest")}
       </button>
     </div>
   );

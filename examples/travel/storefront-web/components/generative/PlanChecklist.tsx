@@ -3,6 +3,7 @@
 
 "use client";
 
+import { useT } from "web-shared";
 import type { PlanPayload } from "@/lib/types";
 import {
   BODY,
@@ -20,6 +21,7 @@ export default function PlanChecklist({
   payload: PlanPayload;
   partial?: boolean;
 }) {
+  const t = useT();
   const steps = payload.steps ?? [];
   return (
     <section className="al-reveal" style={{ ...CARD, padding: 24 }}>
@@ -106,7 +108,7 @@ export default function PlanChecklist({
 
       {!partial && steps.length ? (
         <p style={{ ...META, fontSize: 11, marginTop: 4 }}>
-          {steps.length} {steps.length === 1 ? "step" : "steps"} to ready
+          {steps.length === 1 ? t("{n} step to ready", { n: steps.length }) : t("{n} steps to ready", { n: steps.length })}
         </p>
       ) : null}
     </section>

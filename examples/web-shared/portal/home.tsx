@@ -6,16 +6,21 @@
 /** The blocks every portal's home page shares; a vertical supplies its nouns and rows. */
 
 import type { ReactNode } from "react";
-import { describeProposer, describeResolver, formatDayMonth, plural } from "../format";
+import { describeProposer, describeResolver, formatDayMonth } from "../format";
+import { english } from "../english";
+import { type Translate, useT } from "../i18n";
 import { Icon, type IconName } from "../icons";
 import { AskButton, Button, KindIcon, Panel, Pill, type Tone } from "../ui";
 import { CHANGE_STATUS } from "./cards";
 
 /** The question a KPI tile prefills: why the figure moved against the comparison window. */
-export function askWhy(label: string, changePct: number | null | undefined, comparison: string): string {
-  const name = label.toLowerCase();
-  if (changePct == null) return `How is ${name} trending, and what's behind it?`;
-  return `Why is ${name} ${changePct >= 0 ? "up" : "down"} ${Math.abs(changePct).toFixed(1)}% against the ${comparison || "prior period"}?`;
+export function askWhy(label: string, changePct: number | null | undefined, comparison: string, t: Translate = english): string {
+  const name = t(label).toLowerCase();
+  if (changePct == null) return t("How is {name} trending, and what's behind it?", { name });
+  const vars = { name, pct: Math.abs(changePct).toFixed(1), comparison: comparison || t("prior period") };
+  return changePct >= 0
+    ? t("Why is {name} up {pct}% against the {comparison}?", vars)
+    : t("Why is {name} down {pct}% against the {comparison}?", vars);
 }
 
 /** A ratio's change from its parts' changes, e.g. average order value from sales and orders. */
@@ -26,16 +31,17 @@ export function ratioChangePct(numeratorPct: number | null | undefined, denomina
 
 /** Approval itself happens on the change card; this banner hands off to the assistant. */
 export function ApprovalsBanner({ changes, onReview }: { changes: { change_id: string; summary: string }[]; onReview: () => void }) {
+  const t = useT();
   if (changes.length === 0) return null;
   return (
     <section className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-(--violet)/20 bg-(--violet-soft) px-[18px] py-3">
       <KindIcon icon="edit" tone="violet" size={32} />
       <div className="min-w-0 flex-1">
-        <div className="text-[14px] font-semibold text-(--ink)">{plural(changes.length, "change")} awaiting approval</div>
+        <div className="text-[14px] font-semibold text-(--ink)">{changes.length === 1 ? t("{n} change awaiting approval", { n: changes.length }) : t("{n} changes awaiting approval", { n: changes.length })}</div>
         <div className="mt-0.5 truncate text-[12.5px] text-(--ink-soft)">{changes.map((change) => change.summary).join(" · ")}</div>
       </div>
       <Button variant="primary" size="sm" onClick={onReview}>
-        Review
+        {t("Review")}
       </Button>
     </section>
   );
@@ -77,10 +83,11 @@ export function AttentionList({ children }: { children: ReactNode }) {
 
 /** The footer under a capped queue; the link goes to the view that lists the hidden rows, if one does. */
 export function QueueOverflow({ hidden, link }: { hidden: number; link?: { label: string; onClick: () => void } }) {
+  const t = useT();
   if (hidden <= 0) return null;
   return (
     <div className="flex items-center gap-2 border-t border-(--line) px-[18px] py-2.5 text-[12.5px] text-(--ink-soft)">
-      <span>{plural(hidden, "more item")} in the queue</span>
+      <span>{hidden === 1 ? t("{n} more item in the queue", { n: hidden }) : t("{n} more items in the queue", { n: hidden })}</span>
       {link ? <ViewLink label={link.label} onClick={link.onClick} className="ml-auto" /> : null}
     </div>
   );
@@ -141,9 +148,10 @@ interface ChangeSummary {
 
 /** The last few resolved changes, newest first. */
 export function RecentChanges({ changes, limit = 4 }: { changes: ChangeSummary[]; limit?: number }) {
+  const t = useT();
   if (changes.length === 0) return null;
   return (
-    <Panel title="Recent changes">
+    <Panel title={t("Recent changes")}>
       <ul className="divide-y divide-(--line) px-[18px] pb-2">
         {changes.slice(0, limit).map((change) => {
           const status = CHANGE_STATUS[change.status];
@@ -155,11 +163,11 @@ export function RecentChanges({ changes, limit = 4 }: { changes: ChangeSummary[]
                   {change.summary}
                 </div>
                 <Pill tone={status.tone} dot>
-                  {status.label}
+                  {t(status.label)}
                 </Pill>
               </div>
               <div className="mt-0.5 text-[12px] text-(--ink-soft)">
-                {describeResolver(change) ?? describeProposer(change)}
+                {describeResolver(change, t) ?? describeProposer(change, t)}
                 {actedAt ? ` · ${formatDayMonth(actedAt)}` : ""}
               </div>
             </li>

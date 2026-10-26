@@ -13,6 +13,7 @@ import {
   useMerchantChat,
   useResource,
   useSession,
+  useT,
 } from "web-shared";
 import AssistantPanel from "@/components/AssistantPanel";
 import BookingsView from "@/components/views/BookingsView";
@@ -35,6 +36,7 @@ function StoreMark() {
 }
 
 export default function PortalPage() {
+  const t = useT();
   const session = useSession(api);
   const [view, setView] = useState<PortalView>("home");
   const [assistantOpen, setAssistantOpen] = useState(false);
@@ -46,7 +48,7 @@ export default function PortalPage() {
 
   const chat = useMerchantChat<StagedChange>(api, {
     ...session,
-    unreachable: UNREACHABLE,
+    unreachable: t(UNREACHABLE),
     onPortalRefresh: refreshPortal,
   });
 
@@ -67,26 +69,26 @@ export default function PortalPage() {
   const nav = useMemo<PortalNavItem<PortalView>[]>(() => {
     const alerts = overview?.snapshot.alerts;
     return [
-      { id: "home", label: "Home", icon: "home" },
-      { id: "properties", label: "Properties", icon: "bed" },
+      { id: "home", label: t("Home"), icon: "home" },
+      { id: "properties", label: t("Properties"), icon: "bed" },
       {
         id: "bookings",
-        label: "Bookings",
+        label: t("Bookings"),
         icon: "calendar",
         attention: alerts?.order_issues || null,
         count: alerts ? (alerts.low_stock ?? 0) + (alerts.slow_movers ?? 0) : null,
       },
     ];
-  }, [overview]);
+  }, [overview, t]);
 
   return (
     <>
       <PortalShell
-        brand={{ mark: <StoreMark />, name: "ACME Travel", detail: "Supplier workspace" }}
+        brand={{ mark: <StoreMark />, name: "ACME Travel", detail: t("Supplier workspace") }}
         nav={nav}
         view={view}
         onViewChange={setView}
-        operator={{ name: session.operator ?? "Operator", role: "Revenue manager" }}
+        operator={{ name: session.operator ?? t("Operator"), role: t("Revenue manager") }}
         assistantOpen={assistantOpen}
         assistantBusy={chat.busy}
         onToggleAssistant={() => setAssistantOpen((open) => !open)}
@@ -135,7 +137,7 @@ export default function PortalPage() {
           trace={chat.trace}
           memory={chat.memory}
           newMemoryKeys={chat.newMemoryKeys}
-          memoryTitle="Business memory"
+          memoryTitle={t("Business memory")}
           onClose={() => setActivityOpen(false)}
         />
       ) : null}

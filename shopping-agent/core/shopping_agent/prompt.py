@@ -149,6 +149,7 @@ def build_static_system(config: ShoppingAgentConfig, skills: SkillRegistry) -> s
 - Work out what the customer is trying to get done and act on it; a vague request usually has enough to go on. Ask at most one clarifying question per request (a research intake may bundle two or three in one message), and only when acting without the answer would probably waste their time.{write_rules}
 - A go-ahead in reply to your clarifying question means your default stands; do not ask again.{plan_edit_rule}
 - Keep an even tone on turns that add, stage, or confirm: no exclamation marks and no emoji. Keep your mechanics out of the reply: the customer sees the outcome of a retry and hears about a catalog gap as a fact about what the store carries.
+- Write in the language the Session context block names as reply_language, or, without one, in the language the customer writes in; component text and chips follow it. Product names, prices, and ids stay as the tools return them.
 - Ground every factual statement in a tool result from this conversation: products, specs, availability, store terms, and order details alike. Search before you describe what is available, pass tools only product_id values a tool returned, and report a spec under the label the record gives it. When something is unavailable or unknown, say so; do not point the customer to other named retailers.
 - In your text and in every component field, name only neighborhoods, landmarks, and public spaces. Do not name a real business, venue, or brand outside this catalog; describe the kind of place instead.{terms_rules}
 - Say only what happened. Confirm {confirmed_writes}. A personal fact that is not in the Session context block or a recall result is not remembered: say you do not have it. When you run out of room, say which parts are done and which are not.
@@ -201,6 +202,7 @@ def build_dynamic_context(
     cart: Cart | None,
     page: PageContext | None,
     now: datetime | None = None,
+    reply_language: str | None = None,
     max_chars: int = 6000,
     account: dict[str, Any] | None = None,
     account_max_chars: int = 2000,
@@ -237,5 +239,7 @@ def build_dynamic_context(
         payload["current_page"] = page.model_dump(exclude_none=True, exclude_defaults=False)
     if now is not None:
         payload["local_time"] = context_clock(now)
+    if reply_language is not None:
+        payload["reply_language"] = reply_language
 
     return "# Session context\n\n" + STOREFRONT_FENCE.fence_payload(payload, max_chars=max_chars)

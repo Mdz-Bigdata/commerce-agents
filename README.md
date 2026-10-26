@@ -19,12 +19,20 @@ Python 3.11+ and Node 22. Clone, install, add a key, run a vertical:
 git clone https://github.com/anthropics/commerce-agents.git && cd commerce-agents
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt       # the seven packages and their pinned dependencies
-cp .env.example .env                  # add ANTHROPIC_API_KEY
+cp .env.example .env                  # add ANTHROPIC_API_KEY, or pick MODEL_PROVIDER and its key
 (cd examples && npm ci)               # the eight web apps share one workspace
 python scripts/run_demo.py retail     # API :8000 + storefront :3000
 ```
 
-`--merchant` starts the portal instead of the storefront and `--all` starts both. The
+`--merchant` starts the portal instead of the storefront and `--all` starts both.
+`MODEL_PROVIDER` in `.env` runs the examples on Anthropic or on an OpenAI-compatible provider
+(OpenAI, DeepSeek, Qwen, Moonshot, Zhipu GLM, Ollama, or any other endpoint); every app
+switches between English and Chinese from its app bar ([`examples/README.md`](examples/README.md)).
+Every reply carries 👍/👎 and a handoff to a person; the example APIs log each turn's tools,
+evidence ids, and outcome (never its text), and `python scripts/metrics_report.py --lang zh`
+computes resolution, self-service, and handoff rates from that log ([`docs/metrics.md`](docs/metrics.md)).
+`scripts/start_all.sh` does the setup above (`.venv`, `.env`, `npm ci`) and starts every
+vertical's API, storefront, and portal at once; name verticals to start only those. The
 verticals are `retail` (:3000, portal :3100), `travel` (:3001, :3101), `telecom` (:3002,
 :3102), and `entertainment` (:3003, :3103); each README lists prompts to try on both surfaces.
 
@@ -74,9 +82,9 @@ its analytics, catalog, inventory, pricing, and campaign systems.
 | [`merchant-agent/managed-agents/`](merchant-agent/managed-agents/) | Manifest, merchant MCP server, scheduled digest for Managed Agents | — |
 | [`examples/`](examples/) | Four verticals, shared host code (`demo_common/`), shared web code (`web-shared/`) | — |
 | [`plugins/commerce-builder/`](plugins/commerce-builder/) | The Claude Code plugin | — |
-| [`docs/`](docs/) | `safety.md` (enforced rules), `backends.md` (mapping your systems), `deployment.md` (other platforms) | — |
+| [`docs/`](docs/) | `safety.md` (enforced rules), `backends.md` (mapping your systems), `deployment.md` (other platforms), `metrics.md` (operations metrics) | — |
 | [`tests/`](tests/) | Cross-package suites; each package also has its own `tests/` | — |
-| [`scripts/`](scripts/) | `install.sh`, `run_demo.py`, `smoke_chat.py`, `screenshot_tour.py`, `check.py`, `deploy_managed_agent.sh`, `verify_all.py` | — |
+| [`scripts/`](scripts/) | `install.sh`, `run_demo.py`, `start_all.sh`, `metrics_report.py`, `smoke_chat.py`, `screenshot_tour.py`, `check.py`, `deploy_managed_agent.sh`, `verify_all.py` | — |
 
 ## Three ways to run an agent
 

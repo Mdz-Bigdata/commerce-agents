@@ -4,10 +4,11 @@
 "use client";
 
 import { useState } from "react";
-import { formatMoney, useCatalogIndex } from "web-shared";
+import { formatMoney, useCatalogIndex, useT } from "web-shared";
 import { fetchProducts } from "@/lib/api";
 import { countdownTone, formatCountdown } from "@/lib/format";
 import { useCountdown, useLive, type TimedOffer } from "@/lib/live";
+import { tPlural } from "@/lib/i18n-helpers";
 import type { Product } from "@/lib/types";
 import { CountdownArc } from "./generative/shared";
 
@@ -21,6 +22,7 @@ export function OfferBannerInner({
   product?: Product;
   onClaim: () => void;
 }) {
+  const t = useT();
   const { offerWindowMinutes } = useLive();
   const seconds = useCountdown(offer.deadline);
   const attrs = product?.attributes ?? {};
@@ -28,14 +30,14 @@ export function OfferBannerInner({
     <div className="at-slide-down border-b border-(--ok)/40 bg-(--ok-soft) px-5 py-2.5">
       <div className="mx-auto flex max-w-3xl flex-wrap items-center gap-x-4 gap-y-1.5">
         <p className="min-w-0 flex-1 text-[13px] leading-snug text-(--ink)">
-          <b className="text-(--ok)">Your turn:</b> {offer.quantity} returned ticket
-          {offer.quantity === 1 ? "" : "s"}
+          <b className="text-(--ok)">{t("Your turn:")}</b>{" "}
+          {tPlural(t, offer.quantity, "{n} returned ticket", "{n} returned tickets")}
           {attrs.event_name ? ` · ${attrs.event_name}` : ""}
           {attrs.tier ? ` · ${attrs.tier}` : ""}
           {product ? (
             <span className="text-(--ink-soft)">
               {" "}
-              at the original {formatMoney(product.price)} all-in
+              {t("at the original {price} all-in", { price: formatMoney(product.price) })}
             </span>
           ) : null}
         </p>
@@ -46,13 +48,13 @@ export function OfferBannerInner({
             size={14}
             strokeWidth={3.5}
           />
-          closes{" "}
+          {t("closes")}{" "}
           <b className="text-[13px]" style={{ color: countdownTone(seconds) }}>
             {formatCountdown(seconds ?? 0)}
           </b>
         </span>
         <button type="button" onClick={onClaim} className="btn-primary shrink-0 !py-1.5 !text-[11px]">
-          Claim seats
+          {t("Claim seats")}
         </button>
       </div>
     </div>

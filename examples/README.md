@@ -9,8 +9,8 @@ prompts to try on both surfaces, and what it adds to the libraries.
 
 | Path | Contents |
 |---|---|
-| `demo_common/` | Host code the four APIs share: app and middleware (`host.py`), session store (`sessions.py`), storefront routes (`storefront.py`), merchant router (`merchant.py`), memory routes and fixture seeder (`memory.py`), mock-backend helpers (`*_fixtures.py`) |
-| `web-shared/` | The npm package the eight web apps import: the API client, the session and turn hooks, the event types (`protocol.ts` mirrors `commerce_common/streaming.py`), the transcript and inspector components, shared primitives and icons, and the two app frames (`storefront/`, `portal/`) |
+| `demo_common/` | Host code the four APIs share: app and middleware (`host.py`), the model provider from `MODEL_PROVIDER` (`model_provider.py`), the operations log with the feedback and handoff routes (`analytics.py`), session store (`sessions.py`), storefront routes (`storefront.py`), merchant router (`merchant.py`), memory routes and fixture seeder (`memory.py`), mock-backend helpers (`*_fixtures.py`) |
+| `web-shared/` | The npm package the eight web apps import: the API client, the session and turn hooks, the event types (`protocol.ts` mirrors `commerce_common/streaming.py`), the transcript and inspector components, shared primitives and icons, and the two app frames (`storefront/`, `portal/`), and the English/Chinese switch (`i18n.tsx`, `locale.ts`, `i18n-zh.ts`) |
 | `package.json` | The npm workspace: `web-shared` plus every `*/storefront-web` and `*/merchant-web` (`npm ci` installs all of them) |
 | `<vertical>/api/` | One FastAPI process: the two mock backends, the two agent configs (`agent_config.py`), the vertical's own routes and presentation extensions, and the merchant router mounted under `/api/merchant` |
 | `<vertical>/data/` | The fixtures both backends load, listed in the vertical's README |
@@ -24,6 +24,16 @@ own components: `components/generative/` has one entry per presentation tool, ty
 app's `lib/types.ts`, so the four frontends are four builds of the same payload schemas
 (`shopping_agent/tools/presentation.py`, `merchant_agent/tools/presentation.py`); a
 deployment's frontend is a fifth.
+
+## Languages
+
+Every app renders in English or Simplified Chinese; the EN / 中文 button in the app bar (the
+portal's sidebar) switches it. The choice is the `acme-locale` cookie, which the layout reads
+so the server renders the language the client hydrates with, and which every app on
+localhost shares. English text is the key: `useT()` from `web-shared` looks it up in the
+app's `lib/i18n-zh.ts` over `web-shared/i18n-zh.ts` and falls back to English. A chat request
+carries the locale; the host puts the matching `reply_language` in the context block and the
+agent writes in it. Catalog data (names, descriptions, fees) stays as the fixtures author it.
 
 ## Showcase pages
 
@@ -42,8 +52,12 @@ only the session id, in `X-Session-Id`, and the routes read the principal from i
 | Variable | Effect | Read in | Default |
 |---|---|---|---|
 | `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` | Chat credentials; the environment wins over `<vertical>/.env`, which wins over the repo-root `.env` | `demo_common/host.py` | unset (client credential chain) |
+| `MODEL_PROVIDER` | `anthropic`, or an OpenAI-compatible preset: `openai`, `deepseek`, `qwen`, `moonshot`, `zhipu`, `ollama`, `openai-compatible` | `demo_common/model_provider.py` | `anthropic` |
+| `MODEL_API_KEY` | The provider's key; each preset also reads its usual variable (`OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, `DASHSCOPE_API_KEY`, `MOONSHOT_API_KEY`, `ZHIPUAI_API_KEY`) | `demo_common/model_provider.py` | unset |
+| `MODEL_BASE_URL`, `MODEL_NAME`, `MODEL_FAST_NAME` | The endpoint, the turn loop's model, and memory extraction's model, over the preset's | `demo_common/model_provider.py` | the preset's |
 | `COMMERCE_DEMO_AUTH` | `sdk` skips the `.env` files and clears the key variables so the client's credential chain is used; `run_demo.py --federated` sets it | `demo_common/host.py` | unset |
 | `DEMO_ALLOWED_HOSTS` | Comma-separated Host values the API answers to besides `localhost` and `127.0.0.1` | `demo_common/host.py` | unset |
+| `DEMO_ANALYTICS`, `DEMO_ANALYTICS_DIR` | `0` turns the operations log off; the directory replaces `<vertical>/data/.analytics/` (`docs/metrics.md`) | `demo_common/analytics.py` | on, per vertical |
 | `DEMO_LOG_LEVEL` | `INFO` writes one line per model call; `DEBUG` adds each request and response | `demo_common/host.py` | `INFO` |
 | `MERCHANT_REQUIRE_HOST_APPROVAL` | `0` lets an approval typed in chat apply a change; `1` requires the preview card's button | `demo_common/host.py` | `1` |
 | `MERCHANT_ANALYSIS_CODE_EXECUTION` | `1` mounts the hosted code execution tool in the retail analysis delegate | `retail/api/agent_config.py` | `0` |

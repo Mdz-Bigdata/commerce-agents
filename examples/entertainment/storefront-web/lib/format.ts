@@ -1,7 +1,7 @@
 // Copyright 2026 Anthropic PBC
 // SPDX-License-Identifier: Apache-2.0
 
-import { formatMoney } from "web-shared";
+import { formatMoney, type Translate } from "web-shared";
 import type { Product } from "./types";
 
 // --- Event date blocks -------------------------------------------------------
@@ -75,12 +75,12 @@ export function statusPill(product: Product): StatusPill {
   return { label: "On sale", tone: "calm" };
 }
 
-export function scarcityLine(product: Product): string | null {
+export function scarcityLine(product: Product, t: Translate): string | null {
   if (!(product.labels ?? []).some((label) => label.startsWith("Selling fast"))) return null;
   const remaining = product.attributes?.tickets_remaining;
   const tier = product.attributes?.tier;
   if (!remaining || !tier) return null;
-  return `${remaining} left in ${tier}`;
+  return t("{remaining} left in {tier}", { remaining, tier });
 }
 
 // --- Fees & value scores ----------------------------------------------------------
@@ -138,16 +138,20 @@ export function valueScore(product: Product): ValueScore | null {
   };
 }
 
-export function valueScoreBasis(value: ValueScore): string {
+export function valueScoreBasis(value: ValueScore, t: Translate): string {
   const delta = value.vsFace.replace("+", "");
+  const pct = value.vsFace.startsWith("-") ? delta.replace("-", "") : delta;
   const direction = value.vsFace.startsWith("-")
-    ? `${delta.replace("-", "")} below`
+    ? t("{pct} below", { pct })
     : value.vsFace === "+0%" || value.vsFace === "0%"
-      ? "level with"
-      : `${delta} above`;
+      ? t("level with")
+      : t("{pct} above", { pct });
   return value.boxAllIn != null
-    ? `${direction} the box-office all-in price (${formatMoney(value.boxAllIn)}) for the same tier`
-    : `${direction} the box-office all-in price for the same tier`;
+    ? t("{direction} the box-office all-in price ({price}) for the same tier", {
+        direction,
+        price: formatMoney(value.boxAllIn),
+      })
+    : t("{direction} the box-office all-in price for the same tier", { direction });
 }
 
 // --- Tier legend colors ---------------------------------------------------------

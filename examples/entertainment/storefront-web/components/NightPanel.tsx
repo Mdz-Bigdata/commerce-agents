@@ -3,9 +3,10 @@
 
 "use client";
 
-import { AskLink, BagPanel, CheckoutButton, formatMoney, TotalRow, useCatalogIndex } from "web-shared";
+import { AskLink, BagPanel, CheckoutButton, formatMoney, TotalRow, useCatalogIndex, useT } from "web-shared";
 import { fetchProducts } from "@/lib/api";
 import { countdownTone, dateBlock, formatCountdown } from "@/lib/format";
+import { tPlural } from "@/lib/i18n-helpers";
 import { useCountdown, useLive, type TimedHold, type TimedOffer } from "@/lib/live";
 import type { Product } from "@/lib/types";
 import { CountdownArc, DateSquare } from "./generative/shared";
@@ -19,6 +20,7 @@ function HoldRow({
   product?: Product;
   onRelease: () => void;
 }) {
+  const t = useT();
   const { holdMinutes } = useLive();
   const seconds = useCountdown(hold.deadline);
   const attrs = product?.attributes ?? {};
@@ -43,7 +45,7 @@ function HoldRow({
               seconds != null && seconds <= 30 ? "at-urgent" : ""
             }`}
             style={{ color: countdownTone(seconds) }}
-            title="Hold expires; the seats release to other buyers at 0:00"
+            title={t("Hold expires; the seats release to other buyers at 0:00")}
           >
             <CountdownArc
               fraction={(seconds ?? 0) / (holdMinutes * 60)}
@@ -60,7 +62,7 @@ function HoldRow({
         onClick={onRelease}
         className="at-mono mt-1 text-[11px] text-(--ink-soft) underline-offset-2 hover:text-(--danger) hover:underline"
       >
-        Release now
+        {t("Release now")}
       </button>
     </li>
   );
@@ -78,6 +80,7 @@ export function TonightStrip({
   total: number;
   deadline: number | null;
 }) {
+  const t = useT();
   const { holdMinutes } = useLive();
   const seconds = useCountdown(deadline);
   const attrs = product?.attributes ?? {};
@@ -87,7 +90,7 @@ export function TonightStrip({
       {date ? <DateSquare {...date} /> : null}
       <div className="min-w-0 flex-1">
         <p className="at-display truncate text-[16px] uppercase leading-tight text-(--ink)">
-          {attrs.event_name ?? product?.title ?? "Tonight"}
+          {attrs.event_name ?? product?.title ?? t("Tonight")}
         </p>
         <p className="truncate text-[11.5px] text-(--ink-soft)">
           {[attrs.venue, attrs.tier ? `${attrs.tier} × ${quantity}` : `× ${quantity}`]
@@ -96,7 +99,7 @@ export function TonightStrip({
         </p>
         <p className="at-mono mt-0.5 text-[14px] font-bold text-(--ink)">
           {formatMoney(total)}
-          <span className="at-eyebrow ml-1.5 font-normal">all-in</span>
+          <span className="at-eyebrow ml-1.5 font-normal">{t("all-in")}</span>
         </p>
       </div>
       <div className="shrink-0 text-right">
@@ -129,29 +132,30 @@ function OfferCard({
   product?: Product;
   onClaim: () => void;
 }) {
+  const t = useT();
   const seconds = useCountdown(offer.deadline);
   const attrs = product?.attributes ?? {};
   return (
     <div className="rounded-(--radius) border border-(--ok)/40 bg-(--ok-soft) p-3">
-      <p className="at-eyebrow !text-(--ok)">Return offer: your turn in line</p>
+      <p className="at-eyebrow !text-(--ok)">{t("Return offer: your turn in line")}</p>
       <p className="mt-1 text-[13px] font-semibold leading-snug text-(--ink)">
-        {offer.quantity} ticket{offer.quantity === 1 ? "" : "s"} · {attrs.event_name ?? offer.product_id}
+        {tPlural(t, offer.quantity, "{n} ticket", "{n} tickets")} · {attrs.event_name ?? offer.product_id}
         {attrs.tier ? <span className="text-(--ink-soft)"> · {attrs.tier}</span> : null}
       </p>
       {product ? (
         <p className="mt-0.5 text-[11.5px] text-(--ink-soft)">
-          at the original {formatMoney(product.price)} all-in
+          {t("at the original {price} all-in", { price: formatMoney(product.price) })}
         </p>
       ) : null}
       <div className="mt-2 flex items-center justify-between gap-3">
         <span className="at-mono text-[12px] text-(--ink-soft)">
-          Claim window closes{" "}
+          {t("Claim window closes")}{" "}
           <b className={`text-[13px] ${seconds != null && seconds <= 60 ? "text-(--danger)" : "text-(--warn)"}`}>
             {formatCountdown(seconds ?? 0)}
           </b>
         </span>
         <button type="button" onClick={onClaim} className="btn-primary !py-1.5 !text-[11px]">
-          Claim seats
+          {t("Claim seats")}
         </button>
       </div>
     </div>
@@ -160,6 +164,7 @@ function OfferCard({
 
 /** The held seats beside the conversation. Release and Claim act at once; checkout goes through the assistant. */
 export default function NightPanel() {
+  const t = useT();
   const { holds, offers, release, claim } = useLive();
   const catalog = useCatalogIndex(fetchProducts);
   const lineTotal = (hold: { product_id: string; quantity: number }) => (catalog[hold.product_id]?.price ?? 0) * hold.quantity;
@@ -170,23 +175,23 @@ export default function NightPanel() {
 
   return (
     <BagPanel
-      title="Your night"
-      count={`${heldTickets} held`}
+      title={t("Your night")}
+      count={t("{n} held", { n: heldTickets })}
       isEmpty={holds.length === 0 && offers.length === 0}
       empty={
         <>
-          No seats held yet.
+          {t("No seats held yet.")}
           <br />
-          Ask ACME Assistant to hold seats for 8 minutes while you decide.
+          {t("Ask ACME Assistant to hold seats for 8 minutes while you decide.")}
         </>
       }
       footer={
         <>
-          <TotalRow label="Held total, all-in" value={formatMoney(total)} note={holds.length ? "Nothing is charged until you check out." : undefined} />
-          <CheckoutButton staged={false} disabled={holds.length === 0} prompt="Check out my held seats." />
+          <TotalRow label={t("Held total, all-in")} value={formatMoney(total)} note={holds.length ? t("Nothing is charged until you check out.") : undefined} />
+          <CheckoutButton staged={false} disabled={holds.length === 0} prompt={t("Check out my held seats.")} />
           {holds.length ? (
             <div className="mt-2.5 flex justify-center">
-              <AskLink label="Ask about these seats" prompt="Tell me about the seats I'm holding: the view, what's included, and the all-in price." />
+              <AskLink label={t("Ask about these seats")} prompt={t("Tell me about the seats I'm holding: the view, what's included, and the all-in price.")} />
             </div>
           ) : null}
         </>
@@ -200,7 +205,7 @@ export default function NightPanel() {
             onClick={() => void release(soonest.hold_id)}
             className="at-mono mt-1.5 text-[11px] text-(--ink-soft) underline-offset-2 hover:text-(--danger) hover:underline"
           >
-            Release now
+            {t("Release now")}
           </button>
         </div>
       ) : null}
@@ -216,7 +221,7 @@ export default function NightPanel() {
 
       {later.length ? (
         <>
-          <p className="at-eyebrow mb-1">Also held</p>
+          <p className="at-eyebrow mb-1">{t("Also held")}</p>
           <ul className="divide-y divide-(--line)">
             {later.map((hold) => (
               <HoldRow key={hold.hold_id} hold={hold} product={catalog[hold.product_id]} onRelease={() => void release(hold.hold_id)} />

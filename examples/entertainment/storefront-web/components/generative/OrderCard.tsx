@@ -3,14 +3,15 @@
 
 "use client";
 
-import { formatMoney, orderStatusLabel } from "web-shared";
+import { formatMoney, orderStatusLabel, useT } from "web-shared";
 import type { OrderStatusPayload } from "@/lib/types";
 import { Stub } from "./shared";
 
 export default function OrderCard({ payload }: { payload: OrderStatusPayload }) {
+  const t = useT();
   const order = payload.order;
   return (
-    <Stub component="order_status" label={`Order ${payload.order_id}`}>
+    <Stub component="order_status" label={t("Order {id}", { id: payload.order_id })}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[15px] leading-snug text-(--ink)">{payload.summary}</p>
         {order ? <span className="at-pill at-pill--calm">{orderStatusLabel(order.status)}</span> : null}
@@ -33,7 +34,7 @@ export default function OrderCard({ payload }: { payload: OrderStatusPayload }) 
             ))}
           </div>
           <div className="mt-2 flex items-baseline justify-between border-t border-(--line) pt-2">
-            <span className="text-[14px] font-bold text-(--ink)">Total, all-in</span>
+            <span className="text-[14px] font-bold text-(--ink)">{t("Total, all-in")}</span>
             <span className="at-mono text-[17px] font-bold text-(--ink)">
               {formatMoney(order.total, order.currency)}
             </span>

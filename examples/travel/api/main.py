@@ -10,7 +10,7 @@ with the ``present_itinerary`` extension, and the supplier router under /api/mer
 from __future__ import annotations
 
 from commerce_common.memory import InMemoryMemoryStore
-from demo_common import REPO_ROOT, MemorySeeder, build_storefront_host, load_demo_env
+from demo_common import REPO_ROOT, MemorySeeder, build_storefront_host, load_demo_env, model_client
 from shopping_agent_runtime import ShoppingAgent
 
 from .agent_config import build_shopping_config
@@ -25,6 +25,7 @@ agent = ShoppingAgent(
     backend=backend,
     skills_dir=REPO_ROOT / "shopping-agent" / "skills",
     config=build_shopping_config(),
+    client=model_client(),
     memory_store=InMemoryMemoryStore(),
     extra_presentation_tools=[build_itinerary_extension()],
 )

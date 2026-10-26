@@ -120,6 +120,29 @@ agent = ShoppingAgent(
 )
 ```
 
+Endpoints that serve OpenAI-compatible Chat Completions instead of `/v1/messages` take
+`commerce_common.openai_compat.OpenAICompatibleClient`. It translates each request (tools
+to functions, `tool_use` and `tool_result` blocks to tool calls and `tool` messages) and
+streams the reply back as Messages API events, so eager dispatch, partial frames, and the
+salvage of unparsable tool input behave as on the first-party API. Cache breakpoints,
+thinking, and server tools (web search, code execution) do not carry over, and the
+model ids are the endpoint's own.
+
+```python
+from commerce_common.openai_compat import OpenAICompatibleClient
+
+agent = ShoppingAgent(
+    **common,
+    config=ShoppingAgentConfig(model="deepseek-chat", memory_model="deepseek-chat"),
+    client=OpenAICompatibleClient(base_url="https://api.deepseek.com/v1", api_key="your-key"),
+)
+```
+
+The example APIs build this client from `MODEL_PROVIDER` and its companions
+(`examples/demo_common/model_provider.py`, `.env.example`): presets for OpenAI, DeepSeek,
+Qwen (DashScope), Moonshot, Zhipu GLM, and Ollama, and `openai-compatible` for any other
+endpoint.
+
 The packages declare `anthropic>=0.91`, the release that adds `AsyncAnthropicBedrockMantle`,
 the newest of the client classes above.
 

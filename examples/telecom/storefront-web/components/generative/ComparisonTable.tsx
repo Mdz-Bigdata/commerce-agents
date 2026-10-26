@@ -6,6 +6,7 @@
 /** Renders present_comparison for devices; plans use plan_matrix. */
 
 import type { CSSProperties } from "react";
+import { useT } from "web-shared";
 import { formatPrice, formatPriceWithUnit, plateGlyph, plateTint } from "@/lib/format";
 import type { ComparisonPayload } from "@/lib/types";
 import { Frame, Rating } from "./shared";
@@ -34,6 +35,7 @@ export default function ComparisonTable({
   payload: ComparisonPayload;
   partial?: boolean;
 }) {
+  const t = useT();
   const recommended = payload.recommended_product_id;
   const entries = payload.entries ?? [];
   const delta = payload.price_delta;
@@ -45,7 +47,7 @@ export default function ComparisonTable({
   return (
     <Frame
       component="comparison"
-      label={payload.title ?? "Side by side"}
+      label={payload.title ?? t("Side by side")}
       flush
     >
       <div className={`grid gap-px bg-(--line) ${columns > 2 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
@@ -63,7 +65,7 @@ export default function ComparisonTable({
             >
               {isRec ? (
                 <span className="am-tag am-tag--accent absolute right-3 top-3 z-10">
-                  ✓ {RECOMMENDED_LABEL}
+                  ✓ {t(RECOMMENDED_LABEL)}
                 </span>
               ) : null}
               <div className="am-plate relative h-[72px] w-full">
@@ -99,7 +101,7 @@ export default function ComparisonTable({
               <div className="self-end">
                 {best_for ? (
                   <p className="am-rule pt-2 text-[13px] font-medium text-(--ink-soft)">
-                    Best for: <span className="text-(--ink)">{best_for}</span>
+                    {t("Best for: ")}<span className="text-(--ink)">{best_for}</span>
                   </p>
                 ) : null}
               </div>
@@ -122,16 +124,16 @@ export default function ComparisonTable({
         <div className="border-t border-(--line) px-4 py-2.5">
           {delta ? (
             <p className="text-[13px] text-(--ink)">
-              Price difference:{" "}
+              {t("Price difference: ")}
               <span className="am-mono font-semibold">{formatPrice(delta.amount)}</span>{" "}
               <span className="am-mono text-(--ink-soft)">
-                ({formatPrice(delta.low_price)} vs {formatPrice(delta.high_price)})
+                {t("({low} vs {high})", { low: formatPrice(delta.low_price), high: formatPrice(delta.high_price) })}
               </span>
             </p>
           ) : null}
           {payload.dimensions?.length ? (
             <p className="mt-0.5 text-[12px] text-(--ink-soft)">
-              Compared on: {payload.dimensions.join(" · ")}
+              {t("Compared on: {dimensions}", { dimensions: payload.dimensions.join(" · ") })}
             </p>
           ) : null}
         </div>

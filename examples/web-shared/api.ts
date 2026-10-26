@@ -1,7 +1,8 @@
 // Copyright 2026 Anthropic PBC
 // SPDX-License-Identifier: Apache-2.0
 
-import type { AgentEvent, MemoryFact, Order } from "./protocol";
+import { cookieLocale } from "./locale";
+import type { AgentEvent, HandoffReason, MemoryFact, Order } from "./protocol";
 
 const SESSION_HEADER = "X-Session-Id";
 
@@ -104,12 +105,24 @@ export class AgentApi {
     return data?.orders ?? null;
   }
 
+  /** A vote on one reply; false when the API did not record it. */
+  async sendFeedback(turnId: string, helpful: boolean): Promise<boolean> {
+    return (await this.post<{ ok: boolean }>("/feedback", { turn_id: turnId, helpful })) !== null;
+  }
+
+  /** Opens a support ticket for a person to pick up; the ticket id, or null. */
+  async requestHandoff(turnId: string | undefined, reason: HandoffReason): Promise<string | null> {
+    const data = await this.post<{ ticket: string }>("/handoff", { turn_id: turnId ?? null, reason });
+    return data?.ticket ?? null;
+  }
+
   /** Throws when the request itself fails. */
   async *chatStream(message: string): AsyncGenerator<AgentEvent> {
     const response = await fetch(`${this.base}/chat`, {
       method: "POST",
       headers: this.headers(true),
-      body: JSON.stringify({ message }),
+      // The agent replies in the language the shopper picked.
+      body: JSON.stringify({ message, locale: cookieLocale() }),
     });
     if (!response.ok || !response.body) throw new Error(`chat request failed: ${response.status}`);
     yield* readEventStream(response.body);

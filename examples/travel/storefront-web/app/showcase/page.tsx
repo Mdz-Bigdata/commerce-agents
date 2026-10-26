@@ -6,7 +6,7 @@
 /** Renders from fixtures; no API needed. */
 
 import type { ReactNode } from "react";
-import type { UISlotStatus } from "web-shared";
+import { type UISlotStatus, useT } from "web-shared";
 import TripPanel from "@/components/TripPanel";
 import GenerativeBlock from "@/components/generative";
 import { SHOWCASE, SHOWCASE_PRODUCT_INDEX } from "@/lib/showcase-fixtures";
@@ -44,10 +44,11 @@ function Section({ name, children }: { name: string; children: ReactNode }) {
 }
 
 export default function ShowcasePage() {
+  const t = useT();
   return (
     <main className="relative z-[2] mx-auto max-w-3xl px-6 py-14">
       <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-(--ink-soft)">
-        ACME Travel component showcase (fixture data)
+        {t("ACME Travel component showcase (fixture data)")}
       </p>
       {SECTIONS.map(({ component, id = component, payload, status = "final" }) => (
         <Section key={id} name={id}>

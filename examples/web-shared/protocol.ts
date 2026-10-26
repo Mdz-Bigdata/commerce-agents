@@ -105,6 +105,15 @@ export interface AssistantChatItem {
    * tool a progress line names returns.
    */
   activity?: string;
+  /** The server's id for this reply (`turn_complete`), which votes and handoffs name. */
+  turnId?: string;
+  /** The user's vote on this reply. */
+  rating?: "up" | "down";
+  /** The support ticket a handoff from this reply opened. */
+  ticket?: string;
 }
+
+/** Why the user asked for a person: the reason the operations log counts it under. */
+export type HandoffReason = "user_requested" | "after_negative_feedback" | "after_error";
 
 export type ChatItem = UserChatItem | AssistantChatItem;

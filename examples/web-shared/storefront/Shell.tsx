@@ -5,6 +5,7 @@
 
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityButton } from "../ActivityButton";
+import { LanguageToggle, useLocale } from "../i18n";
 import type { AgentApi } from "../api";
 import { Composer } from "../Composer";
 import { Icon, type IconName } from "../icons";
@@ -81,6 +82,7 @@ export function StoreShell<V extends string>({
   banner?: ReactNode;
   children: ReactNode;
 }) {
+  const { locale, t } = useLocale();
   const [activityOpen, setActivityOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const bagButtonRef = useRef<HTMLButtonElement>(null);
@@ -123,7 +125,7 @@ export function StoreShell<V extends string>({
       <div className="flex h-dvh flex-col text-(--ink)">
         <header className="flex h-[58px] shrink-0 items-center gap-2 border-b border-(--line) bg-(--chrome) px-3 sm:gap-5 sm:px-5">
           <div className="flex shrink-0 items-center">{brand}</div>
-          <nav className="flex min-w-0 items-center gap-1" aria-label="Views">
+          <nav className="flex min-w-0 items-center gap-1" aria-label={t("Views")}>
             {views.map((item) => {
               const active = item.id === view;
               return (
@@ -149,6 +151,7 @@ export function StoreShell<V extends string>({
             })}
           </nav>
           <div className="ml-auto flex items-center gap-2">
+            <LanguageToggle />
             <ActivityButton
               streaming={chat.streaming}
               newMemoryCount={chat.newMemoryKeys.size}
@@ -158,7 +161,12 @@ export function StoreShell<V extends string>({
               ref={bagButtonRef}
               type="button"
               onClick={() => onPanelOpenChange(true)}
-              aria-label={`Open ${bag.label.toLowerCase()}, ${bag.count} ${bag.noun}${bag.count === 1 ? "" : "s"}`}
+              aria-label={t("Open {label}, {count} {noun}", {
+                label: bag.label.toLowerCase(),
+                count: bag.count,
+                // The noun arrives in the page's language; only the English one takes an "s".
+                noun: locale === "en" && bag.count !== 1 ? `${bag.noun}s` : bag.noun,
+              })}
               className="flex h-[34px] items-center gap-2 rounded-full bg-(--ink) pl-3 pr-1.5 text-[13px] font-semibold text-(--surface) transition hover:brightness-110 xl:hidden"
             >
               <Icon name="bag" size={16} />
@@ -176,7 +184,7 @@ export function StoreShell<V extends string>({
             <button
               type="button"
               onClick={() => setAccountOpen(true)}
-              aria-label={`${shopper.name}: profile and memory`}
+              aria-label={t("{name}: profile and memory", { name: shopper.name })}
               className="flex items-center gap-2.5 rounded-full py-0.5 pl-0.5 pr-1 text-left transition-colors hover:bg-(--well)/60 md:pr-3"
             >
               <Avatar name={shopper.name} />
@@ -203,7 +211,7 @@ export function StoreShell<V extends string>({
                 send={ask}
                 ready={chat.ready}
                 busy={chat.busy}
-                label={`Message ${assistantName}`}
+                label={t("Message {name}", { name: assistantName })}
                 placeholder={placeholder}
                 className="mx-auto max-w-[760px]"
               />
@@ -248,7 +256,7 @@ export function StoreShell<V extends string>({
             trace={chat.trace}
             memory={chat.memory}
             newMemoryKeys={chat.newMemoryKeys}
-            memoryTitle={`What ${assistantName} knows`}
+            memoryTitle={t("What {name} knows", { name: assistantName })}
             onClose={() => setActivityOpen(false)}
           />
         ) : null}

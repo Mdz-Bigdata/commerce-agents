@@ -3,7 +3,7 @@
 
 /** Shared by the Events view, the Holds view, and the event_pacing card. */
 
-import { formatNumber, Pill } from "web-shared";
+import { formatNumber, Pill, type Translate, useT } from "web-shared";
 import type { HoldBuckets, WeeklySoldPoint } from "@/lib/types";
 import { formatPacePts } from "@/lib/format";
 
@@ -22,6 +22,7 @@ export function SellThroughBar({
   sellThroughPct: number | null | undefined;
   baselinePct: number | null | undefined;
 }) {
+  const t = useT();
   const sold = clampPct(sellThroughPct);
   const baseline = clampPct(baselinePct);
   if (sold == null) return null;
@@ -30,9 +31,11 @@ export function SellThroughBar({
     <div
       className="relative h-1.5 w-full overflow-hidden rounded-full bg-(--line)"
       role="img"
-      aria-label={`${sold.toFixed(1)}% sold${
-        baseline != null ? `, baseline ${baseline.toFixed(1)}%` : ""
-      }`}
+      aria-label={
+        baseline != null
+          ? t("{pct}% sold, baseline {baseline}%", { pct: sold.toFixed(1), baseline: baseline.toFixed(1) })
+          : t("{pct}% sold", { pct: sold.toFixed(1) })
+      }
     >
       <div
         className={`h-full ${behind ? "bg-(--danger)" : "bg-(--ink)/70"}`}
@@ -42,7 +45,7 @@ export function SellThroughBar({
         <span
           className="absolute inset-y-0 w-0.5 bg-(--warn)"
           style={{ left: `${baseline}%` }}
-          title={`Comparable-events baseline ${baseline.toFixed(1)}%`}
+          title={t("Comparable-events baseline {pct}%", { pct: baseline.toFixed(1) })}
         />
       ) : null}
     </div>
@@ -50,16 +53,18 @@ export function SellThroughBar({
 }
 
 export function PaceChip({ pts }: { pts: number | null | undefined }) {
+  const t = useT();
   if (pts == null) return null;
   return (
-    <Pill tone={pts >= 0 ? "ok" : pts <= UNDER_PACE_ALERT_PTS ? "danger" : "muted"} title="Sell-through vs the comparable-events baseline at today's days-to-event">
-      <span className="at-mono">{formatPacePts(pts)}</span>
+    <Pill tone={pts >= 0 ? "ok" : pts <= UNDER_PACE_ALERT_PTS ? "danger" : "muted"} title={t("Sell-through vs the comparable-events baseline at today's days-to-event")}>
+      <span className="at-mono">{formatPacePts(pts, t)}</span>
     </Pill>
   );
 }
 
 /** The y axis starts at zero. */
 export function WeeklySparkline({ points }: { points: WeeklySoldPoint[] }) {
+  const t = useT();
   if (points.length < 2) return null;
   const width = 160;
   const height = 36;
@@ -76,9 +81,10 @@ export function WeeklySparkline({ points }: { points: WeeklySoldPoint[] }) {
       className="h-9 w-full"
       preserveAspectRatio="none"
       role="img"
-      aria-label={`Weekly cumulative sales, ${formatNumber(points[0].sold_cum)} to ${formatNumber(
-        points[points.length - 1].sold_cum,
-      )} tickets`}
+      aria-label={t("Weekly cumulative sales, {from} to {to} tickets", {
+        from: formatNumber(points[0].sold_cum),
+        to: formatNumber(points[points.length - 1].sold_cum),
+      })}
     >
       <polyline
         points={`0,${height} ${coords.join(" ")} ${width},${height}`}
@@ -111,6 +117,7 @@ export function PacingCurve({
   height?: number;
   underPacing?: boolean;
 }) {
+  const t = useT();
   const seats = capacity ?? 0;
   if (seats <= 0 || points.length < 2) return null;
   const rawBaseline = weeklyBaselinePct ?? [];
@@ -141,13 +148,14 @@ export function PacingCurve({
         className="w-full"
         preserveAspectRatio="none"
         role="img"
-        aria-label={`Sell-through pacing: actual ${actual[actual.length - 1].toFixed(
-          1,
-        )}% sold${
+        aria-label={
           baseline != null
-            ? `, comparable baseline ${baseline[baseline.length - 1].toFixed(1)}%`
-            : ""
-        }`}
+            ? t("Sell-through pacing: actual {actual}% sold, comparable baseline {baseline}%", {
+                actual: actual[actual.length - 1].toFixed(1),
+                baseline: baseline[baseline.length - 1].toFixed(1),
+              })
+            : t("Sell-through pacing: actual {actual}% sold", { actual: actual[actual.length - 1].toFixed(1) })
+        }
       >
         {[25, 50, 75, 100].map((gridPct) => (
           <line
@@ -186,12 +194,12 @@ export function PacingCurve({
             style={{ background: actualStroke }}
             aria-hidden
           />
-          actual
+          {t("actual")}
         </span>
         {baseline != null ? (
           <span className="flex items-center gap-1">
             <span className="w-3 border-t border-dashed border-(--ink-soft)" aria-hidden />
-            baseline
+            {t("baseline")}
           </span>
         ) : null}
       </div>
@@ -206,12 +214,12 @@ export function releasableTotal(holds: HoldBuckets | null | undefined): number {
 }
 
 /** Zeros included. */
-export function holdsSummary(holds: HoldBuckets | null | undefined): string | null {
+export function holdsSummary(holds: HoldBuckets | null | undefined, t: Translate): string | null {
   if (!holds) return null;
   return [
-    `Promoter ${formatNumber(holds.promoter_hold ?? 0)}`,
-    `Production ${formatNumber(holds.production_hold ?? 0)}`,
-    `Comps ${formatNumber(holds.comps ?? 0)}`,
-    `Kills ${formatNumber(holds.kills ?? 0)}`,
+    t("Promoter {n}", { n: formatNumber(holds.promoter_hold ?? 0) }),
+    t("Production {n}", { n: formatNumber(holds.production_hold ?? 0) }),
+    t("Comps {n}", { n: formatNumber(holds.comps ?? 0) }),
+    t("Kills {n}", { n: formatNumber(holds.kills ?? 0) }),
   ].join(" · ");
 }

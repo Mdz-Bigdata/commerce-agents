@@ -11,6 +11,7 @@ import; the fixture helpers are imported from their own modules."""
 from .host import REPO_ROOT, host_approval_default, load_demo_env, spawn_background
 from .memory import MemorySeeder
 from .merchant import MerchantIdentity, build_merchant_router
+from .model_provider import model_client, model_config_fields, resolve_provider
 from .sessions import (
     SESSION_HEADER,
     SessionConflictError,
@@ -36,6 +37,9 @@ __all__ = [
     "build_storefront_host",
     "host_approval_default",
     "load_demo_env",
+    "model_client",
+    "model_config_fields",
+    "resolve_provider",
     "session_dependency",
     "spawn_background",
 ]

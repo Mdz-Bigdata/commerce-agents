@@ -4,7 +4,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { formatMoney } from "web-shared";
+import { formatMoney, useT } from "web-shared";
 import { formatTime, tierColorMap } from "@/lib/format";
 import { useLive } from "@/lib/live";
 import { useStageLights } from "@/lib/stage-lights";
@@ -59,6 +59,7 @@ function SightlineVignette({
   stage: VenueMapSection | undefined;
   viewHeight: number;
 }) {
+  const t = useT();
   const base = VIGNETTE_BASE[selected.kind] ?? { stage: 0.5, horizon: 0.45 };
   // 0 = touching the stage block, 1 = across the whole room.
   let distance = 0.5;
@@ -79,7 +80,7 @@ function SightlineVignette({
       viewBox="0 0 96 64"
       className="h-[64px] w-[96px] shrink-0 rounded-(--radius) border border-(--line) bg-(--ground)"
       role="img"
-      aria-label={`Stylized view from ${selected.label}, not a photo`}
+      aria-label={t("Stylized view from {section}, not a photo", { section: selected.label })}
     >
       <defs>
         <linearGradient id="at-vign-sky" x1="0" y1="0" x2="0" y2="1">
@@ -142,11 +143,12 @@ function QuantityStepper({
   setQuantity: (next: number) => void;
   max: number;
 }) {
+  const t = useT();
   return (
     <div className="flex items-center rounded-(--radius) border border-(--line) bg-(--card)">
       <button
         onClick={() => setQuantity(Math.max(1, quantity - 1))}
-        aria-label="Fewer tickets"
+        aria-label={t("Fewer tickets")}
         className="px-2.5 py-0.5 text-sm text-(--ink-soft) hover:text-(--ink)"
       >
         −
@@ -156,7 +158,7 @@ function QuantityStepper({
       </span>
       <button
         onClick={() => setQuantity(Math.min(max, quantity + 1))}
-        aria-label="More tickets"
+        aria-label={t("More tickets")}
         className="px-2.5 py-0.5 text-sm text-(--ink-soft) hover:text-(--ink)"
       >
         +
@@ -166,6 +168,7 @@ function QuantityStepper({
 }
 
 export default function VenueMap({ payload }: { payload: VenueMapPayload }) {
+  const t = useT();
   const { hold, join, holdMinutes } = useLive();
   const sections = payload.sections ?? [];
   const viewbox = payload.venue.viewbox;
@@ -246,7 +249,7 @@ export default function VenueMap({ payload }: { payload: VenueMapPayload }) {
   return (
     <Stub
       component="venue_map"
-      label={payload.title ?? `${payload.venue.name}: the room`}
+      label={payload.title ?? t("{venue}: the room", { venue: payload.venue.name })}
     >
       <div ref={rootRef} className="flex items-baseline justify-between gap-3">
         <div className="min-w-0">
@@ -258,7 +261,7 @@ export default function VenueMap({ payload }: { payload: VenueMapPayload }) {
             {eventBits.length ? ` · ${eventBits.join(" · ")}` : ""}
           </p>
         </div>
-        <span className="at-eyebrow shrink-0">live availability</span>
+        <span className="at-eyebrow shrink-0">{t("live availability")}</span>
       </div>
 
       <div className="mt-3 grid gap-4 sm:grid-cols-[1.5fr_1fr]">
@@ -266,7 +269,7 @@ export default function VenueMap({ payload }: { payload: VenueMapPayload }) {
           viewBox={`0 0 ${viewbox.width} ${viewbox.height}`}
           className="w-full rounded-(--radius) border border-(--line) bg-(--ground)"
           role="img"
-          aria-label={`Stylized schematic of ${payload.venue.name}`}
+          aria-label={t("Stylized schematic of {venue}", { venue: payload.venue.name })}
         >
           <defs>
             <pattern id="at-hatch" width="2.4" height="2.4" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
@@ -341,7 +344,7 @@ export default function VenueMap({ payload }: { payload: VenueMapPayload }) {
                     fill="var(--ink)"
                     style={{ pointerEvents: "none", userSelect: "none" }}
                   >
-                    STAGE
+                    {t("STAGE")}
                   </text>
                 ) : labelFits ? (
                   <text
@@ -411,7 +414,7 @@ export default function VenueMap({ payload }: { payload: VenueMapPayload }) {
                       {tier.tier ?? tier.label}
                     </span>
                     {recommended ? (
-                      <span className="at-pill at-pill--accent shrink-0">{RECOMMENDED_LABEL}</span>
+                      <span className="at-pill at-pill--accent shrink-0">{t(RECOMMENDED_LABEL)}</span>
                     ) : null}
                   </span>
                   <span
@@ -423,14 +426,14 @@ export default function VenueMap({ payload }: { payload: VenueMapPayload }) {
                           : "text-(--ink-soft)"
                     }`}
                   >
-                    {soldOut ? "Sold out, waitlist open" : `${tier.remaining} left`}
+                    {soldOut ? t("Sold out, waitlist open") : t("{n} left", { n: String(tier.remaining) })}
                   </span>
                 </span>
                 <span className="at-mono shrink-0 text-[14px] font-semibold text-(--ink)">
                   {tier.price_all_in != null
                     ? formatMoney(tier.price_all_in, tier.currency)
                     : "—"}
-                  <span className="ml-1 text-[11px] font-normal text-(--ink-soft)">all-in</span>
+                  <span className="ml-1 text-[11px] font-normal text-(--ink-soft)">{t("all-in")}</span>
                 </span>
               </button>
             );
@@ -459,7 +462,7 @@ export default function VenueMap({ payload }: { payload: VenueMapPayload }) {
                     <path d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z" />
                     <circle cx="8" cy="8" r="2" />
                   </svg>
-                  {SIGHTLINES[selected.kind] ?? "Stylized schematic, not a seat-accurate plan"}
+                  {t(SIGHTLINES[selected.kind] ?? "Stylized schematic, not a seat-accurate plan")}
                 </p>
               </div>
             </div>
@@ -467,7 +470,7 @@ export default function VenueMap({ payload }: { payload: VenueMapPayload }) {
               {selected.price_all_in != null
                 ? formatMoney(selected.price_all_in, selected.currency)
                 : "—"}
-              <span className="ml-1 text-[11px] font-normal text-(--ink-soft)">all-in</span>
+              <span className="ml-1 text-[11px] font-normal text-(--ink-soft)">{t("all-in")}</span>
             </span>
           </div>
           <div className="mt-2.5 flex flex-wrap items-center gap-3">
@@ -480,15 +483,15 @@ export default function VenueMap({ payload }: { payload: VenueMapPayload }) {
                 />
                 <span className="text-[12px] text-(--ink-soft)">
                   {selected.kind === "floor"
-                    ? "General admission, no assigned seats"
-                    : "Reserved seats, assigned together at purchase"}
+                    ? t("General admission, no assigned seats")
+                    : t("Reserved seats, assigned together at purchase")}
                 </span>
               </>
             ) : null}
             <span className="ml-auto">
               {actionState === "done" ? (
                 <span className="at-mono text-[11.5px] font-semibold text-(--warn)">
-                  ✓ Held for {holdMinutes}:00, not charged
+                  ✓ {t("Held for {minutes}:00, not charged", { minutes: holdMinutes })}
                 </span>
               ) : actionState === "queued" && queuePosition != null && selected.product_id ? (
                 <QueuePosition productId={selected.product_id} fallback={queuePosition} />
@@ -501,10 +504,10 @@ export default function VenueMap({ payload }: { payload: VenueMapPayload }) {
                   {actionState === "busy"
                     ? "…"
                     : actionState === "failed"
-                      ? "Couldn't hold. Try again"
+                      ? t("Couldn't hold. Try again")
                       : selectedSoldOut
-                        ? `Join waitlist for ${boundedQuantity}`
-                        : `Hold ${boundedQuantity} for 8 min`}
+                        ? t("Join waitlist for {n}", { n: boundedQuantity })
+                        : t("Hold {n} for 8 min", { n: boundedQuantity })}
                 </button>
               )}
             </span>
@@ -513,7 +516,7 @@ export default function VenueMap({ payload }: { payload: VenueMapPayload }) {
       ) : null}
 
       <p className="at-eyebrow mt-3 !normal-case !tracking-normal">
-        Stylized schematic. Counts are live inventory; prices are all-in per ticket.
+        {t("Stylized schematic. Counts are live inventory; prices are all-in per ticket.")}
       </p>
     </Stub>
   );

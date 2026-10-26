@@ -4,7 +4,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { type AgentEvent, type Profile, type Session, StoreShell, type StoreView, useAgentTurn, useSession } from "web-shared";
+import { type AgentEvent, type Profile, type Session, StoreShell, type StoreView, useAgentTurn, useSession, useT } from "web-shared";
 import Chat from "@/components/Chat";
 import { PRESENTATION_COMPONENTS } from "@/components/generative/Bones";
 import { CountdownArc } from "@/components/generative/shared";
@@ -53,6 +53,7 @@ function Wordmark({ warm }: { warm: boolean }) {
 
 /** The soonest hold's countdown, inside the bag button. */
 function HoldTimer({ deadline }: { deadline: number | null }) {
+  const t = useT();
   const { holdMinutes } = useLive();
   const seconds = useCountdown(deadline);
   if (seconds == null) return null;
@@ -60,7 +61,7 @@ function HoldTimer({ deadline }: { deadline: number | null }) {
     <span
       className={`at-mono flex items-center gap-1 text-[11.5px] font-semibold ${seconds <= 30 ? "at-urgent" : ""}`}
       style={{ color: countdownTone(seconds) }}
-      title="Hold expires; the seats release to other buyers at 0:00"
+      title={t("Hold expires; the seats release to other buyers at 0:00")}
     >
       <CountdownArc fraction={seconds / (holdMinutes * 60)} tone={countdownTone(seconds)} size={12} strokeWidth={4} />
       {formatCountdown(seconds)}
@@ -87,6 +88,7 @@ function Storefront({ profile, onSwitchProfile }: Pick<StoreProps, "profile" | "
 }
 
 function Store({ session, cart, onCartUpdate, profile, onSwitchProfile }: StoreProps) {
+  const t = useT();
   const { holds, refreshHolds, refreshWaitlist, refreshTickets } = useLive();
   const [view, setView] = useState<View>("assistant");
   const [panelOpen, setPanelOpen] = useState(false);
@@ -108,7 +110,7 @@ function Store({ session, cart, onCartUpdate, profile, onSwitchProfile }: StoreP
     refreshTickets();
   }, [refreshHolds, refreshWaitlist, refreshTickets]);
 
-  const chat = useAgentTurn(api, { ...session, unreachable: UNREACHABLE, onEvent, onTurnEnd, pendingComponent });
+  const chat = useAgentTurn(api, { ...session, unreachable: t(UNREACHABLE), onEvent, onTurnEnd, pendingComponent });
 
   const soonest = holds.length ? Math.min(...holds.map((hold) => hold.deadline)) : null;
   const held = cart?.item_count ?? 0;
@@ -117,21 +119,21 @@ function Store({ session, cart, onCartUpdate, profile, onSwitchProfile }: StoreP
   return (
     <StoreShell
       brand={<Wordmark warm={holds.length > 0} />}
-      views={VIEWS}
+      views={VIEWS.map((item) => ({ ...item, label: t(item.label) }))}
       view={view}
       onViewChange={setView}
       chat={chat}
       api={api}
-      assistantName={ASSISTANT}
+      assistantName={t(ASSISTANT)}
       shopper={shopper}
       profiles={PROFILES}
       profileId={profile.id}
       onSwitchProfile={onSwitchProfile}
-      bag={{ label: "Your night", count: held, noun: "held seat", extra: holds.length ? <HoldTimer deadline={soonest} /> : null }}
+      bag={{ label: t("Your night"), count: held, noun: t("held seat"), extra: holds.length ? <HoldTimer deadline={soonest} /> : null }}
       panel={<NightPanel />}
       panelOpen={panelOpen}
       onPanelOpenChange={setPanelOpen}
-      placeholder={view === "tickets" ? "Ask about a ticket, a transfer, a refund…" : "Ask about a show, a tier, a fee…"}
+      placeholder={view === "tickets" ? t("Ask about a ticket, a transfer, a refund…") : t("Ask about a show, a tier, a fee…")}
       banner={<OfferBanner />}
     >
       {/* The conversation stays mounted under the other view so its cards keep their state. */}

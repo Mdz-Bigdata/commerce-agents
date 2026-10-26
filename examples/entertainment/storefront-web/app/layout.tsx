@@ -3,6 +3,10 @@
 
 import type { Metadata } from "next";
 import { Archivo, Big_Shoulders, IBM_Plex_Mono } from "next/font/google";
+import { cookies } from "next/headers";
+import { LocaleProvider } from "web-shared/i18n";
+import { htmlLang, LOCALE_COOKIE, parseLocale } from "web-shared/locale";
+import { ZH } from "../lib/i18n-zh";
 import "./globals.css";
 
 const bigShoulders = Big_Shoulders({
@@ -35,18 +39,22 @@ export const metadata: Metadata = {
   description: "Find shows and hold seats with the ACME Assistant.",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const locale = parseLocale((await cookies()).get(LOCALE_COOKIE)?.value);
   return (
     <html
-      lang="en"
+      lang={htmlLang(locale)}
+      suppressHydrationWarning
       className={`${bigShoulders.variable} ${archivo.variable} ${plexMono.variable}`}
     >
-      <body>
-        {/* Page-wide limelight wash. */}
-        <div className="at-house" aria-hidden />
-        <div className="relative z-[2] h-full">
-          {children}
-        </div>
+      <body suppressHydrationWarning>
+        <LocaleProvider initial={locale} messages={ZH}>
+          {/* Page-wide limelight wash. */}
+          <div className="at-house" aria-hidden />
+          <div className="relative z-[2] h-full">
+            {children}
+          </div>
+        </LocaleProvider>
       </body>
     </html>
   );

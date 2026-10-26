@@ -1,0 +1,95 @@
+# Copyright 2026 Anthropic PBC
+# SPDX-License-Identifier: Apache-2.0
+
+"""scripts/metrics_report.py over a hand-built log: each rate's numerator and denominator
+as docs/metrics.md defines them."""
+
+import importlib.util
+import json
+import sys
+from pathlib import Path
+
+SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "metrics_report.py"
+spec = importlib.util.spec_from_file_location("metrics_report", SCRIPT)
+assert spec and spec.loader
+report = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = report  # dataclasses resolve their module through sys.modules
+spec.loader.exec_module(report)
+
+
+def turn(session, turn_id, *, tools=(), writes=(), error=None, elapsed=1000, blocked=()):
+    return {
+        "kind": "turn",
+        "vertical": "retail",
+        "role": "storefront",
+        "session": session,
+        "turn_id": turn_id,
+        "tools": [{"name": name, "status": status} for name, status in tools],
+        "writes": list(writes),
+        "blocked": list(blocked),
+        "error": error,
+        "elapsed_ms": elapsed,
+        "usage": {"input_tokens": 100, "output_tokens": 20},
+    }
+
+
+def other(kind, session, **fields):
+    return {"kind": kind, "vertical": "retail", "role": "storefront", "session": session, **fields}
+
+
+def test_rates_follow_the_definitions(tmp_path):
+    records = [
+        # s1: resolved on its first turn by a cart write, no handoff.
+        turn("s1", "t1", tools=[("search_products", "ok")], writes=["cart"]),
+        # s2: resolved on its second turn by a 👍.
+        turn("s2", "t2", tools=[("search_products", "ok")]),
+        turn("s2", "t3"),
+        other("feedback", "s2", turn_id="t3", helpful=True),
+        # s3: unresolved; the user disliked a reply and asked for a person.
+        turn(
+            "s3",
+            "t4",
+            tools=[("add_to_cart", "blocked")],
+            blocked=[{"tool": "add_to_cart", "reason": "provenance"}],
+        ),
+        other("feedback", "s3", turn_id="t4", helpful=False),
+        other("handoff", "s3", turn_id="t4", reason="after_negative_feedback", ticket="H-1"),
+        # s4: every turn failed: not an effective session.
+        turn("s4", "t5", error="no_key"),
+    ]
+    path = tmp_path / "storefront.jsonl"
+    path.write_text("\n".join(json.dumps(r) for r in records) + "\n")
+    metrics = report.compute(report.load([path])[("retail", "storefront")])
+
+    assert metrics["effective_sessions"] == 3
+    assert metrics["resolution_rate"] == {"value": 2 / 3, "numerator": 2, "denominator": 3}
+    assert metrics["first_turn_resolution_rate"]["numerator"] == 1
+    assert metrics["self_service_rate"]["numerator"] == 2
+    assert metrics["handoff_rate"]["numerator"] == 1
+    assert metrics["handoff_reasons"] == {"after_negative_feedback": 1}
+    assert metrics["negative_feedback_rate"] == {"value": 0.5, "numerator": 1, "denominator": 2}
+    assert metrics["grounded_turn_rate"] == {"value": 0.5, "numerator": 2, "denominator": 4}
+    assert metrics["system_error_rate"]["numerator"] == 1
+    assert metrics["errors"] == {"no_key": 1}
+    assert metrics["gate_refusals"] == {"add_to_cart: provenance": 1}
+    assert metrics["tokens_per_turn"] == 120
+
+
+def test_the_review_sample_puts_dislikes_errors_and_refusals_first(tmp_path):
+    records = [
+        turn("s1", "ok-1"),
+        turn("s1", "err", error="generic"),
+        turn("s2", "bad"),
+        other("feedback", "s2", turn_id="bad", helpful=False),
+        turn("s3", "held", blocked=[{"tool": "checkout", "reason": "cap"}]),
+    ]
+    path = tmp_path / "storefront.jsonl"
+    path.write_text("\n".join(json.dumps(r) for r in records))
+    sessions = report.load([path])[("retail", "storefront")]
+    picked = report.review_sample(sessions, 4, seed=0)
+    assert [item["why"] for item in picked] == [
+        "negative_feedback",
+        "system_error",
+        "gate_refusal",
+        "random",
+    ]

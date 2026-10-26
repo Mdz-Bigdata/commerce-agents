@@ -6,6 +6,7 @@
 import { type ButtonHTMLAttributes, type ReactNode, useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { formatChangePct } from "./format";
+import { useT } from "./i18n";
 import { Icon, type IconName } from "./icons";
 
 export type Tone = "ok" | "warn" | "danger" | "info" | "violet" | "accent" | "muted";
@@ -249,13 +250,14 @@ export function StatTile({
   onClick?: () => void;
   ariaLabel?: string;
 }) {
+  const t = useT();
   const body = (
     <>
       <div className="relative text-[12.5px] font-medium whitespace-nowrap text-(--ink-soft)">
         {label}
         {onClick ? (
           <span className="absolute right-0 top-0 flex items-center gap-1 bg-inherit text-[11.5px] text-(--ink-faint) opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
-            Ask why <Icon name="arrow-right" size={12} />
+            {t("Ask why")} <Icon name="arrow-right" size={12} />
           </span>
         ) : null}
       </div>
@@ -263,7 +265,7 @@ export function StatTile({
         <span className="text-[26px] font-semibold leading-none tracking-[-0.02em] tabular-nums text-(--ink)">{value}</span>
         <ChangeChip changePct={changePct} />
       </div>
-      {points && points.length > 1 ? <Sparkline points={points} prior={prior} label={`${label} over the period`} className="mt-2" /> : null}
+      {points && points.length > 1 ? <Sparkline points={points} prior={prior} label={t("{label} over the period", { label })} className="mt-2" /> : null}
     </>
   );
   const className = "group block w-full px-[18px] pb-3.5 pt-4 text-left transition-colors";
@@ -388,7 +390,7 @@ export function Sheet({
   onClose,
   footer,
   children,
-  closeLabel = "Close",
+  closeLabel,
 }: {
   title: ReactNode;
   detail?: ReactNode;
@@ -397,6 +399,7 @@ export function Sheet({
   children: ReactNode;
   closeLabel?: string;
 }) {
+  const t = useT();
   const [host, setHost] = useState<HTMLElement | null>(null);
   const titleId = useId();
   useEffect(() => {
@@ -422,7 +425,7 @@ export function Sheet({
             {title}
             {detail ? <span className="ml-2 font-normal tabular-nums text-(--ink-soft)">{detail}</span> : null}
           </div>
-          <IconButton icon="x" label={closeLabel} onClick={onClose} />
+          <IconButton icon="x" label={closeLabel ?? t("Close")} onClick={onClose} />
         </div>
         <div className="panel-scroll flex flex-1 flex-col gap-4 overflow-y-auto p-[18px]">{children}</div>
         {footer ? <div className="flex items-center gap-2 border-t border-(--line) px-[18px] py-3">{footer}</div> : null}

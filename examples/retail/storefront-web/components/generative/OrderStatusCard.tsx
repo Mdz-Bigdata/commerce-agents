@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Fragment } from "react";
-import { formatDate, formatMoney } from "web-shared";
+import { formatDate, formatMoney, type Locale, useLocale, useT } from "web-shared";
 import type { OrderStatusPayload } from "@/lib/types";
 
 /** Rail stages reached; statuses absent here render no rail. */
@@ -16,15 +16,16 @@ const RAIL_PROGRESS: Record<string, number> = {
 
 const RAIL_STAGES = ["Ordered", "Packed", "Shipped", "Delivered"] as const;
 
-function shortDay(iso: string): string {
+function shortDay(iso: string, locale: Locale): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
   if (!match) return iso;
   // Parsed by parts so the local timezone can't shift it a day.
   const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date);
+  return new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", { month: "short", day: "numeric" }).format(date);
 }
 
 function DeliveryRail({ order }: { order: NonNullable<OrderStatusPayload["order"]> }) {
+  const { locale, t } = useLocale();
   const reached = RAIL_PROGRESS[order.status];
   if (reached == null) return null;
   const delayed = order.status === "delayed";
@@ -58,9 +59,9 @@ function DeliveryRail({ order }: { order: NonNullable<OrderStatusPayload["order"
                   {isDelaySegment ? (
                     <span
                       className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full bg-(--warn-soft) px-2 py-0.5 text-[11px] font-semibold text-(--warn)"
-                      title="The original delivery estimate was missed"
+                      title={t("The original delivery estimate was missed")}
                     >
-                      delayed
+                      {t("delayed")}
                     </span>
                   ) : null}
                 </div>
@@ -92,20 +93,20 @@ function DeliveryRail({ order }: { order: NonNullable<OrderStatusPayload["order"
                 complete ? "font-semibold text-(--ink)" : "text-(--ink-soft)"
               }`}
             >
-              <div>{stage}</div>
+              <div>{t(stage)}</div>
               {index === 0 && order.placed_at ? (
-                <div className="font-normal text-(--ink-soft)">{shortDay(order.placed_at)}</div>
+                <div className="font-normal text-(--ink-soft)">{shortDay(order.placed_at, locale)}</div>
               ) : null}
               {last && deliveredOn ? (
-                <div className="font-normal text-(--ink-soft)">{shortDay(deliveredOn)}</div>
+                <div className="font-normal text-(--ink-soft)">{shortDay(deliveredOn, locale)}</div>
               ) : null}
               {last && !deliveredOn && estimate ? (
                 <div className="font-normal">
                   {original ? (
-                    <s className="text-(--ink-soft)/80">{shortDay(original)}</s>
+                    <s className="text-(--ink-soft)/80">{shortDay(original, locale)}</s>
                   ) : null}{" "}
                   <span className={original ? "font-bold text-(--warn)" : "text-(--ink-soft)"}>
-                    {shortDay(estimate)}
+                    {shortDay(estimate, locale)}
                   </span>
                 </div>
               ) : null}
@@ -129,6 +130,7 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 export default function OrderStatusCard({ payload }: { payload: OrderStatusPayload }) {
+  const t = useT();
   const order = payload.order;
   // Adopters swap backends, so only http(s) tracking links render.
   const trackingHref =
@@ -137,9 +139,9 @@ export default function OrderStatusCard({ payload }: { payload: OrderStatusPaylo
   return (
     <section className="rounded-2xl border border-(--line) bg-(--card) p-4 shadow-(--shadow-sm)">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-[15px] font-semibold text-(--ink)">Order {payload.order_id}</h3>
+        <h3 className="text-[15px] font-semibold text-(--ink)">{t("Order {id}", { id: payload.order_id })}</h3>
         <span className={`rounded-full px-2.5 py-0.5 text-[13px] font-medium ${STATUS_STYLES[status] ?? STATUS_STYLES.processing}`}>
-          {status.replaceAll("_", " ")}
+          {t(status.replaceAll("_", " "))}
         </span>
       </div>
       <p className="mt-2 text-[15px] leading-relaxed text-(--ink)">{payload.summary}</p>
@@ -155,13 +157,13 @@ export default function OrderStatusCard({ payload }: { payload: OrderStatusPaylo
             </div>
           ))}
           <div className="flex justify-between border-t border-(--line) pt-1 font-medium text-(--ink)">
-            <span>Total</span>
+            <span>{t("Total")}</span>
             <span>{formatMoney(order.total, order.currency)}</span>
           </div>
           {order.estimated_delivery && RAIL_PROGRESS[status] == null ? (
             // The rail shows the estimate for its own statuses; this line covers the rest.
             <div className="text-[13px] text-(--ink-soft)">
-              Estimated delivery: {formatDate(order.estimated_delivery)}
+              {t("Estimated delivery: {date}", { date: formatDate(order.estimated_delivery) })}
             </div>
           ) : null}
         </div>
@@ -173,7 +175,7 @@ export default function OrderStatusCard({ payload }: { payload: OrderStatusPaylo
           rel="noreferrer"
           className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-(--line) px-3 py-1.5 text-[13px] font-semibold text-(--ink) transition hover:border-(--accent) hover:shadow-(--shadow-sm)"
         >
-          Track package
+          {t("Track package")}
           <span aria-hidden>↗</span>
         </a>
       ) : null}

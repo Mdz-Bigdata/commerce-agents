@@ -9,7 +9,9 @@
  */
 
 import { type ReactNode, useState } from "react";
+import { english } from "../english";
 import { formatDayMonth, formatMoney, formatWeekday, plural } from "../format";
+import { type Translate, useT } from "../i18n";
 import type { Order } from "../protocol";
 import { AskButton, Notice, PageHeader, Panel, Pill, Segmented, Skeleton, type Tone } from "../ui";
 import { useStoreFrame } from "./frame";
@@ -54,14 +56,15 @@ export function estimateOf(order: Order): { date: string; note: string | null } 
 }
 
 /** The label for a status, the vertical's own word first ("return_initiated" → "Return requested"). */
-export function orderStatusLabel(status: string, labels?: Record<string, string>): string {
-  return labels?.[status] ?? STATUS[status]?.label ?? status.replaceAll("_", " ");
+export function orderStatusLabel(status: string, labels?: Record<string, string>, t: Translate = english): string {
+  return t(labels?.[status] ?? STATUS[status]?.label ?? status.replaceAll("_", " "));
 }
 
 export function OrderStatusPill({ status, labels }: { status: string; labels?: Record<string, string> }) {
+  const t = useT();
   return (
     <Pill tone={STATUS[status]?.tone ?? "muted"} dot>
-      {orderStatusLabel(status, labels)}
+      {orderStatusLabel(status, labels, t)}
     </Pill>
   );
 }
@@ -84,12 +87,12 @@ export interface OrderNouns {
   /** Before an open order's date: "Arrives", "Starts". */
   openVerb: string;
   /** The date line of a closed order: delivered, cancelled, or refunded. */
-  closedWhen: (order: Order, date: string) => string;
+  closedWhen: (order: Order, date: string, t?: Translate) => string;
   /** This vertical's words for the shared statuses ("shipped" → "Confirmed"). */
   statusLabels?: Record<string, string>;
   /** The view's filters after "All". */
   filters: { id: string; label: string; match: (order: Order) => boolean }[];
-  handoff: (order: Order) => OrderHandoff;
+  handoff: (order: Order, t?: Translate) => OrderHandoff;
 }
 
 /** Retail's vocabulary; a vertical spreads this and overrides what differs. */
@@ -99,47 +102,50 @@ export const ORDER_NOUNS: OrderNouns = {
   cardTitle: "Arriving",
   noneOpen: "Nothing on the way",
   openVerb: "Arrives",
-  closedWhen: (order, date) => (order.status === "delivered" ? `Delivered ${date}` : `Placed ${formatDayMonth(order.placed_at)}`),
+  closedWhen: (order, date, t = english) =>
+    order.status === "delivered" ? t("Delivered {date}", { date }) : t("Placed {date}", { date: formatDayMonth(order.placed_at) }),
   filters: [
     { id: "open", label: "On the way", match: isOpen },
     { id: "delayed", label: "Delayed", match: (order) => order.status === "delayed" },
     { id: "closed", label: "Past", match: (order) => !isOpen(order) },
   ],
-  handoff(order) {
-    const ref = `order ${order.order_id}`;
-    if (order.status === "delayed") return { label: "Ask why", prompt: `Why is ${ref} delayed, and when will it arrive?` };
-    if (order.status === "delivered") return { label: "Ask about a return", prompt: `Can I still return something from ${ref}?` };
-    if (isOpen(order)) return { label: "Ask", prompt: `Where is ${ref} right now?` };
-    return { label: "Ask", prompt: `What's the status of ${ref}?` };
+  handoff(order, t = english) {
+    const ref = { ref: t("order {id}", { id: order.order_id }) };
+    if (order.status === "delayed") return { label: t("Ask why"), prompt: t("Why is {ref} delayed, and when will it arrive?", ref) };
+    if (order.status === "delivered") return { label: t("Ask about a return"), prompt: t("Can I still return something from {ref}?", ref) };
+    if (isOpen(order)) return { label: t("Ask"), prompt: t("Where is {ref} right now?", ref) };
+    return { label: t("Ask"), prompt: t("What's the status of {ref}?", ref) };
   },
 };
 
-function orderTitle(order: Order): string {
+function orderTitle(order: Order, t: Translate): string {
   const [first, ...rest] = order.items;
   if (!first) return order.order_id;
-  return rest.length ? `${first.title} + ${rest.length} more` : first.title;
+  return rest.length ? t("{title} + {n} more", { title: first.title, n: rest.length }) : first.title;
 }
 
 function When({ order, nouns }: { order: Order; nouns: OrderNouns }) {
+  const t = useT();
   const estimate = estimateOf(order);
-  if (!estimate) return <span>Placed {formatDayMonth(order.placed_at)}</span>;
-  if (!isOpen(order)) return <span>{nouns.closedWhen(order, estimate.date)}</span>;
+  if (!estimate) return <span>{t("Placed {date}", { date: formatDayMonth(order.placed_at) })}</span>;
+  if (!isOpen(order)) return <span>{nouns.closedWhen(order, estimate.date, t)}</span>;
   return (
     <span className={order.status === "delayed" ? "font-semibold text-(--warn)" : ""} title={estimate.note ?? undefined}>
-      {order.status === "delayed" ? "Expected" : nouns.openVerb} {estimate.date}
+      {order.status === "delayed" ? t("Expected") : t(nouns.openVerb)} {estimate.date}
     </span>
   );
 }
 
 function OrderRow({ order, nouns, thumb, compact = false }: { order: Order; nouns: OrderNouns; thumb: (order: Order) => ReactNode; compact?: boolean }) {
+  const t = useT();
   const { ask } = useStoreFrame();
-  const handoff = nouns.handoff(order);
+  const handoff = nouns.handoff(order, t);
   const estimate = estimateOf(order);
   return (
     <li className="flex items-center gap-3 border-t border-(--line) px-[18px] py-3 first:border-t-0">
       {thumb(order)}
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[14px] font-semibold text-(--ink)">{orderTitle(order)}</div>
+        <div className="truncate text-[14px] font-semibold text-(--ink)">{orderTitle(order, t)}</div>
         <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[12px] text-(--ink-soft)">
           {compact ? <OrderStatusPill status={order.status} labels={nouns.statusLabels} /> : <span className="tabular-nums">{order.order_id}</span>}
           <span aria-hidden>·</span>
@@ -153,7 +159,7 @@ function OrderRow({ order, nouns, thumb, compact = false }: { order: Order; noun
           {formatMoney(order.total, order.currency)}
         </span>
       )}
-      <AskButton label={handoff.label} onClick={() => ask(handoff.prompt)} />
+      <AskButton label={t(handoff.label)} onClick={() => ask(handoff.prompt)} />
     </li>
   );
 }
@@ -172,16 +178,18 @@ export function ArrivingPanel({
   thumb: (order: Order) => ReactNode;
   onSeeAll?: () => void;
 }) {
-  if (!orders) return failed ? <Notice>Couldn&apos;t load your {nouns.title.toLowerCase()}.</Notice> : <Skeleton className="h-[188px]" />;
+  const t = useT();
+  const plain = t(nouns.title).toLowerCase();
+  if (!orders) return failed ? <Notice>{t("Couldn't load your {things}.", { things: plain })}</Notice> : <Skeleton className="h-[188px]" />;
   // A shopper with no history gets no card; one with nothing open sees the two most recent.
   if (!orders.length) return null;
   const open = upcoming(orders).slice(0, 3);
   const shown = open.length ? open : orders.slice(0, 2);
   return (
     <Panel
-      title={nouns.cardTitle}
-      subtitle={open.length ? plural(orders.length, nouns.one) : nouns.noneOpen}
-      action={onSeeAll ? <MoreLink label={`All ${nouns.title.toLowerCase()}`} onClick={onSeeAll} /> : null}
+      title={t(nouns.cardTitle)}
+      subtitle={open.length ? plural(orders.length, nouns.one, undefined, t) : t(nouns.noneOpen)}
+      action={onSeeAll ? <MoreLink label={t("All {things}", { things: plain })} onClick={onSeeAll} /> : null}
     >
       <ul>
         {shown.map((order) => (
@@ -206,27 +214,28 @@ export function OrdersView({
   subtitle?: ReactNode;
   thumb: (order: Order) => ReactNode;
 }) {
+  const t = useT();
   const [filter, setFilter] = useState("all");
   const all = orders ?? [];
   const active = nouns.filters.find((entry) => entry.id === filter);
   const shown = active ? all.filter(active.match) : all;
-  const title = nouns.title.toLowerCase();
+  const title = t(nouns.title).toLowerCase();
   return (
     <StorePage>
-      <PageHeader title={nouns.title} subtitle={subtitle}>
+      <PageHeader title={t(nouns.title)} subtitle={subtitle}>
         <Segmented
-          label={`Filter ${title}`}
+          label={t("Filter {things}", { things: title })}
           value={filter}
           onChange={setFilter}
           options={[
-            { id: "all", label: "All", count: all.length },
-            ...nouns.filters.map((entry) => ({ id: entry.id, label: entry.label, count: all.filter(entry.match).length })),
+            { id: "all", label: t("All"), count: all.length },
+            ...nouns.filters.map((entry) => ({ id: entry.id, label: t(entry.label), count: all.filter(entry.match).length })),
           ]}
         />
       </PageHeader>
       {orders === null ? (
         failed ? (
-          <Notice>Couldn&apos;t load your {title}. The assistant can still look them up.</Notice>
+          <Notice>{t("Couldn't load your {things}. The assistant can still look them up.", { things: title })}</Notice>
         ) : (
           <Skeleton className="h-[320px]" />
         )
@@ -239,7 +248,7 @@ export function OrdersView({
           </ul>
         </Panel>
       ) : (
-        <Notice>No {title} here.</Notice>
+        <Notice>{t("No {things} here.", { things: title })}</Notice>
       )}
     </StorePage>
   );

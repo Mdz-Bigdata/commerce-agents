@@ -4,7 +4,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { AskButton, formatDayMonth, formatMoney, formatNumber, formatRate, KindIcon, MiniBar, Notice, PageHeader, Panel, Pill, Skeleton, Sparkline, useResource } from "web-shared";
+import { AskButton, formatDayMonth, formatMoney, formatNumber, formatRate, KindIcon, MiniBar, Notice, PageHeader, Panel, Pill, Skeleton, Sparkline, useResource, useT } from "web-shared";
 import { fetchBase } from "@/lib/api";
 import type { BaseOverviewResponse, Cohort, PlanMixRow, PlanWeek } from "@/lib/types";
 
@@ -13,6 +13,7 @@ function series(weeks: PlanWeek[] | undefined, key: "subscribers" | "churn_rate_
 }
 
 function PlanMixTable({ data, onAskAssistant }: { data: BaseOverviewResponse; onAskAssistant: (text: string) => void }) {
+  const t = useT();
   // Staged promotion windows keyed by plan, so a row can flag a pending promo.
   const stagedByPlan = useMemo(() => {
     const map = new Map<string, { name?: string | null; starts?: string | null; ends?: string | null }>();
@@ -29,14 +30,14 @@ function PlanMixTable({ data, onAskAssistant }: { data: BaseOverviewResponse; on
       <table className="w-full border-collapse">
         <thead>
           <tr className="text-left text-[12px] font-semibold text-(--ink-soft)">
-            <th className="py-2.5 pl-[18px] pr-3 font-semibold">Plan</th>
-            <th className="px-3 py-2.5 text-right font-semibold">Lines</th>
-            <th className="hidden px-3 py-2.5 font-semibold @4xl:table-cell">Share of base</th>
-            <th className="px-3 py-2.5 text-right font-semibold">Churn</th>
-            <th className="hidden px-3 py-2.5 text-right font-semibold @3xl:table-cell">ARPU</th>
-            <th className="px-3 py-2.5 text-right font-semibold">Margin / line</th>
-            <th className="hidden px-3 py-2.5 font-semibold @2xl:table-cell">13-week lines</th>
-            <th className="py-2.5 pl-3 pr-[18px]" aria-label="Row actions" />
+            <th className="py-2.5 pl-[18px] pr-3 font-semibold">{t("Plan")}</th>
+            <th className="px-3 py-2.5 text-right font-semibold">{t("Lines")}</th>
+            <th className="hidden px-3 py-2.5 font-semibold @4xl:table-cell">{t("Share of base")}</th>
+            <th className="px-3 py-2.5 text-right font-semibold">{t("Churn")}</th>
+            <th className="hidden px-3 py-2.5 text-right font-semibold @3xl:table-cell">{t("ARPU")}</th>
+            <th className="px-3 py-2.5 text-right font-semibold">{t("Margin / line")}</th>
+            <th className="hidden px-3 py-2.5 font-semibold @2xl:table-cell">{t("13-week lines")}</th>
+            <th className="py-2.5 pl-3 pr-[18px]" aria-label={t("Row actions")} />
           </tr>
         </thead>
         <tbody>
@@ -45,7 +46,7 @@ function PlanMixTable({ data, onAskAssistant }: { data: BaseOverviewResponse; on
             const subs = series(plan.weeks, "subscribers");
             const churn = series(plan.weeks, "churn_rate_pct");
             const churnRising = churn.length > 1 && churn[churn.length - 1] > churn[0];
-            const label = plan.title ?? plan.plan_id ?? "Plan";
+            const label = plan.title ?? plan.plan_id ?? t("Plan");
             return (
               <tr key={plan.plan_id ?? plan.title} className="border-t border-(--line)">
                 <td className="py-2.5 pl-[18px] pr-3">
@@ -54,12 +55,14 @@ function PlanMixTable({ data, onAskAssistant }: { data: BaseOverviewResponse; on
                     <div className="min-w-0">
                       <div className="text-[13.5px] font-medium leading-snug text-(--ink)">{plan.title}</div>
                       <div className="am-mono text-[11.5px] text-(--ink-soft)">
-                        {[plan.plan_id, plan.price != null ? `${formatMoney(plan.price)}/mo` : null].filter(Boolean).join(" · ")}
+                        {[plan.plan_id, plan.price != null ? t("{price}/mo", { price: formatMoney(plan.price) }) : null].filter(Boolean).join(" · ")}
                       </div>
                       {staged ? (
                         <div className="mt-1">
                           <Pill tone="violet" dot>
-                            Staged promo window{staged.starts && staged.ends ? ` · ${formatDayMonth(staged.starts)} – ${formatDayMonth(staged.ends)}` : ""}
+                            {staged.starts && staged.ends
+                              ? t("Staged promo window · {start} – {end}", { start: formatDayMonth(staged.starts), end: formatDayMonth(staged.ends) })
+                              : t("Staged promo window")}
                           </Pill>
                         </div>
                       ) : null}
@@ -83,12 +86,14 @@ function PlanMixTable({ data, onAskAssistant }: { data: BaseOverviewResponse; on
                 <td className="am-mono hidden px-3 py-2.5 text-right text-[13px] text-(--ink) @3xl:table-cell">{plan.arpu != null ? formatMoney(plan.arpu) : "—"}</td>
                 <td className="am-mono px-3 py-2.5 text-right text-[13px] text-(--ink)">{plan.margin_per_line_usd != null ? formatMoney(plan.margin_per_line_usd) : "—"}</td>
                 <td className="hidden w-28 px-3 py-2.5 @2xl:table-cell">
-                  {subs.length > 1 ? <Sparkline points={subs} height={30} label={`${label}, weekly subscribers`} /> : "—"}
+                  {subs.length > 1 ? <Sparkline points={subs} height={30} label={t("{label}, weekly subscribers", { label })} /> : "—"}
                 </td>
                 <td className="py-2.5 pl-3 pr-[18px] text-right">
                   <AskButton
-                    label="Ask"
-                    onClick={() => onAskAssistant(`Where is the churn on ${plan.title} (${plan.plan_id}) coming from, and what move would you propose?`)}
+                    label={t("Ask")}
+                    onClick={() =>
+                      onAskAssistant(t("Where is the churn on {title} ({id}) coming from, and what move would you propose?", { title: plan.title ?? "", id: plan.plan_id ?? "" }))
+                    }
                   />
                 </td>
               </tr>
@@ -101,10 +106,11 @@ function PlanMixTable({ data, onAskAssistant }: { data: BaseOverviewResponse; on
 }
 
 function CohortsPanel({ cohorts, onAskAssistant }: { cohorts: Cohort[]; onAskAssistant: (text: string) => void }) {
+  const t = useT();
   return (
-    <Panel title="Cohorts" subtitle="line groups that retention offers and campaigns target">
+    <Panel title={t("Cohorts")} subtitle={t("line groups that retention offers and campaigns target")}>
       {cohorts.length === 0 ? (
-        <p className="px-[18px] pb-4 text-[13.5px] text-(--ink-soft)">No cohorts defined.</p>
+        <p className="px-[18px] pb-4 text-[13.5px] text-(--ink-soft)">{t("No cohorts defined.")}</p>
       ) : (
         <ul className="divide-y divide-(--line)">
           {cohorts.map((cohort) => (
@@ -117,9 +123,12 @@ function CohortsPanel({ cohorts, onAskAssistant }: { cohorts: Cohort[]; onAskAss
               </div>
               <div className="am-mono w-20 shrink-0 text-right">
                 <div className="text-[15px] font-semibold text-(--ink)">{formatNumber(cohort.size)}</div>
-                <div className="text-[11.5px] text-(--ink-soft)">lines</div>
+                <div className="text-[11.5px] text-(--ink-soft)">{t("lines")}</div>
               </div>
-              <AskButton label="Ask" onClick={() => onAskAssistant(`What would you propose for the "${cohort.label}" cohort (${formatNumber(cohort.size)} lines)?`)} />
+              <AskButton
+                label={t("Ask")}
+                onClick={() => onAskAssistant(t('What would you propose for the "{label}" cohort ({n} lines)?', { label: cohort.label, n: formatNumber(cohort.size) }))}
+              />
             </li>
           ))}
         </ul>
@@ -129,6 +138,7 @@ function CohortsPanel({ cohorts, onAskAssistant }: { cohorts: Cohort[]; onAskAss
 }
 
 export default function BaseView({ refreshKey, onAskAssistant }: { refreshKey: number; onAskAssistant: (text: string) => void }) {
+  const t = useT();
   const { data, failed } = useResource(fetchBase, [refreshKey]);
 
   const rising = (data?.plans ?? []).filter((plan) => {
@@ -139,11 +149,15 @@ export default function BaseView({ refreshKey, onAskAssistant }: { refreshKey: n
   return (
     <div className="ac-reveal @container flex flex-col gap-4">
       <PageHeader
-        title="Base"
-        subtitle={data ? `${formatNumber(data.total_subscribers)} active lines across ${data.plans.length} plans${rising ? ` · churn rising on ${rising}` : ""}` : undefined}
+        title={t("Base")}
+        subtitle={
+          data
+            ? `${t("{lines} active lines across {plans} plans", { lines: formatNumber(data.total_subscribers), plans: data.plans.length })}${rising ? ` · ${t("churn rising on {n}", { n: rising })}` : ""}`
+            : undefined
+        }
       />
       {failed && !data ? (
-        <Notice>The telecom API isn&apos;t reachable, so the subscriber base can&apos;t load.</Notice>
+        <Notice>{t("The telecom API isn't reachable, so the subscriber base can't load.")}</Notice>
       ) : !data ? (
         <>
           <Skeleton className="h-64" />
@@ -151,24 +165,24 @@ export default function BaseView({ refreshKey, onAskAssistant }: { refreshKey: n
         </>
       ) : (
         <>
-          <Panel title="Plan mix" subtitle="churn in red where it rose over the last 13 weeks">
+          <Panel title={t("Plan mix")} subtitle={t("churn in red where it rose over the last 13 weeks")}>
             <PlanMixTable data={data} onAskAssistant={onAskAssistant} />
           </Panel>
           <div className="grid items-start gap-4 @4xl:grid-cols-[minmax(0,1fr)_320px]">
             <CohortsPanel cohorts={data.cohorts} onAskAssistant={onAskAssistant} />
             {data.wholesale ? (
-              <Panel title="Wholesale rate card">
+              <Panel title={t("Wholesale rate card")}>
                 <div className="grid grid-cols-2 border-t border-(--line) [&>*+*]:border-l [&>*]:border-(--line)">
                   {data.wholesale.mobile_per_gb_usd != null ? (
                     <div className="px-[18px] py-3">
-                      <div className="text-[12px] font-medium text-(--ink-soft)">Mobile data</div>
+                      <div className="text-[12px] font-medium text-(--ink-soft)">{t("Mobile data")}</div>
                       <div className="am-mono mt-1 text-[18px] font-semibold text-(--ink)">{formatMoney(data.wholesale.mobile_per_gb_usd)}<span className="text-[12px] font-medium text-(--ink-soft)">/GB</span></div>
                     </div>
                   ) : null}
                   {data.wholesale.mobile_core_per_line_usd != null ? (
                     <div className="px-[18px] py-3">
-                      <div className="text-[12px] font-medium text-(--ink-soft)">Core, per line</div>
-                      <div className="am-mono mt-1 text-[18px] font-semibold text-(--ink)">{formatMoney(data.wholesale.mobile_core_per_line_usd)}<span className="text-[12px] font-medium text-(--ink-soft)">/mo</span></div>
+                      <div className="text-[12px] font-medium text-(--ink-soft)">{t("Core, per line")}</div>
+                      <div className="am-mono mt-1 text-[18px] font-semibold text-(--ink)">{formatMoney(data.wholesale.mobile_core_per_line_usd)}<span className="text-[12px] font-medium text-(--ink-soft)">{t("/mo")}</span></div>
                     </div>
                   ) : null}
                 </div>

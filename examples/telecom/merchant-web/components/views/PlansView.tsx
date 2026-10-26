@@ -32,6 +32,7 @@ import {
   Skeleton,
   titleCase,
   useResource,
+  useT,
 } from "web-shared";
 import { fetchBase, fetchListingDetail, fetchListings } from "@/lib/api";
 import { CATEGORY_LABELS, CATEGORY_NOUNS, CATEGORY_ORDER, LINE_CATEGORIES, LISTING_STATUS } from "@/lib/kinds";
@@ -42,18 +43,20 @@ type Filter = "all" | "plans" | "home-internet" | "devices" | "add-ons";
 const CATEGORY_ICONS = { plans: "signal", "home-internet": "home", devices: "box", "add-ons": "tag" } as const;
 
 function StatusPill({ status }: { status: Listing["status"] }) {
+  const t = useT();
   const style = LISTING_STATUS[status];
   return (
     <Pill tone={style.tone} dot>
-      {style.label}
+      {t(style.label)}
     </Pill>
   );
 }
 
 function ContentCell({ quality }: { quality: Listing["content_quality"] }) {
-  if (quality === "poor") return <Pill tone="danger">Poor content</Pill>;
-  if (quality === "needs_work") return <Pill tone="warn">Needs work</Pill>;
-  return <span className="text-[12.5px] text-(--ink-soft)">Good</span>;
+  const t = useT();
+  if (quality === "poor") return <Pill tone="danger">{t("Poor content")}</Pill>;
+  if (quality === "needs_work") return <Pill tone="warn">{t("Needs work")}</Pill>;
+  return <span className="text-[12.5px] text-(--ink-soft)">{t("Good")}</span>;
 }
 
 function CategoryIcon({ category }: { category: string }) {
@@ -77,11 +80,12 @@ function Rows({ rows }: { rows: [string, string | null][] }) {
 }
 
 function ProductSheet({ listingId, category, onClose, onAskAssistant }: { listingId: string; category: string; onClose: () => void; onAskAssistant: (text: string) => void }) {
+  const t = useT();
   const { data: detail, failed } = useResource(() => fetchListingDetail(listingId), [listingId]);
   const listing = detail?.listing;
   const pricing = detail?.pricing;
   const isLine = LINE_CATEGORIES.has(listing?.category ?? category) || pricing?.active_subscribers != null;
-  const noun = CATEGORY_NOUNS[listing?.category ?? category] ?? "product";
+  const noun = t(CATEGORY_NOUNS[listing?.category ?? category] ?? "product");
   const ref = listing ? `${listing.title} (${listing.listing_id})` : listingId;
   const ask = (text: string) => {
     onClose();
@@ -90,10 +94,10 @@ function ProductSheet({ listingId, category, onClose, onAskAssistant }: { listin
 
   return (
     <Sheet
-      title={CATEGORY_LABELS[listing?.category ?? category] ?? titleCase(category)}
+      title={t(CATEGORY_LABELS[listing?.category ?? category] ?? titleCase(category))}
       detail={listingId}
       onClose={onClose}
-      closeLabel={`Close ${noun} detail`}
+      closeLabel={t("Close {noun} detail", { noun })}
       footer={
         listing ? (
           <Button
@@ -101,16 +105,20 @@ function ProductSheet({ listingId, category, onClose, onAskAssistant }: { listin
             icon="spark"
             className="flex-1"
             onClick={() =>
-              ask(isLine ? `How is ${ref} performing on subscribers, churn, and margin, and what would you change?` : `How is ${ref} selling, and does the price or listing need work?`)
+              ask(
+                isLine
+                  ? t("How is {ref} performing on subscribers, churn, and margin, and what would you change?", { ref })
+                  : t("How is {ref} selling, and does the price or listing need work?", { ref }),
+              )
             }
           >
-            Ask about this {noun}
+            {t("Ask about this {noun}", { noun })}
           </Button>
         ) : null
       }
     >
       {failed && !listing ? (
-        <p className="text-[13.5px] text-(--ink-soft)">Couldn&apos;t load this {noun}.</p>
+        <p className="text-[13.5px] text-(--ink-soft)">{t("Couldn't load this {noun}.", { noun })}</p>
       ) : !listing ? (
         <>
           <Skeleton className="h-24" />
@@ -126,36 +134,36 @@ function ProductSheet({ listingId, category, onClose, onAskAssistant }: { listin
               <div className="mt-2 flex flex-wrap gap-1.5">
                 <StatusPill status={listing.status} />
                 {listing.content_quality && listing.content_quality !== "good" ? (
-                  <Pill tone={listing.content_quality === "poor" ? "danger" : "warn"}>Content {listing.content_quality === "poor" ? "is poor" : "needs work"}</Pill>
+                  <Pill tone={listing.content_quality === "poor" ? "danger" : "warn"}>{listing.content_quality === "poor" ? t("Content is poor") : t("Content needs work")}</Pill>
                 ) : null}
-                {listing.category ? <Pill>{CATEGORY_LABELS[listing.category] ?? titleCase(listing.category)}</Pill> : null}
+                {listing.category ? <Pill>{t(CATEGORY_LABELS[listing.category] ?? titleCase(listing.category))}</Pill> : null}
               </div>
             </div>
           </div>
 
           <Facts>
-            <Fact label={isLine ? "Price / mo" : hasOptions(listing) ? "Price from" : "Price"} value={formatMoney(listing.price)} />
-            <Fact label={isLine ? "Active lines" : "Stock"} value={formatNumber(listing.stock)} />
+            <Fact label={isLine ? t("Price / mo") : hasOptions(listing) ? t("Price from") : t("Price")} value={formatMoney(listing.price)} />
+            <Fact label={isLine ? t("Active lines") : t("Stock")} value={formatNumber(listing.stock)} />
             <Fact
-              label={isLine ? "ARPU" : "Sold, 30 days"}
+              label={isLine ? t("ARPU") : t("Sold, 30 days")}
               value={isLine ? (pricing?.arpu != null ? formatMoney(pricing.arpu) : null) : listing.sales_last_30d != null ? formatNumber(listing.sales_last_30d) : null}
             />
             <Fact
-              label={isLine ? "Margin / line" : "Margin"}
+              label={isLine ? t("Margin / line") : t("Margin")}
               value={isLine ? (pricing?.margin_per_line_usd != null ? formatMoney(pricing.margin_per_line_usd) : null) : pricing?.margin_pct != null ? formatRate(pricing.margin_pct) : null}
             />
           </Facts>
 
           {listing.variants?.length ? (
             <section>
-              <SectionTitle aside="priced and stocked per variant">Variants</SectionTitle>
+              <SectionTitle aside={t("priced and stocked per variant")}>{t("Variants")}</SectionTitle>
               <ul className="divide-y divide-(--line) rounded-[10px] border border-(--line) text-[13px]">
                 {listing.variants.map((variant) => (
                   <li key={variant.listing_id} className="flex items-center gap-3 px-3 py-1.5">
                     <button
                       type="button"
                       className="min-w-0 flex-1 text-left hover:underline"
-                      onClick={() => ask(`How is ${variant.title} in ${optionValuesLabel(variant)} (${variant.listing_id}) selling, and is the price right?`)}
+                      onClick={() => ask(t("How is {title} in {options} ({id}) selling, and is the price right?", { title: variant.title, options: optionValuesLabel(variant), id: variant.listing_id }))}
                     >
                       <div className="font-medium text-(--ink)">{optionValuesLabel(variant)}</div>
                       <div className="text-[11.5px] tabular-nums text-(--ink-soft)">{variant.listing_id}</div>
@@ -173,23 +181,27 @@ function ProductSheet({ listingId, category, onClose, onAskAssistant }: { listin
             <section>
               <SectionTitle
                 aside={[
-                  pricing.unit_cost != null ? `${isLine ? "wholesale" : "unit cost"} ${formatMoney(isLine && pricing.wholesale_cost_per_line_usd != null ? pricing.wholesale_cost_per_line_usd : pricing.unit_cost)}` : "",
-                  pricing.demand_signal ? `demand ${pricing.demand_signal}` : "",
-                  pricing.last_changed ? `changed ${formatDate(pricing.last_changed)}` : "",
+                  pricing.unit_cost != null
+                    ? t(isLine ? "wholesale {cost}" : "unit cost {cost}", {
+                        cost: formatMoney(isLine && pricing.wholesale_cost_per_line_usd != null ? pricing.wholesale_cost_per_line_usd : pricing.unit_cost),
+                      })
+                    : "",
+                  pricing.demand_signal ? t("demand {signal}", { signal: pricing.demand_signal }) : "",
+                  pricing.last_changed ? t("changed {date}", { date: formatDate(pricing.last_changed) }) : "",
                 ]
                   .filter(Boolean)
                   .join(" · ")}
               >
-                Pricing
+                {t("Pricing")}
               </SectionTitle>
               {pricing.min_price != null && pricing.max_price != null ? <PriceBand current={pricing.current_price} floor={pricing.min_price} ceiling={pricing.max_price} /> : null}
               <div className="mt-3">
                 <Rows
                   rows={[
-                    ["Share of base", pricing.plan_mix_share_pct != null ? formatRate(pricing.plan_mix_share_pct) : null],
-                    ["Average usage", pricing.avg_usage_gb != null ? `${pricing.avg_usage_gb.toFixed(1)} GB` : null],
-                    ["Margin", isLine && pricing.margin_pct != null ? formatRate(pricing.margin_pct) : null],
-                    ["Return rate", listing.return_rate_pct != null ? formatRate(listing.return_rate_pct) : null],
+                    [t("Share of base"), pricing.plan_mix_share_pct != null ? formatRate(pricing.plan_mix_share_pct) : null],
+                    [t("Average usage"), pricing.avg_usage_gb != null ? `${pricing.avg_usage_gb.toFixed(1)} GB` : null],
+                    [t("Margin"), isLine && pricing.margin_pct != null ? formatRate(pricing.margin_pct) : null],
+                    [t("Return rate"), listing.return_rate_pct != null ? formatRate(listing.return_rate_pct) : null],
                   ]}
                 />
               </div>
@@ -198,15 +210,15 @@ function ProductSheet({ listingId, category, onClose, onAskAssistant }: { listin
 
           {pricing?.active_promotions?.length ? (
             <section>
-              <SectionTitle>Active promotions</SectionTitle>
+              <SectionTitle>{t("Active promotions")}</SectionTitle>
               <ul className="divide-y divide-(--line) rounded-[12px] bg-(--accent-soft)/60">
                 {pricing.active_promotions.map((promo, index) => (
                   <li key={promo.change_id ?? index} className="px-3 py-2 text-[13px] leading-snug">
-                    <div className="text-(--ink)">{promo.summary ?? "Promotional window"}</div>
+                    <div className="text-(--ink)">{promo.summary ?? t("Promotional window")}</div>
                     <div className="am-mono mt-0.5 text-[11.5px] text-(--ink-soft)">
                       {[
-                        promo.promo_price != null ? `${formatMoney(promo.promo_price)}/mo` : null,
-                        promo.standing_price != null ? `standing ${formatMoney(promo.standing_price)}` : null,
+                        promo.promo_price != null ? t("{price}/mo", { price: formatMoney(promo.promo_price) }) : null,
+                        promo.standing_price != null ? t("standing {price}", { price: formatMoney(promo.standing_price) }) : null,
                         promo.starts && promo.ends ? `${formatDayMonth(promo.starts)} – ${formatDayMonth(promo.ends)}` : null,
                       ]
                         .filter(Boolean)
@@ -220,7 +232,7 @@ function ProductSheet({ listingId, category, onClose, onAskAssistant }: { listin
 
           {listing.missing_attributes?.length ? (
             <section>
-              <SectionTitle>Missing from the listing</SectionTitle>
+              <SectionTitle>{t("Missing from the listing")}</SectionTitle>
               <div className="flex flex-wrap items-center gap-1.5">
                 {listing.missing_attributes.map((attribute) => (
                   <Pill key={attribute} tone="warn">
@@ -228,8 +240,8 @@ function ProductSheet({ listingId, category, onClose, onAskAssistant }: { listin
                   </Pill>
                 ))}
                 <AskButton
-                  label="Draft these attributes"
-                  onClick={() => ask(`Draft the missing attributes (${listing.missing_attributes?.join(", ")}) for ${ref}.`)}
+                  label={t("Draft these attributes")}
+                  onClick={() => ask(t("Draft the missing attributes ({attributes}) for {ref}.", { attributes: listing.missing_attributes?.join(", ") ?? "", ref }))}
                 />
               </div>
             </section>
@@ -237,7 +249,7 @@ function ProductSheet({ listingId, category, onClose, onAskAssistant }: { listin
 
           {listing.review_snippets?.length ? (
             <section>
-              <SectionTitle aside={<QuotedAsData subject="Customer-written" />}>What customers say</SectionTitle>
+              <SectionTitle aside={<QuotedAsData subject={t("Customer-written")} />}>{t("What customers say")}</SectionTitle>
               <div className="flex flex-col gap-1.5">
                 {listing.review_snippets.map((snippet, index) => (
                   <blockquote key={index} className="rounded-[10px] bg-(--ground) px-3 py-2 text-[13px] leading-snug text-(--ink-2)">
@@ -250,7 +262,7 @@ function ProductSheet({ listingId, category, onClose, onAskAssistant }: { listin
 
           {listing.long_description ? (
             <section>
-              <SectionTitle>Description</SectionTitle>
+              <SectionTitle>{t("Description")}</SectionTitle>
               <p className="whitespace-pre-line text-[13px] leading-relaxed text-(--ink-2)">{listing.long_description}</p>
             </section>
           ) : null}
@@ -271,25 +283,26 @@ function ProductTable({
   baseRows: Map<string, PlanMixRow> | null;
   onOpen: (id: string) => void;
 }) {
+  const t = useT();
   const lineCategory = LINE_CATEGORIES.has(category);
   return (
     <div className="panel-scroll @container overflow-x-auto">
       <table className="w-full border-collapse">
         <thead>
           <tr className="text-left text-[12px] font-semibold text-(--ink-soft)">
-            <th className="py-2.5 pl-[18px] pr-3 font-semibold">{titleCase(CATEGORY_NOUNS[category] ?? "product")}</th>
-            <th className="px-3 py-2.5 text-right font-semibold">{lineCategory ? "Price / mo" : "Price"}</th>
-            <th className="px-3 py-2.5 text-right font-semibold">{lineCategory ? "Active lines" : "Stock"}</th>
+            <th className="py-2.5 pl-[18px] pr-3 font-semibold">{t(titleCase(CATEGORY_NOUNS[category] ?? "product"))}</th>
+            <th className="px-3 py-2.5 text-right font-semibold">{lineCategory ? t("Price / mo") : t("Price")}</th>
+            <th className="px-3 py-2.5 text-right font-semibold">{lineCategory ? t("Active lines") : t("Stock")}</th>
             {lineCategory ? (
               <>
-                <th className="px-3 py-2.5 text-right font-semibold">Churn</th>
-                <th className="hidden px-3 py-2.5 text-right font-semibold @2xl:table-cell">ARPU</th>
-                <th className="hidden px-3 py-2.5 text-right font-semibold @3xl:table-cell">Margin / line</th>
+                <th className="px-3 py-2.5 text-right font-semibold">{t("Churn")}</th>
+                <th className="hidden px-3 py-2.5 text-right font-semibold @2xl:table-cell">{t("ARPU")}</th>
+                <th className="hidden px-3 py-2.5 text-right font-semibold @3xl:table-cell">{t("Margin / line")}</th>
               </>
             ) : (
-              <th className="px-3 py-2.5 font-semibold">Content</th>
+              <th className="px-3 py-2.5 font-semibold">{t("Content")}</th>
             )}
-            <th className="py-2.5 pl-3 pr-[18px] font-semibold">Status</th>
+            <th className="py-2.5 pl-3 pr-[18px] font-semibold">{t("Status")}</th>
           </tr>
         </thead>
         <tbody>
@@ -306,7 +319,7 @@ function ProductTable({
                   }
                 }}
                 tabIndex={0}
-                aria-label={`Open ${listing.title}`}
+                aria-label={t("Open {title}", { title: listing.title })}
                 className="cursor-pointer border-t border-(--line) transition-colors hover:bg-(--ground)/70 focus-visible:bg-(--ground)/70 focus-visible:outline-none"
               >
                 <td className="py-2 pl-[18px] pr-3">
@@ -359,6 +372,7 @@ function groupListings(listings: Listing[]): { category: string; rows: Listing[]
 }
 
 export default function PlansView({ refreshKey, onAskAssistant }: { refreshKey: number; onAskAssistant: (text: string) => void }) {
+  const t = useT();
   const { data: listingData, failed } = useResource(fetchListings, [refreshKey]);
   // Base rows keyed by plan_id; the tables render without them when /base is unavailable.
   const { data: base } = useResource(fetchBase, [refreshKey]);
@@ -393,11 +407,11 @@ export default function PlansView({ refreshKey, onAskAssistant }: { refreshKey: 
   const needsWork = (listings ?? []).filter((listing) => listing.content_quality && listing.content_quality !== "good").length;
   const summary = listings
     ? [
-        total != null && total > listings.length ? `${formatNumber(listings.length)} of ${formatNumber(total)} products` : null,
-        `${counts.plans + counts["home-internet"]} plans`,
-        `${counts.devices} devices`,
-        `${counts["add-ons"]} add-ons`,
-        needsWork ? `${needsWork} need content work` : "",
+        total != null && total > listings.length ? t("{shown} of {total} products", { shown: formatNumber(listings.length), total: formatNumber(total) }) : null,
+        t("{n} plans", { n: counts.plans + counts["home-internet"] }),
+        t("{n} devices", { n: counts.devices }),
+        t("{n} add-ons", { n: counts["add-ons"] }),
+        needsWork ? t("{n} need content work", { n: needsWork }) : "",
       ]
         .filter(Boolean)
         .join(" · ")
@@ -406,38 +420,38 @@ export default function PlansView({ refreshKey, onAskAssistant }: { refreshKey: 
 
   return (
     <div className="ac-reveal flex flex-col gap-4">
-      <PageHeader title="Catalog" subtitle={summary}>
-        <Button variant="secondary" icon="spark" onClick={() => onAskAssistant("Which plans are carrying the thinnest margin per line, and what would you change?")}>
-          Ask about the catalog
+      <PageHeader title={t("Catalog")} subtitle={summary}>
+        <Button variant="secondary" icon="spark" onClick={() => onAskAssistant(t("Which plans are carrying the thinnest margin per line, and what would you change?"))}>
+          {t("Ask about the catalog")}
         </Button>
       </PageHeader>
 
       {failed && !listings ? (
-        <Notice>The telecom API isn&apos;t reachable, so the catalog can&apos;t load.</Notice>
+        <Notice>{t("The telecom API isn't reachable, so the catalog can't load.")}</Notice>
       ) : !listings ? (
         <Skeleton className="h-96" />
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-2.5">
-            <SearchField value={query} onChange={setQuery} placeholder="Search by name, ID, or attribute" label="Search the catalog" className="min-w-[260px] flex-1 sm:max-w-sm" />
+            <SearchField value={query} onChange={setQuery} placeholder={t("Search by name, ID, or attribute")} label={t("Search the catalog")} className="min-w-[260px] flex-1 sm:max-w-sm" />
             <Segmented<Filter>
-              label="Filter the catalog"
+              label={t("Filter the catalog")}
               value={filter}
               onChange={setFilter}
               options={[
-                { id: "all", label: "All", count: counts.all },
-                { id: "plans", label: "Plans", count: counts.plans },
-                { id: "home-internet", label: "Home internet", count: counts["home-internet"] },
-                { id: "devices", label: "Devices", count: counts.devices },
-                { id: "add-ons", label: "Add-ons", count: counts["add-ons"] },
+                { id: "all", label: t("All"), count: counts.all },
+                { id: "plans", label: t("Plans"), count: counts.plans },
+                { id: "home-internet", label: t("Home internet"), count: counts["home-internet"] },
+                { id: "devices", label: t("Devices"), count: counts.devices },
+                { id: "add-ons", label: t("Add-ons"), count: counts["add-ons"] },
               ]}
             />
           </div>
 
-          {groups.length === 0 ? <Notice>Nothing in the catalog matches.</Notice> : null}
+          {groups.length === 0 ? <Notice>{t("Nothing in the catalog matches.")}</Notice> : null}
 
           {groups.map(({ category, rows }) => (
-            <Panel key={category} title={CATEGORY_LABELS[category] ?? titleCase(category)} subtitle={String(rows.length)}>
+            <Panel key={category} title={t(CATEGORY_LABELS[category] ?? titleCase(category))} subtitle={String(rows.length)}>
               <ProductTable category={category} listings={rows} baseRows={baseRows} onOpen={setOpenListing} />
             </Panel>
           ))}

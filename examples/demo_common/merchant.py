@@ -46,7 +46,15 @@ from merchant_agent import (
 from merchant_agent.executor import MerchantToolExecutor
 from merchant_agent_runtime import MerchantAgent
 
-from .host import DemoStorefront, append_user_turn, stream_turn
+from .analytics import OperationsLog, install_operations_routes
+from .host import (
+    REPO_ROOT,
+    DemoStorefront,
+    Locale,
+    append_user_turn,
+    reply_language,
+    stream_turn,
+)
 from .memory import install_memory_routes
 from .sessions import SessionRecord, SessionStore, session_dependency
 
@@ -99,6 +107,7 @@ class MerchantIdentity:
 
 class MerchantChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
+    locale: Locale | None = None
 
 
 class MerchantResetRequest(BaseModel):
@@ -125,14 +134,16 @@ def build_merchant_router(
     memory_store = cast(MemoryStore, agent.memory.store)
     sessions: SessionStore[MerchantSessionState] = SessionStore(MerchantSessionState)
     CurrentSession = session_dependency(sessions, "/api/merchant/session")
+    log = OperationsLog.for_example(REPO_ROOT / "examples" / example_dir, "merchant")
     router = APIRouter()
 
-    def context(record: MerchantRecord) -> MerchantSessionContext:
+    def context(record: MerchantRecord, locale: Locale | None = None) -> MerchantSessionContext:
         return MerchantSessionContext(
             session_id=record.session_id,
             merchant_id=identity.merchant_id,
             operator=identity.operator,
             now=datetime.now(),
+            reply_language=reply_language(locale),
         )
 
     @router.post("/session")
@@ -148,7 +159,13 @@ def build_merchant_router(
     async def chat(request: MerchantChatRequest, record: CurrentSession) -> StreamingResponse:
         append_user_turn(record, request.message, "Portal events")
         return stream_turn(
-            agent, sessions, record, context(record), env_hint=f"examples/{example_dir}/.env"
+            agent,
+            sessions,
+            record,
+            context(record, request.locale),
+            env_hint=f"examples/{example_dir}/.env",
+            locale=request.locale,
+            log=log,
         )
 
     @router.get("/overview")
@@ -261,6 +278,7 @@ def build_merchant_router(
         if execution.blocked is not None:
             return {"ok": False, "change": None, "reason": execution.result_text}
         verb = "approved and applied" if action == "apply_change" else "dismissed"
+        log.action(record.session_id, action, [change_id])
         record.pending_app_events.append(
             f"Operator {verb} change {change_id} from the preview card."
         )
@@ -284,6 +302,16 @@ def build_merchant_router(
 
     install_memory_routes(
         router, "/memory", current_session=CurrentSession, memory_store=memory_store
+    )
+    install_operations_routes(
+        router,
+        "",
+        current_session=CurrentSession,
+        log=log,
+        handoff_note=(
+            "The operator escalated to the support team; ticket {ticket} is open and a "
+            "person will follow up."
+        ),
     )
 
     @router.post("/reset")

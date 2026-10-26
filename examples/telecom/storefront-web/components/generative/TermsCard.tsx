@@ -5,12 +5,14 @@
 
 /** Renders present_guide. */
 
+import { useT } from "web-shared";
 import PlanTile from "@/components/PlanTile";
 import { formatPriceWithUnit } from "@/lib/format";
 import type { GuidePayload } from "@/lib/types";
 import { Frame } from "./shared";
 
 export default function TermsCard({ payload }: { payload: GuidePayload }) {
+  const t = useT();
   return (
     <Frame component="guide" label={payload.title}>
       <div className="space-y-3">
@@ -45,7 +47,7 @@ export default function TermsCard({ payload }: { payload: GuidePayload }) {
 
       {payload.sources?.length ? (
         <div className="am-rule mt-4 flex flex-wrap items-center gap-1.5 pt-2.5">
-          <span className="am-meta">Sources</span>
+          <span className="am-meta">{t("Sources")}</span>
           {payload.sources.map((source) => (
             <span key={source} className="am-tag">
               {source}

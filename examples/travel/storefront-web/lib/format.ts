@@ -1,7 +1,7 @@
 // Copyright 2026 Anthropic PBC
 // SPDX-License-Identifier: Apache-2.0
 
-import { formatMoney } from "web-shared";
+import { formatMoney, type Translate } from "web-shared";
 import type { Product } from "./types";
 
 const DESTINATION_GRADIENTS: Record<string, [string, string]> = {
@@ -48,13 +48,14 @@ const PRICE_UNIT_LABELS: Record<string, string> = {
   per_traveler: "/ person",
 };
 
-export function priceUnitLabel(unit?: string | null): string | null {
+export function priceUnitLabel(unit: string | null | undefined, t: Translate): string | null {
   if (!unit) return null;
-  return PRICE_UNIT_LABELS[unit] ?? `/ ${unit.replace(/^per[_\s]+/, "").replace(/_/g, " ")}`;
+  const known = PRICE_UNIT_LABELS[unit];
+  return known ? t(known) : `/ ${unit.replace(/^per[_\s]+/, "").replace(/_/g, " ")}`;
 }
 
-export function productPriceUnit(product: Product): string | null {
-  return priceUnitLabel(product.attributes?.price_unit);
+export function productPriceUnit(product: Product, t: Translate): string | null {
+  return priceUnitLabel(product.attributes?.price_unit, t);
 }
 
 export function formatPrice(value: number): string {
@@ -78,8 +79,21 @@ function quantityNoun(productId: string): "nights" | "guests" | "travelers" | nu
   return null;
 }
 
-export function quantityLabel(productId: string, quantity: number): string {
+export function quantityLabel(productId: string, quantity: number, t: Translate): string {
   const noun = quantityNoun(productId);
   if (!noun) return `× ${quantity}`;
-  return `× ${quantity} ${quantity === 1 ? noun.slice(0, -1) : noun}`;
+  const one = quantity === 1;
+  if (noun === "nights") return one ? t("× {n} night", { n: quantity }) : t("× {n} nights", { n: quantity });
+  if (noun === "guests") return one ? t("× {n} guest", { n: quantity }) : t("× {n} guests", { n: quantity });
+  return one ? t("× {n} traveler", { n: quantity }) : t("× {n} travelers", { n: quantity });
+}
+
+/** "1 trip", "3 trips". */
+export function tripCount(t: Translate, n: number): string {
+  return n === 1 ? t("{n} trip", { n }) : t("{n} trips", { n });
+}
+
+/** "1 booking", "3 bookings". */
+export function bookingCount(t: Translate, n: number): string {
+  return n === 1 ? t("{n} booking", { n }) : t("{n} bookings", { n });
 }

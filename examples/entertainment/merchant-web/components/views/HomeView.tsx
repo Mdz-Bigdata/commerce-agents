@@ -6,36 +6,33 @@
 import { useMemo, useState } from "react";
 import {
   ApprovalsBanner,
-  askWhy,
   AttentionList,
   AttentionRow,
-  formatChangePct,
   formatComparisonLabel,
   formatDayMonth,
   formatMoney,
   formatNumber,
   formatPeriodLabel,
   formatRate,
-  greeting,
   MiniBar,
   Notice,
   PageHeader,
   Panel,
-  plural,
   QueueOverflow,
   ratioChangePct,
   RecentChanges,
   RecordList,
-  runwayLabel,
   Segmented,
   Skeleton,
   StatStrip,
   StatTile,
+  type Translate,
+  useT,
   ViewLink,
 } from "web-shared";
 import { INVENTORY_KINDS, ISSUE_KINDS, ORDER_STATUS } from "@/lib/kinds";
 import type { InventoryAlert, OrderIssue, OverviewResponse, TodaySnapshot } from "@/lib/types";
-import { formatDaysToEvent } from "@/lib/format";
+import { askWhy, countLabel, formatDaysToEvent, greetingFor, runwayLabel, unsignedChangePct } from "@/lib/format";
 
 type Filter = "all" | "orders" | "scarce" | "pacing";
 type Row = { kind: "issue"; issue: OrderIssue } | { kind: "tier"; alert: InventoryAlert };
@@ -43,17 +40,26 @@ type Row = { kind: "issue"; issue: OrderIssue } | { kind: "tier"; alert: Invento
 const ROW_CAP = 6;
 
 /** One sentence from the overview: the gross move and what needs the operator. */
-function briefing(data: OverviewResponse): string {
+function briefing(data: OverviewResponse, t: Translate): string {
   const { snapshot, needs_attention } = data;
   const parts: string[] = [];
   if (snapshot.sales_change_pct != null) {
-    const direction = snapshot.sales_change_pct >= 0 ? "up" : "down";
-    parts.push(`Gross sales are ${direction} ${formatChangePct(Math.abs(snapshot.sales_change_pct)).replace("+", "")} on the week.`);
+    parts.push(
+      t(snapshot.sales_change_pct >= 0 ? "Gross sales are up {pct} on the week." : "Gross sales are down {pct} on the week.", {
+        pct: unsignedChangePct(snapshot.sales_change_pct),
+      }),
+    );
   }
   const orders = needs_attention.order_issues.length;
   const tiers = needs_attention.inventory.length;
-  const needs = [orders ? plural(orders, "order") : "", tiers ? plural(tiers, "tier") : ""].filter(Boolean);
-  parts.push(needs.length ? `${needs.join(" and ")} need you today.` : "Nothing needs you today.");
+  const needs = [orders ? countLabel(t, orders, "{n} order", "{n} orders") : "", tiers ? countLabel(t, tiers, "{n} tier", "{n} tiers") : ""].filter(Boolean);
+  parts.push(
+    needs.length === 2
+      ? t("{a} and {b} need you today.", { a: needs[0], b: needs[1] })
+      : needs.length === 1
+        ? t("{a} need you today.", { a: needs[0] })
+        : t("Nothing needs you today."),
+  );
   return parts.join(" ");
 }
 
@@ -73,22 +79,30 @@ function rowsFor(data: OverviewResponse, filter: Filter): Row[] {
 }
 
 function IssueRow({ issue, onAskAssistant }: { issue: OrderIssue; onAskAssistant: (text: string) => void }) {
+  const t = useT();
   const style = ISSUE_KINDS[issue.kind];
   return (
     <AttentionRow
       icon={style.icon}
       tone={style.tone}
       title={issue.summary}
-      meta={[style.label, `Order ${issue.order_id}`, issue.opened_at ? `opened ${formatDayMonth(issue.opened_at)}` : ""].filter(Boolean).join(" · ")}
+      meta={[
+        t(style.label),
+        t("Order {id}", { id: issue.order_id }),
+        issue.opened_at ? t("opened {date}", { date: formatDayMonth(issue.opened_at) }) : "",
+      ]
+        .filter(Boolean)
+        .join(" · ")}
       action={{
-        label: issue.kind === "buyer_message" ? "Draft reply" : "Ask",
-        onClick: () => onAskAssistant(`What are my options for order ${issue.order_id}? ${issue.summary}.`),
+        label: issue.kind === "buyer_message" ? t("Draft reply") : t("Ask"),
+        onClick: () => onAskAssistant(t("What are my options for order {id}? {summary}.", { id: issue.order_id, summary: issue.summary })),
       }}
     />
   );
 }
 
 function TierRow({ alert, onAskAssistant }: { alert: InventoryAlert; onAskAssistant: (text: string) => void }) {
+  const t = useT();
   const style = INVENTORY_KINDS[alert.kind];
   const scarce = alert.kind === "low_stock";
   const ref = `${alert.title} (${alert.listing_id})`;
@@ -99,12 +113,12 @@ function TierRow({ alert, onAskAssistant }: { alert: InventoryAlert; onAskAssist
       title={alert.title}
       meta={
         <>
-          <span className={`font-semibold ${scarce ? "text-(--warn)" : "text-(--danger)"}`}>{scarce ? `${formatNumber(alert.stock)} open seats` : style.label}</span>
+          <span className={`font-semibold ${scarce ? "text-(--warn)" : "text-(--danger)"}`}>{scarce ? t("{n} open seats", { n: formatNumber(alert.stock) }) : t(style.label)}</span>
           {[
             "",
-            scarce ? "" : `${formatNumber(alert.stock)} open`,
-            alert.days_of_cover != null ? runwayLabel(alert.days_of_cover) : "",
-            alert.sales_last_30d != null ? `${formatNumber(alert.sales_last_30d)} sold in 30 days` : "",
+            scarce ? "" : t("{n} open", { n: formatNumber(alert.stock) }),
+            alert.days_of_cover != null ? runwayLabel(alert.days_of_cover, t) : "",
+            alert.sales_last_30d != null ? t("{n} sold in 30 days", { n: formatNumber(alert.sales_last_30d) }) : "",
             alert.listing_id,
           ]
             .filter((part, index) => index === 0 || part)
@@ -113,17 +127,18 @@ function TierRow({ alert, onAskAssistant }: { alert: InventoryAlert; onAskAssist
       }
       action={
         scarce
-          ? { label: "Release holds", onClick: () => onAskAssistant(`${ref} is nearly sold out. Should we release any held seats?`) }
-          : { label: "Ask", onClick: () => onAskAssistant(`${ref} is behind its comparable-events pace. What would you propose?`) }
+          ? { label: t("Release holds"), onClick: () => onAskAssistant(t("{ref} is nearly sold out. Should we release any held seats?", { ref })) }
+          : { label: t("Ask"), onClick: () => onAskAssistant(t("{ref} is behind its comparable-events pace. What would you propose?", { ref })) }
       }
     />
   );
 }
 
 function NextUp({ today, onNavigate }: { today: TodaySnapshot; onNavigate: () => void }) {
+  const t = useT();
   if (!today.upcoming.length) return null;
   return (
-    <Panel title="Next up" action={<ViewLink label="All events" onClick={onNavigate} />}>
+    <Panel title={t("Next up")} action={<ViewLink label={t("All events")} onClick={onNavigate} />}>
       <div className="grid gap-2.5 px-[18px] pb-4 pt-1 @2xl:grid-cols-3">
         {today.upcoming.map((show) => (
           <button
@@ -131,18 +146,23 @@ function NextUp({ today, onNavigate }: { today: TodaySnapshot; onNavigate: () =>
             type="button"
             onClick={onNavigate}
             className="rounded-[10px] border border-(--line) bg-(--well)/60 px-3 py-2.5 text-left transition-colors hover:border-(--accent)"
-            aria-label={`${show.event_name}, ${formatDayMonth(show.event_date)}, ${formatNumber(show.sold)} of ${formatNumber(show.capacity)} sold. Open the Events view.`}
+            aria-label={t("{event}, {date}, {sold} of {capacity} sold. Open the Events view.", {
+              event: show.event_name,
+              date: formatDayMonth(show.event_date),
+              sold: formatNumber(show.sold),
+              capacity: formatNumber(show.capacity),
+            })}
           >
             <div className="at-display truncate text-[16px] text-(--ink)" title={show.event_name}>
               {show.event_name}
             </div>
             <div className="mt-0.5 truncate text-[11.5px] text-(--ink-soft)">
-              {[show.venue, formatDayMonth(show.event_date), formatDaysToEvent(show.days_to_event)].filter(Boolean).join(" · ")}
+              {[show.venue, formatDayMonth(show.event_date), formatDaysToEvent(show.days_to_event, t)].filter(Boolean).join(" · ")}
             </div>
             <MiniBar value={show.capacity > 0 ? show.sold / show.capacity : 0} tone="accent" className="mt-2 w-full" />
             <div className="at-mono mt-1 text-[11.5px] text-(--ink-soft)">
-              {formatNumber(show.sold)}/{formatNumber(show.capacity)} sold · {formatNumber(show.remaining)} open
-              {show.waitlist_depth > 0 ? ` · waitlist ${formatNumber(show.waitlist_depth)}` : ""}
+              {t("{sold}/{capacity} sold", { sold: formatNumber(show.sold), capacity: formatNumber(show.capacity) })} · {t("{n} open", { n: formatNumber(show.remaining) })}
+              {show.waitlist_depth > 0 ? ` · ${t("waitlist {n}", { n: formatNumber(show.waitlist_depth) })}` : ""}
             </div>
           </button>
         ))}
@@ -165,11 +185,12 @@ export default function HomeView({
   onAskAssistant: (text: string) => void;
   onNavigate: (view: "events" | "holds") => void;
 }) {
+  const t = useT();
   const [filter, setFilter] = useState<Filter>("all");
   const pending = useMemo(() => (data?.needs_attention.pending_changes ?? []).filter((change) => change.status === "staged"), [data]);
   const rows = useMemo(() => (data ? rowsFor(data, filter) : []), [data, filter]);
   const now = useMemo(() => new Date(), []);
-  const title = `${greeting(now)}${operator ? `, ${operator}` : ""}`;
+  const title = `${greetingFor(now, t)}${operator ? `, ${operator}` : ""}`;
   const today = now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
   if (failed && !data) {
@@ -177,8 +198,8 @@ export default function HomeView({
       <>
         <PageHeader title={title} subtitle={today} />
         <Notice>
-          The entertainment API on port 8003 isn&apos;t reachable. Start it with{" "}
-          <code className="at-mono rounded bg-(--well) px-1 text-[13px]">uvicorn entertainment.api.main:app --app-dir examples --port 8003</code> and reload.
+          {t("The entertainment API on port 8003 isn't reachable. Start it with")}{" "}
+          <code className="at-mono rounded bg-(--well) px-1 text-[13px]">uvicorn entertainment.api.main:app --app-dir examples --port 8003</code> {t("and reload.")}
         </Notice>
       </>
     );
@@ -208,39 +229,47 @@ export default function HomeView({
 
   return (
     <div className="ac-reveal @container flex flex-col gap-5">
-      <PageHeader title={title} subtitle={`${today} · ${briefing(data)}`} />
+      <PageHeader title={title} subtitle={`${today} · ${briefing(data, t)}`} />
 
-      <ApprovalsBanner changes={pending} onReview={() => onAskAssistant("Walk me through the changes awaiting my approval and what each one would do.")} />
+      <ApprovalsBanner changes={pending} onReview={() => onAskAssistant(t("Walk me through the changes awaiting my approval and what each one would do."))} />
 
-      <Panel title="This week" subtitle={`${formatPeriodLabel(snapshot.period)}${comparison ? ` · against the ${comparison}` : ""}`} bodyClassName="pb-1">
+      <Panel
+        title={t("This week")}
+        subtitle={
+          comparison
+            ? t("{period} · against the {comparison}", { period: formatPeriodLabel(snapshot.period), comparison: t(comparison) })
+            : formatPeriodLabel(snapshot.period)
+        }
+        bodyClassName="pb-1"
+      >
         <StatStrip>
           <StatTile
-            label="Gross sales"
+            label={t("Gross sales")}
             value={formatMoney(snapshot.sales, currency, { whole: snapshot.sales >= 1000 })}
             changePct={snapshot.sales_change_pct}
-            onClick={() => onAskAssistant(askWhy("Gross sales", snapshot.sales_change_pct, comparison))}
-            ariaLabel="Gross sales: ask the assistant why"
+            onClick={() => onAskAssistant(askWhy(t, "Gross sales", snapshot.sales_change_pct, comparison))}
+            ariaLabel={t("{label}: ask the assistant why", { label: t("Gross sales") })}
           />
           <StatTile
-            label="Orders"
+            label={t("Orders")}
             value={formatNumber(snapshot.orders)}
             changePct={snapshot.orders_change_pct}
-            onClick={() => onAskAssistant(askWhy("Orders", snapshot.orders_change_pct, comparison))}
-            ariaLabel="Orders: ask the assistant why"
+            onClick={() => onAskAssistant(askWhy(t, "Orders", snapshot.orders_change_pct, comparison))}
+            ariaLabel={t("{label}: ask the assistant why", { label: t("Orders") })}
           />
           <StatTile
-            label="Conversion"
+            label={t("Conversion")}
             value={snapshot.conversion_rate != null ? formatRate(snapshot.conversion_rate) : "—"}
             changePct={snapshot.conversion_change_pct}
-            onClick={() => onAskAssistant(askWhy("Conversion", snapshot.conversion_change_pct, comparison))}
-            ariaLabel="Conversion: ask the assistant why"
+            onClick={() => onAskAssistant(askWhy(t, "Conversion", snapshot.conversion_change_pct, comparison))}
+            ariaLabel={t("{label}: ask the assistant why", { label: t("Conversion") })}
           />
           <StatTile
-            label="Average order"
+            label={t("Average order")}
             value={snapshot.average_order_value != null ? formatMoney(snapshot.average_order_value, currency) : "—"}
             changePct={aovChangePct}
-            onClick={() => onAskAssistant(askWhy("Average order value", aovChangePct, comparison))}
-            ariaLabel="Average order value: ask the assistant why"
+            onClick={() => onAskAssistant(askWhy(t, "Average order value", aovChangePct, comparison))}
+            ariaLabel={t("{label}: ask the assistant why", { label: t("Average order value") })}
           />
         </StatStrip>
       </Panel>
@@ -249,23 +278,23 @@ export default function HomeView({
 
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
         <Panel
-          title="Needs you today"
+          title={t("Needs you today")}
           action={
             <Segmented<Filter>
-              label="Filter attention items"
+              label={t("Filter attention items")}
               value={filter}
               onChange={setFilter}
               options={[
-                { id: "all", label: "All", count: counts.orders + counts.scarce + counts.pacing },
-                { id: "orders", label: "Orders", count: counts.orders },
-                { id: "scarce", label: "Scarce", count: counts.scarce },
-                { id: "pacing", label: "Pacing", count: counts.pacing },
+                { id: "all", label: t("All"), count: counts.orders + counts.scarce + counts.pacing },
+                { id: "orders", label: t("Orders"), count: counts.orders },
+                { id: "scarce", label: t("Scarce"), count: counts.scarce },
+                { id: "pacing", label: t("Pacing"), count: counts.pacing },
               ]}
             />
           }
         >
           {rows.length === 0 ? (
-            <p className="px-[18px] pb-4 pt-1 text-[13.5px] text-(--ink-soft)">Nothing is waiting on you.</p>
+            <p className="px-[18px] pb-4 pt-1 text-[13.5px] text-(--ink-soft)">{t("Nothing is waiting on you.")}</p>
           ) : (
             <>
               <AttentionList>
@@ -283,17 +312,19 @@ export default function HomeView({
         </Panel>
 
         <div className="flex flex-col gap-4">
-          <Panel title="Recent orders">
+          <Panel title={t("Recent orders")}>
             {data.recent_orders.length === 0 ? (
-              <p className="px-[18px] pb-4 text-[13px] text-(--ink-soft)">No orders yet.</p>
+              <p className="px-[18px] pb-4 text-[13px] text-(--ink-soft)">{t("No orders yet.")}</p>
             ) : (
               <RecordList
                 mono
                 rows={data.recent_orders.slice(0, 5).map((order) => ({
                   id: order.order_id,
-                  detail: plural(order.items, "ticket"),
+                  detail: countLabel(t, order.items, "{n} ticket", "{n} tickets"),
                   sub: `${formatDayMonth(order.placed_at)} · ${formatMoney(order.total)}`,
-                  status: ORDER_STATUS[order.status] ?? { label: order.status.replaceAll("_", " "), tone: "muted" },
+                  status: ORDER_STATUS[order.status]
+                    ? { ...ORDER_STATUS[order.status], label: t(ORDER_STATUS[order.status].label) }
+                    : { label: t(order.status.replaceAll("_", " ")), tone: "muted" },
                 }))}
               />
             )}

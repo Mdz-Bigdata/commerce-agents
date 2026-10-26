@@ -7,6 +7,7 @@
 
 import { type ReactNode, useEffect, useState } from "react";
 import { type FieldKinds, formatDate, formatFieldValue, formatMoney, humanizeField } from "../format";
+import { type Translate, useT } from "../i18n";
 import { Icon, type IconName } from "../icons";
 import { AskButton, Button, KindIcon, Pill, type Tone } from "../ui";
 import type { ChangeAction } from "./merchant";
@@ -87,10 +88,11 @@ export const CHANGE_STATUS: Record<ChangeLike["status"], { tone: Tone; label: st
 };
 
 export function ChangeStatusPill({ status }: { status: ChangeLike["status"] }) {
+  const t = useT();
   const { tone, label } = CHANGE_STATUS[status];
   return (
     <Pill tone={tone} dot>
-      {label}
+      {t(label)}
     </Pill>
   );
 }
@@ -103,6 +105,7 @@ export function useChangeActions<T extends ChangeLike>(
   streamed: T,
   onAct?: (changeId: string, action: ChangeAction) => Promise<T | null>,
 ) {
+  const t = useT();
   const [change, setChange] = useState<T>(streamed);
   useEffect(() => {
     setChange(streamed);
@@ -116,7 +119,7 @@ export function useChangeActions<T extends ChangeLike>(
     setError(null);
     const updated = await onAct(change.change_id, action);
     if (updated) setChange(updated);
-    else setError("That action did not go through. Check the API and try again.");
+    else setError(t("That action did not go through. Check the API and try again."));
     setBusy(null);
   };
 
@@ -137,31 +140,46 @@ export function ApproveBar({
   canAct: boolean;
   onAct: (action: ChangeAction) => void;
 }) {
+  const t = useT();
   return (
     <div className="px-3.5 pb-3.5 pt-3">
       {change.status === "staged" ? (
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="accent" size="sm" icon="check" onClick={() => onAct("apply")} disabled={busy !== null || !canAct}>
-            {busy === "apply" ? "Applying…" : "Approve"}
+            {busy === "apply" ? t("Applying…") : t("Approve")}
           </Button>
           <Button variant="secondary" size="sm" onClick={() => onAct("discard")} disabled={busy !== null || !canAct}>
-            {busy === "discard" ? "Dismissing…" : "Dismiss"}
+            {busy === "discard" ? t("Dismissing…") : t("Dismiss")}
           </Button>
-          <span className="text-[11.5px] leading-tight text-(--ink-soft)">Nothing applies until you approve.</span>
+          <span className="text-[11.5px] leading-tight text-(--ink-soft)">{t("Nothing applies until you approve.")}</span>
         </div>
       ) : (
         <div className="flex items-center gap-2 text-[13px] text-(--ink-soft)">
           <Icon name={change.status === "applied" ? "check" : "x"} size={15} className={change.status === "applied" ? "text-(--ok)" : "text-(--ink-faint)"} />
-          {change.status === "applied"
-            ? `Approved${change.applied_by ? ` by ${change.applied_by}` : ""}${change.applied_at ? ` on ${formatDate(change.applied_at)}` : ""}.`
-            : `Dismissed${
-                change.discarded_by ? ` by ${change.discarded_by}${change.discarded_by_kind === "agent" ? "'s assistant" : ""}` : ""
-              }. Nothing was changed.`}
+          {change.status === "applied" ? approvedLine(change, t) : dismissedLine(change, t)}
         </div>
       )}
       {error ? <div className="mt-2 text-[13px] text-(--danger)">{error}</div> : null}
     </div>
   );
+}
+
+/** "Approved by Dana on Jun 24, 2026." with either part left out when unknown. */
+function approvedLine(change: ChangeLike, t: Translate): string {
+  const name = change.applied_by;
+  const date = change.applied_at ? formatDate(change.applied_at) : null;
+  if (name && date) return t("Approved by {name} on {date}.", { name, date });
+  if (name) return t("Approved by {name}.", { name });
+  if (date) return t("Approved on {date}.", { date });
+  return t("Approved.");
+}
+
+function dismissedLine(change: ChangeLike, t: Translate): string {
+  const name = change.discarded_by;
+  if (!name) return t("Dismissed. Nothing was changed.");
+  return change.discarded_by_kind === "agent"
+    ? t("Dismissed by {name}'s assistant. Nothing was changed.", { name })
+    : t("Dismissed by {name}. Nothing was changed.", { name });
 }
 
 export interface DiffItem {
@@ -192,6 +210,7 @@ export function DiffRows({
   /** Names a target id, e.g. the record's title; the id shows beside it. */
   targetLabel?: (target: string) => string | null | undefined;
 }) {
+  const t = useT();
   if (!items.length) return null;
   const formatValue = (field: string, value: unknown) => formatFieldValue(field, value, fields);
   return (
@@ -203,7 +222,7 @@ export function DiffRows({
             <div className="min-w-0 text-[12.5px] text-(--ink-soft)">
               {name ? <span className="font-semibold text-(--ink)">{name} </span> : null}
               <span className="tabular-nums">{item.target}</span>
-              <span> · {humanizeField(item.field)}</span>
+              <span> · {t(humanizeField(item.field))}</span>
             </div>
             <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 text-[14px] tabular-nums break-words">
               <s className="min-w-0 text-(--ink-soft) decoration-(--ink-faint)">{formatValue(item.field, item.before)}</s>
@@ -218,20 +237,21 @@ export function DiffRows({
 }
 
 export function LongTextDiff({ item }: { item: DiffItem }) {
+  const t = useT();
   const formatValue = (field: string, value: unknown) => formatFieldValue(field, value);
   return (
     <div className="mx-3.5 mt-2.5 overflow-hidden rounded-[11px] border border-(--line)">
       <div className="flex items-baseline gap-2 border-b border-(--line) bg-(--ground) px-3 py-1.5 text-[12px]">
-        <span className="font-semibold text-(--ink)">{humanizeField(item.field)}</span>
+        <span className="font-semibold text-(--ink)">{t(humanizeField(item.field))}</span>
         <span className="tabular-nums text-(--ink-soft)">{item.target}</span>
       </div>
       <div className="grid gap-2 px-3 py-2.5 text-[13px] leading-snug">
         <div>
-          <div className="text-[11.5px] font-semibold text-(--ink-soft)">Before</div>
+          <div className="text-[11.5px] font-semibold text-(--ink-soft)">{t("Before")}</div>
           <p className="mt-0.5 whitespace-pre-line break-words text-(--ink-soft)">{formatValue(item.field, item.before)}</p>
         </div>
         <div>
-          <div className="text-[11.5px] font-semibold text-(--ink)">After</div>
+          <div className="text-[11.5px] font-semibold text-(--ink)">{t("After")}</div>
           <p className="mt-0.5 whitespace-pre-line break-words font-medium text-(--ink)">{formatValue(item.field, item.after)}</p>
         </div>
       </div>
@@ -248,6 +268,7 @@ export function MarginHeadroom({
   /** "Unit cost", "Nightly cost", "Per-ticket cost". */
   costLabel: string;
 }) {
+  const t = useT();
   const item = change.items.length === 1 ? change.items[0] : null;
   if (!item || typeof item.before !== "number" || typeof item.after !== "number" || change.margin_before_pct == null || change.margin_after_pct == null) {
     return null;
@@ -263,15 +284,20 @@ export function MarginHeadroom({
       <div
         className="relative h-2 rounded-full bg-(--well)"
         role="img"
-        aria-label={`New price ${formatMoney(item.after)}, previous ${formatMoney(item.before)}, ${costLabel.toLowerCase()} ${formatMoney(cost)}`}
+        aria-label={t("New price {price}, previous {previous}, {cost} {amount}", {
+          price: formatMoney(item.after),
+          previous: formatMoney(item.before),
+          cost: costLabel.toLowerCase(),
+          amount: formatMoney(cost),
+        })}
       >
         <div className={`absolute inset-y-0 left-0 rounded-full ${headroom > 0 ? "bg-(--accent)" : "bg-(--danger)"}`} style={{ width: at(item.after) }} />
         <div className="absolute -inset-y-0.5 w-0.5 rounded bg-(--danger)" style={{ left: at(cost) }} />
         <div className="absolute -inset-y-0.5 w-0.5 rounded bg-(--ink-soft)/70" style={{ left: at(item.before) }} />
       </div>
       <p className="mt-1.5 text-[12.5px] tabular-nums text-(--ink-soft)">
-        {costLabel} {formatMoney(cost)} · <b className="font-semibold text-(--ink)">{formatMoney(headroom)} headroom</b> · {deltaPts >= 0 ? "+" : ""}
-        {deltaPts.toFixed(1)} margin pts
+        {costLabel} {formatMoney(cost)} · <b className="font-semibold text-(--ink)">{t("{amount} headroom", { amount: formatMoney(headroom) })}</b> ·{" "}
+        {t("{delta} margin pts", { delta: `${deltaPts >= 0 ? "+" : ""}${deltaPts.toFixed(1)}` })}
       </p>
     </div>
   );
@@ -279,23 +305,24 @@ export function MarginHeadroom({
 
 /** Floor, current price, and ceiling on one track. */
 export function PriceBand({ current, floor, ceiling }: { current: number; floor: number; ceiling: number }) {
+  const t = useT();
   // Pad the track so the floor and ceiling labels never sit on its ends.
   const low = Math.min(floor, current) * 0.8;
   const high = Math.max(ceiling, current) * 1.12;
   const at = (value: number) => `${((value - low) / (high - low)) * 100}%`;
   return (
-    <div className="relative mt-1 h-[54px]" role="img" aria-label={`${formatMoney(current)} now, floor ${formatMoney(floor)}, ceiling ${formatMoney(ceiling)}`}>
+    <div className="relative mt-1 h-[54px]" role="img" aria-label={t("{price} now, floor {floor}, ceiling {ceiling}", { price: formatMoney(current), floor: formatMoney(floor), ceiling: formatMoney(ceiling) })}>
       <div className="absolute inset-x-0 top-[22px] h-2 rounded-full bg-(--well)" />
       <div className="absolute top-[22px] h-2 rounded-full bg-(--accent)/70" style={{ left: at(floor), right: `calc(100% - ${at(ceiling)})` }} />
       <div className="absolute top-[15px] h-[22px] w-[3px] -translate-x-1/2 rounded bg-(--ink)" style={{ left: at(current) }} />
       <span className="absolute top-0 -translate-x-1/2 whitespace-nowrap text-[11.5px] font-semibold tabular-nums text-(--ink)" style={{ left: at(current) }}>
-        {formatMoney(current)} now
+        {t("{price} now", { price: formatMoney(current) })}
       </span>
       <span className="absolute top-[36px] -translate-x-1/2 whitespace-nowrap text-[11.5px] tabular-nums text-(--ink-soft)" style={{ left: at(floor) }}>
-        floor {formatMoney(floor)}
+        {t("floor {price}", { price: formatMoney(floor) })}
       </span>
       <span className="absolute top-[36px] -translate-x-1/2 whitespace-nowrap text-[11.5px] tabular-nums text-(--ink-soft)" style={{ left: at(ceiling) }}>
-        ceiling {formatMoney(ceiling)}
+        {t("ceiling {price}", { price: formatMoney(ceiling) })}
       </span>
     </div>
   );

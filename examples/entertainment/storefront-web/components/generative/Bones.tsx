@@ -3,6 +3,8 @@
 
 /** Shown from a presentation tool call until its `ui` event lands. */
 
+import { useT } from "web-shared";
+
 export const PRESENTATION_COMPONENTS: Record<string, string> = {
   present_products: "products",
   present_comparison: "comparison",
@@ -97,8 +99,9 @@ export function TextBones() {
 }
 
 export function ComponentBones({ component }: { component: string }) {
+  const t = useT();
   return (
-    <div className="at-card overflow-hidden p-4 sm:p-5" aria-label="ACME Assistant is working">
+    <div className="at-card overflow-hidden p-4 sm:p-5" aria-label={t("ACME Assistant is working")}>
       <Bones component={component} />
     </div>
   );

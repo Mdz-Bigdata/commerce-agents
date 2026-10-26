@@ -3,7 +3,7 @@
 
 "use client";
 
-import { AskLink, BagPanel, CheckoutButton, optionValuesLabel, plural, RemoveLink, Stepper, TotalRow, useCatalogIndex, useStoreFrame } from "web-shared";
+import { AskLink, BagPanel, CheckoutButton, optionValuesLabel, RemoveLink, Stepper, TotalRow, useCatalogIndex, useStoreFrame, useT } from "web-shared";
 import { fetchProducts } from "@/lib/api";
 import { billAfterOrder, formatPrice, priceUnitOf, splitCart } from "@/lib/format";
 import type { AccountContext, CartItem, CartPayload, Product } from "@/lib/types";
@@ -26,6 +26,7 @@ function isStockable(productId: string): boolean {
 
 /** The order beside the conversation: monthly and due-today totals, and what the bill becomes. */
 export default function OrderPanel({ cart, account }: { cart: CartPayload | null; account: AccountContext | null }) {
+  const t = useT();
   const { ask } = useStoreFrame();
   const items = cart?.items ?? [];
   const count = cart?.item_count ?? 0;
@@ -36,34 +37,34 @@ export default function OrderPanel({ cart, account }: { cart: CartPayload | null
 
   return (
     <BagPanel
-      title="Order"
-      count={plural(count, "item")}
+      title={t("Order")}
+      count={count === 1 ? t("{n} item", { n: count }) : t("{n} items", { n: count })}
       isEmpty={items.length === 0}
       empty={
         <>
-          Nothing in the order yet.
+          {t("Nothing in the order yet.")}
           <br />
-          Ask ACME Assistant about plans, phones, or home fiber.
+          {t("Ask ACME Assistant about plans, phones, or home fiber.")}
         </>
       }
       footer={
         <>
-          <TotalRow label="Monthly" value={`${formatPrice(monthly)}/mo`} />
+          <TotalRow label={t("Monthly")} value={t("{price}/mo", { price: formatPrice(monthly) })} />
           <div className="mt-1">
-            <TotalRow label="Due today" value={formatPrice(today)} note={items.length ? "Nothing is charged until you check out." : undefined} />
+            <TotalRow label={t("Due today")} value={formatPrice(today)} note={items.length ? t("Nothing is charged until you check out.") : undefined} />
           </div>
           {bill ? (
             <p className="am-mono mt-2 border-t border-(--line) pt-2 text-[12px] font-semibold text-(--ink)">
-              Your bill {formatPrice(bill.before)}/mo → {formatPrice(bill.after)}/mo{" "}
+              {t("Your bill {before}/mo → {after}/mo", { before: formatPrice(bill.before), after: formatPrice(bill.after) })}{" "}
               <span className={billDelta < 0 ? "text-(--accent)" : "text-(--ink-soft)"}>
-                ({billDelta === 0 ? "no change" : `${billDelta > 0 ? "+" : "−"}${formatPrice(Math.abs(billDelta))}/mo`})
+                ({billDelta === 0 ? t("no change") : t("{sign}{amount}/mo", { sign: billDelta > 0 ? "+" : "−", amount: formatPrice(Math.abs(billDelta)) })})
               </span>
             </p>
           ) : null}
-          <CheckoutButton staged={false} disabled={items.length === 0} prompt="Check out my order." />
+          <CheckoutButton staged={false} disabled={items.length === 0} prompt={t("Check out my order.")} />
           {items.length ? (
             <div className="mt-2.5 flex justify-center">
-              <AskLink label="Ask about this order" prompt="Look over my order: is anything missing before I check out?" />
+              <AskLink label={t("Ask about this order")} prompt={t("Look over my order: is anything missing before I check out?")} />
             </div>
           ) : null}
         </>
@@ -72,15 +73,16 @@ export default function OrderPanel({ cart, account }: { cart: CartPayload | null
       <ul>
         {items.map((item, index) => {
           const monthlyLine = priceUnitOf(item.product_id, catalog) === "per_month";
+          const unitPrice = monthlyLine ? t("{price}/mo", { price: formatPrice(item.price) }) : formatPrice(item.price);
           return (
             <li key={item.product_id} className={`py-3 ${index > 0 ? "border-t border-(--line)" : "pt-0"}`}>
               <PlanTile
                 product={asProduct(item)}
-                note={`${optionValuesLabel(item) ? `${optionValuesLabel(item)} · ` : ""}${formatPrice(item.price)}${monthlyLine ? "/mo" : ""} × ${item.quantity}`}
+                note={`${optionValuesLabel(item) ? `${optionValuesLabel(item)} · ` : ""}${unitPrice} × ${item.quantity}`}
                 trailing={
                   <span className="am-mono shrink-0 text-[14px] font-semibold text-(--ink)">
                     {formatPrice(item.line_total)}
-                    {monthlyLine ? <span className="text-[11px] text-(--ink-soft)">/mo</span> : null}
+                    {monthlyLine ? <span className="text-[11px] text-(--ink-soft)">{t("/mo")}</span> : null}
                   </span>
                 }
               />
@@ -89,10 +91,10 @@ export default function OrderPanel({ cart, account }: { cart: CartPayload | null
                   <Stepper
                     quantity={item.quantity}
                     itemTitle={lineName(item)}
-                    onChange={(quantity) => ask(quantity < 1 ? `Remove the ${lineName(item)} from my order.` : `Change the ${lineName(item)} quantity to ${quantity}.`)}
+                    onChange={(quantity) => ask(quantity < 1 ? t("Remove the {name} from my order.", { name: lineName(item) }) : t("Change the {name} quantity to {quantity}.", { name: lineName(item), quantity }))}
                   />
                 ) : null}
-                <RemoveLink itemTitle={lineName(item)} onClick={() => ask(`Remove the ${lineName(item)} from my order.`)} />
+                <RemoveLink itemTitle={lineName(item)} onClick={() => ask(t("Remove the {name} from my order.", { name: lineName(item) }))} />
               </div>
             </li>
           );

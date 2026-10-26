@@ -37,7 +37,8 @@ from shopping_agent.gates import OPTIONS_GATE, PROVENANCE_GATE
 from shopping_agent.serialization import cart_payload as serialize_cart
 from shopping_agent_runtime import ShoppingAgent
 
-from .host import DemoStorefront, append_user_turn, build_app, stream_turn
+from .analytics import OperationsLog, install_operations_routes
+from .host import DemoStorefront, Locale, append_user_turn, build_app, reply_language, stream_turn
 from .memory import MemoryFactEdit, MemorySeeder, install_memory_routes
 from .sessions import SessionRecord, SessionStore, session_dependency
 from .storefront_fixtures import SUMMARY_EXCLUDES
@@ -59,6 +60,7 @@ class StartSessionRequest(BaseModel):
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
     page: PageContext | None = None
+    locale: Locale | None = None
 
 
 class CartAddRequest(BaseModel):
@@ -85,6 +87,7 @@ class StorefrontHost:
         env_hint: str,
         cart_extras: Callable[[StorefrontRecord], dict[str, Any]] | None,
         on_startup: Sequence[Callable[[], Awaitable[None]]] = (),
+        log: OperationsLog | None = None,
     ) -> None:
         self.app = build_app(title, on_startup)
         self.backend = backend
@@ -94,18 +97,24 @@ class StorefrontHost:
         # The parameter annotation a vertical's own routes use: ``record: host.CurrentSession``.
         self.CurrentSession = session_dependency(self.sessions, "/api/session")
         self._env_hint = env_hint
+        self.log = log
         self._cart_extras = cart_extras or (lambda record: {})
 
     def context(
-        self, record: StorefrontRecord, page: PageContext | None = None
+        self,
+        record: StorefrontRecord,
+        page: PageContext | None = None,
+        locale: Locale | None = None,
     ) -> ShoppingSessionContext:
         """The agent's view of a request: identity from the record, the clock from the
-        host (a deployment passes the user's timezone instead)."""
+        host (a deployment passes the user's timezone instead), and the reply language
+        the shopper picked in the UI."""
         return ShoppingSessionContext(
             session_id=record.session_id,
             user_id=record.user_id,
             page=page or PageContext(),
             now=datetime.now(),
+            reply_language=reply_language(locale),
         )
 
     def chat(self, request: ChatRequest, record: StorefrontRecord) -> StreamingResponse:
@@ -114,8 +123,10 @@ class StorefrontHost:
             self.agent,
             self.sessions,
             record,
-            self.context(record, request.page),
+            self.context(record, request.page, request.locale),
             env_hint=self._env_hint,
+            locale=request.locale,
+            log=self.log,
         )
 
     async def cart_payload(self, record: StorefrontRecord) -> dict[str, Any]:
@@ -181,6 +192,7 @@ def build_storefront_host(
         agent=agent,
         env_hint=f"examples/{example_root.name}/.env",
         cart_extras=cart_extras,
+        log=OperationsLog.for_example(example_root, "storefront"),
         # Seed the memory fixtures when the app starts, inside its event loop.
         on_startup=[lambda: memory_seeder.seed_at_boot(cast(MemoryStore, agent.memory.store))],
     )
@@ -204,6 +216,17 @@ def build_storefront_host(
     @app.post("/api/chat", dependencies=[Depends(before_turn)] if before_turn else [])
     async def chat(request: ChatRequest, record: CurrentSession) -> StreamingResponse:
         return host.chat(request, record)
+
+    install_operations_routes(
+        app,
+        "/api",
+        current_session=CurrentSession,
+        log=cast(OperationsLog, host.log),
+        handoff_note=(
+            "The shopper asked for a person; support ticket {ticket} is open and a support "
+            "agent will pick it up."
+        ),
+    )
 
     @app.get("/api/products")
     async def list_products(category: str | None = None, limit: int = 24) -> dict:

@@ -3,7 +3,8 @@
 
 "use client";
 
-import { AssistantPanel as PanelShell, type MerchantChat, type Prefill } from "web-shared";
+import { useMemo } from "react";
+import { AssistantPanel as PanelShell, type MerchantChat, type Prefill, useT } from "web-shared";
 import type { StagedChange } from "@/lib/types";
 import GenerativeBlock from "./generative";
 
@@ -35,10 +36,21 @@ export default function AssistantPanel({
   fullscreen: boolean;
   onToggleFullscreen: () => void;
 }) {
+  const t = useT();
+  const copy = useMemo(
+    () => ({
+      title: t(COPY.title),
+      intro: t(COPY.intro),
+      starters: COPY.starters.map((starter) => t(starter)),
+      label: t(COPY.label),
+      placeholder: t(COPY.placeholder),
+    }),
+    [t],
+  );
   return (
     <PanelShell
       chat={chat}
-      copy={COPY}
+      copy={copy}
       prefill={prefill}
       renderBlock={(segment) => (
         <GenerativeBlock

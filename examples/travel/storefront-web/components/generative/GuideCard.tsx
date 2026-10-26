@@ -3,6 +3,7 @@
 
 "use client";
 
+import { useT } from "web-shared";
 import type { GuidePayload } from "@/lib/types";
 import {
   BODY,
@@ -35,6 +36,7 @@ function SectionBody({ body }: { body: string }) {
 }
 
 export default function GuideCard({ payload }: { payload: GuidePayload }) {
+  const t = useT();
   const sections = payload.sections ?? [];
   return (
     <section className="al-reveal" style={{ ...CARD, padding: 24 }}>
@@ -71,7 +73,7 @@ export default function GuideCard({ payload }: { payload: GuidePayload }) {
 
       {payload.sources?.length ? (
         <p className="mt-3 break-all" style={{ fontFamily: BODY, fontSize: 11, color: "var(--ink-soft)" }}>
-          Sources:{" "}
+          {t("Sources:")}{" "}
           {payload.sources.map((source, i) => (
             <span key={source}>
               {i ? " · " : ""}

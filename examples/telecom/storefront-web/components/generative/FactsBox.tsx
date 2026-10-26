@@ -6,6 +6,7 @@
 /** Renders disclosure. */
 
 import { useEffect, useState } from "react";
+import { useT } from "web-shared";
 import { useCountUp } from "@/lib/motion";
 import type { DisclosurePayload } from "@/lib/types";
 import { Frame } from "./shared";
@@ -59,6 +60,7 @@ function SpeedRow({
 }
 
 export default function FactsBox({ payload }: { payload: DisclosurePayload }) {
+  const t = useT();
   // Gauges fill one frame after mount so the width transition runs.
   const [filled, setFilled] = useState(false);
   useEffect(() => {
@@ -68,7 +70,7 @@ export default function FactsBox({ payload }: { payload: DisclosurePayload }) {
   let gaugeIndex = -1;
 
   return (
-    <Frame component="disclosure" label="Service facts">
+    <Frame component="disclosure" label={t("Service facts")}>
       <div className="mx-auto max-w-md border-x-2 border-(--ink) px-4 pb-3">
         <div className="am-rule-heavy pt-2">
           <h3 className="text-[22px] font-extrabold leading-tight tracking-tight text-(--ink)">
@@ -136,7 +138,7 @@ export default function FactsBox({ payload }: { payload: DisclosurePayload }) {
 
         {payload.sources?.length ? (
           <div className="am-rule mt-2 flex flex-wrap items-center gap-1.5 pt-2">
-            <span className="am-meta">Sources</span>
+            <span className="am-meta">{t("Sources")}</span>
             {payload.sources.map((source) => (
               <span key={source} className="am-tag">
                 {source}

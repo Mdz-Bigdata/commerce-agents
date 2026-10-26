@@ -23,6 +23,7 @@ import type {
   UIBlock,
   UISlotStatus,
 } from "./protocol";
+import { useT } from "./i18n";
 import { describeToolCall } from "./tool-copy";
 
 /** Pace between structural items when a burst arrives at once. */
@@ -101,10 +102,18 @@ export interface AgentTurn {
   newMemoryKeys: ReadonlySet<string>;
   /** Re-reads the store after the shopper edits or forgets a fact; that key stops counting as new. */
   reloadMemory: (editedKey: string) => void;
+  /** Records the user's vote on a finished reply. */
+  rate: (turn: number, helpful: boolean) => void;
+  /** Opens a ticket for a person from a reply; the reason follows from the reply's vote or error. */
+  handoff: (turn: number) => Promise<void>;
 }
 
 export function useAgentTurn(api: AgentApi, options: AgentTurnOptions): AgentTurn {
   const { sessionId, unreachable, onEvent, onTurnEnd, pendingComponent } = options;
+  // Read through a ref so a language switch does not rebuild the stream handlers.
+  const t = useT();
+  const tRef = useRef(t);
+  tRef.current = t;
   const [items, setItems] = useState<ChatItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [turnState, setTurnState] = useState({ turnCount: 0, completed: 0, streaming: false });
@@ -359,7 +368,7 @@ export function useAgentTurn(api: AgentApi, options: AgentTurnOptions): AgentTur
           updateTurn(turn, (item) => ({
             ...item,
             tools: [...item.tools, tool],
-            activity: label || describeToolCall(tool, input),
+            activity: label || describeToolCall(tool, input, tRef.current),
           }));
           const component = callbacks.current.pendingComponent?.(tool);
           if (component && !findSlot(component)) {
@@ -417,7 +426,7 @@ export function useAgentTurn(api: AgentApi, options: AgentTurnOptions): AgentTur
           return;
         }
         case "error": {
-          const text = String(event.data.message ?? "Something went wrong.");
+          const text = String(event.data.message ?? tRef.current("Something went wrong."));
           updateTurn(turn, (item) => ({
             ...item,
             segments: [...item.segments, { type: "error", text }],
@@ -458,10 +467,15 @@ export function useAgentTurn(api: AgentApi, options: AgentTurnOptions): AgentTur
               turn,
               label: "turn complete",
               detail:
-                `in ${n(usage.input_tokens)} · out ${n(usage.output_tokens)}` +
-                ` · cache read ${n(usage.cache_read_input_tokens)}`,
+                tRef.current("in {input} · out {output} · cache read {cache}", {
+                  input: n(usage.input_tokens),
+                  output: n(usage.output_tokens),
+                  cache: n(usage.cache_read_input_tokens),
+                }),
               elapsedMs: performance.now() - startedAt,
             });
+            const turnId = event.data.turn_id;
+            if (typeof turnId === "string") updateTurn(turn, (item) => ({ ...item, turnId }));
             callbacks.current.onEvent?.(event, turn);
           } else {
             handleEvent(turn, event);
@@ -505,9 +519,39 @@ export function useAgentTurn(api: AgentApi, options: AgentTurnOptions): AgentTur
     [api, busy, sessionId, runTurn, readMemory],
   );
 
+  const itemOf = useCallback(
+    (turn: number) =>
+      items.find((item): item is AssistantChatItem => item.kind === "assistant" && item.turn === turn),
+    [items],
+  );
+
+  const rate = useCallback(
+    (turn: number, helpful: boolean) => {
+      const item = itemOf(turn);
+      if (!item?.turnId) return;
+      updateTurn(turn, (current) => ({ ...current, rating: helpful ? "up" : "down" }));
+      void api.sendFeedback(item.turnId, helpful);
+    },
+    [api, itemOf, updateTurn],
+  );
+
+  const handoff = useCallback(
+    async (turn: number) => {
+      const item = itemOf(turn);
+      if (!item || item.ticket) return;
+      const failed = item.segments.some((segment) => segment.type === "error");
+      const reason = item.rating === "down" ? "after_negative_feedback" : failed ? "after_error" : "user_requested";
+      const ticket = await api.requestHandoff(item.turnId, reason);
+      if (ticket) updateTurn(turn, (current) => ({ ...current, ticket }));
+    },
+    [api, itemOf, updateTurn],
+  );
+
   return {
     items,
     setItems,
+    rate,
+    handoff,
     ready: sessionId != null,
     busy,
     send,

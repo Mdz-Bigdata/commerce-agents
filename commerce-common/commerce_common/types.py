@@ -49,10 +49,13 @@ class MemoryFact(BaseModel):
 class ClockContext(BaseModel):
     """The host-supplied clock a session context carries: an IANA ``timezone``, or an
     explicit ``now`` that overrides it. With neither set the prompt carries no local time,
-    because the server's clock is not the user's."""
+    because the server's clock is not the user's. ``reply_language`` names the language
+    the user picked in the host's UI ("Simplified Chinese"); the context block carries it
+    and the prompt has the model write in it."""
 
     timezone: str | None = None
     now: datetime | None = None
+    reply_language: str | None = Field(default=None, max_length=40)
 
     @field_validator("timezone")
     @classmethod

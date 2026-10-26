@@ -6,7 +6,7 @@
 /** The countdown follows the soonest server hold deadline. */
 
 import { useMemo } from "react";
-import { formatMoney, useCatalogIndex, safeHandoffs } from "web-shared";
+import { formatMoney, safeHandoffs, useCatalogIndex, useT } from "web-shared";
 import { fetchProducts } from "@/lib/api";
 import { countdownTone, dateBlock, feeParts, formatCountdown } from "@/lib/format";
 import { useCountdown, useLive } from "@/lib/live";
@@ -61,6 +61,7 @@ export default function CheckoutHold({
   payload: CheckoutPayload;
   variant?: "checkout" | "hold";
 }) {
+  const t = useT();
   const { holds, holdsLoaded, holdMinutes } = useLive();
   const catalog = useCatalogIndex(fetchProducts);
   const cart = payload.cart;
@@ -103,13 +104,13 @@ export default function CheckoutHold({
       component={variant}
       label={
         variant === "hold"
-          ? "Held for you, timer running, not charged"
-          : "Order summary: held, not charged"
+          ? t("Held for you, timer running, not charged")
+          : t("Order summary: held, not charged")
       }
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className={`at-pill ${expired ? "at-pill--out" : "at-pill--scarce"}`}>
-          {expired ? "Released, back on sale" : "Held, not charged"}
+          {expired ? t("Released, back on sale") : t("Held, not charged")}
         </span>
         <div className="flex items-center gap-2.5">
           <CountdownArc
@@ -119,7 +120,7 @@ export default function CheckoutHold({
             strokeWidth={2.5}
           />
           <div className="text-right">
-            <p className="at-eyebrow">{expired ? "Hold ended" : "Hold expires"}</p>
+            <p className="at-eyebrow">{expired ? t("Hold ended") : t("Hold expires")}</p>
             <p
               className={`at-mono text-[40px] font-semibold leading-none tracking-tight ${
                 expired ? "text-(--ink-soft)" : seconds != null && seconds <= 30 ? "at-urgent" : ""
@@ -133,8 +134,8 @@ export default function CheckoutHold({
       </div>
       <p className="mt-1 text-right text-[11px] text-(--ink-soft)">
         {expired
-          ? "These seats went back on sale. Ask ACME Assistant to hold them again."
-          : "At 0:00 these seats release to other buyers."}
+          ? t("These seats went back on sale. Ask ACME Assistant to hold them again.")
+          : t("At 0:00 these seats release to other buyers.")}
       </p>
 
       {payload.note ? (
@@ -177,16 +178,16 @@ export default function CheckoutHold({
 
         {fees ? (
           <div className="mt-3 rounded-(--radius) bg-(--well)/60 px-3 py-2">
-            <p className="at-eyebrow mb-1">Inside the total</p>
-            <FeeRow label={fees.baseLabel} amount={fees.base} />
-            <FeeRow label="Service fee" amount={fees.service} />
-            <FeeRow label="Facility fee" amount={fees.facility} />
-            <FeeRow label="Order processing" amount={fees.processing} />
+            <p className="at-eyebrow mb-1">{t("Inside the total")}</p>
+            <FeeRow label={t(fees.baseLabel)} amount={fees.base} />
+            <FeeRow label={t("Service fee")} amount={fees.service} />
+            <FeeRow label={t("Facility fee")} amount={fees.facility} />
+            <FeeRow label={t("Order processing")} amount={fees.processing} />
           </div>
         ) : null}
 
         <div className="mt-3 flex items-baseline justify-between border-t-2 border-(--rule) pt-2">
-          <span className="text-[15px] font-bold text-(--ink)">Total, all-in</span>
+          <span className="text-[15px] font-bold text-(--ink)">{t("Total, all-in")}</span>
           <span className="at-mono text-[30px] font-bold tracking-tight text-(--ink)">
             {formatMoney(cart.subtotal, cart.currency)}
           </span>
@@ -198,8 +199,7 @@ export default function CheckoutHold({
             <path d="m5.7 8 1.6 1.6 3-3.2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
           <span className="text-[12px] leading-snug text-(--ink-soft)">
-            Guaranteed valid for entry or your money back, and the all-in price you see is
-            the full price you pay.
+            {t("Guaranteed valid for entry or your money back, and the all-in price you see is the full price you pay.")}
           </span>
         </div>
 
@@ -217,7 +217,7 @@ export default function CheckoutHold({
                     aria-describedby="at-checkout-demo-note"
                     className="btn-primary w-full text-center"
                   >
-                    {h.label ?? (h.seller ? `Continue to checkout with ${h.seller}` : "Continue to checkout")}
+                    {h.label ?? (h.seller ? t("Continue to checkout with {seller}", { seller: h.seller }) : t("Continue to checkout"))}
                   </a>
                 ))}
               </div>
@@ -228,27 +228,26 @@ export default function CheckoutHold({
                 disabled
                 aria-describedby="at-checkout-demo-note"
                 className="btn-primary mt-3 w-full !opacity-70"
-                title="Nothing is charged here. Payment happens when you check out."
+                title={t("Nothing is charged here. Payment happens when you check out.")}
               >
-                Continue to checkout
+                {t("Continue to checkout")}
               </button>
             )}
             <p
               id="at-checkout-demo-note"
               className="mt-2 text-center text-[11px] text-(--ink-soft)/80"
             >
-              Nothing is charged here. Payment happens when you check out.
+              {t("Nothing is charged here. Payment happens when you check out.")}
             </p>
             <p className="mt-1 text-center text-[11px] text-(--ink-soft)/80">
               {payload.fulfillment_method === "pickup"
-                ? "Will-call pickup at the venue box office."
-                : "Mobile tickets are added to your wallet at purchase."}
+                ? t("Will-call pickup at the venue box office.")
+                : t("Mobile tickets are added to your wallet at purchase.")}
             </p>
           </>
         ) : (
           <p className="mt-3 text-center text-[11px] text-(--ink-soft)/80">
-            Ask ACME Assistant to check out before the timer ends, or let the hold lapse and
-            the seats go back on sale. Nothing is charged here.
+            {t("Ask ACME Assistant to check out before the timer ends, or let the hold lapse and the seats go back on sale. Nothing is charged here.")}
           </p>
         )}
       </div>

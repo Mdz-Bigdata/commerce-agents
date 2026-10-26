@@ -5,6 +5,7 @@
 
 /** Renders every card from lib/showcase-fixtures.ts; no API needed. */
 
+import { useT } from "web-shared";
 import OrderPanel from "@/components/OrderPanel";
 import GenerativeBlock from "@/components/generative";
 import { SHOWCASE } from "@/lib/showcase-fixtures";
@@ -31,10 +32,11 @@ function Section({ name, children }: { name: string; children: React.ReactNode }
 }
 
 export default function ShowcasePage() {
+  const t = useT();
   return (
     <main className="relative z-[2] mx-auto max-w-3xl px-6 py-14">
       <p className="am-fig">
-        <b>●</b> ACME Mobile component showcase (fixture data)
+        <b>●</b> {t("ACME Mobile component showcase (fixture data)")}
       </p>
       {SECTIONS.map((name) => (
         <Section key={name} name={name}>

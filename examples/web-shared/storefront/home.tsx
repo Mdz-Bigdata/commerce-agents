@@ -8,6 +8,7 @@
 import { type ReactNode, useState } from "react";
 import type { AgentApi } from "../api";
 import { formatDayMonth } from "../format";
+import { useT } from "../i18n";
 import { Icon, type IconName } from "../icons";
 import type { MemoryFact } from "../protocol";
 import { Button, Pill, Sheet } from "../ui";
@@ -96,6 +97,7 @@ function FactRow({
   onEdit: (key: string, value: string) => Promise<boolean>;
   onForget: (key: string) => Promise<void>;
 }) {
+  const t = useT();
   const [draft, setDraft] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -114,7 +116,7 @@ function FactRow({
           <p className="min-w-0 flex-1 text-[14px] leading-snug text-(--ink)">{fact.value}</p>
           <div className="flex shrink-0 gap-3 pt-px text-[12.5px] font-semibold">
             <button type="button" onClick={() => setDraft(fact.value)} className="text-(--ink-2) hover:text-(--ink)">
-              Edit
+              {t("Edit")}
             </button>
             <button
               type="button"
@@ -126,7 +128,7 @@ function FactRow({
               }}
               className="font-medium text-(--danger) hover:underline disabled:opacity-50"
             >
-              Forget
+              {t("Forget")}
             </button>
           </div>
         </div>
@@ -147,24 +149,24 @@ function FactRow({
             }}
             rows={2}
             maxLength={200}
-            aria-label="Correct this"
+            aria-label={t("Correct this")}
             autoFocus
             className="w-full resize-none rounded-[10px] border border-(--accent) bg-(--card) px-3 py-2 text-[14px] leading-snug text-(--ink) shadow-[0_0_0_3px_var(--accent-soft)] outline-none"
           />
-          {failed ? <p className="mt-1 text-[12px] text-(--danger)">That could not be saved. Keep it to a preference or a standing rule.</p> : null}
+          {failed ? <p className="mt-1 text-[12px] text-(--danger)">{t("That could not be saved. Keep it to a preference or a standing rule.")}</p> : null}
           <div className="mt-2 flex gap-2">
             <Button variant="primary" size="sm" onClick={() => void save()} disabled={busy || !draft.trim()}>
-              Save
+              {t("Save")}
             </Button>
             <Button size="sm" onClick={() => setDraft(null)}>
-              Cancel
+              {t("Cancel")}
             </Button>
           </div>
         </div>
       )}
       <div className="mt-1.5 flex items-center gap-2 text-[11.5px] text-(--ink-soft)">
-        {isNew ? <Pill tone="accent">New this session</Pill> : <Pill>{CATEGORY_LABELS[fact.category] ?? fact.category}</Pill>}
-        {fact.updated_at ? <span>Saved {formatDayMonth(fact.updated_at)}</span> : null}
+        {isNew ? <Pill tone="accent">{t("New this session")}</Pill> : <Pill>{t(CATEGORY_LABELS[fact.category] ?? fact.category)}</Pill>}
+        {fact.updated_at ? <span>{t("Saved {date}", { date: formatDayMonth(fact.updated_at) })}</span> : null}
       </div>
     </li>
   );
@@ -196,6 +198,7 @@ export function AccountSheet({
   onSwitchProfile?: (id: string) => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const { chat, assistantName } = useStoreFrame();
   const facts = chat?.memory ?? [];
   const others = profiles.filter((profile) => profile.id !== profileId);
@@ -211,21 +214,21 @@ export function AccountSheet({
     <Sheet title={name} detail={detail} onClose={onClose}>
       {others.length && onSwitchProfile ? (
         <div className="flex flex-wrap items-center gap-2 text-[13px] text-(--ink-2)">
-          <span>Signed in as {name}.</span>
+          <span>{t("Signed in as {name}.", { name })}</span>
           {others.map((profile) => (
             <Button key={profile.id} size="sm" icon="user" onClick={() => onSwitchProfile(profile.id)}>
-              Switch to {profile.name}
+              {t("Switch to {name}", { name: profile.name })}
             </Button>
           ))}
         </div>
       ) : null}
       <section>
         <h3 className="flex items-baseline gap-2 text-[15px] font-semibold text-(--ink)">
-          What {assistantName} knows
-          <span className="ml-auto text-[12px] font-normal tabular-nums text-(--ink-soft)">{facts.length} saved</span>
+          {t("What {name} knows", { name: assistantName })}
+          <span className="ml-auto text-[12px] font-normal tabular-nums text-(--ink-soft)">{t("{n} saved", { n: facts.length })}</span>
         </h3>
         <p className="mt-1 text-[13px] leading-snug text-(--ink-soft)">
-          {assistantName} uses these when it recommends something. Edit or forget any line; a forgotten line is deleted.
+          {t("{name} uses these when it recommends something. Edit or forget any line; a forgotten line is deleted.", { name: assistantName })}
         </p>
         {facts.length ? (
           <ul className="mt-2">
@@ -234,11 +237,11 @@ export function AccountSheet({
             ))}
           </ul>
         ) : (
-          <p className="mt-4 text-[13.5px] text-(--ink-2)">Nothing saved yet.</p>
+          <p className="mt-4 text-[13.5px] text-(--ink-2)">{t("Nothing saved yet.")}</p>
         )}
       </section>
       <p className="mt-auto border-t border-(--line) pt-3 text-[12px] leading-relaxed text-(--ink-soft)">
-        Only preferences and standing rules are kept. Card, account, phone, and email details are refused.
+        {t("Only preferences and standing rules are kept. Card, account, phone, and email details are refused.")}
       </p>
     </Sheet>
   );

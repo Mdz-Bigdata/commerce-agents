@@ -5,6 +5,7 @@
 
 /** Renders lib/showcase-fixtures.ts; no API needed. */
 
+import { useT } from "web-shared";
 import CartPanel from "@/components/CartPanel";
 import GenerativeBlock from "@/components/generative";
 import { SHOWCASE, SHOWCASE_CART } from "@/lib/showcase-fixtures";
@@ -21,10 +22,11 @@ function Section({ name, children }: { name: string; children: React.ReactNode }
 }
 
 export default function ShowcasePage() {
+  const t = useT();
   return (
     <main className="mx-auto max-w-2xl px-6 py-12">
       <p className="text-[11px] font-semibold uppercase tracking-widest text-(--ink-soft)">
-        ACME component showcase (fixture data)
+        {t("ACME component showcase (fixture data)")}
       </p>
       {SECTIONS.map((name) => (
         <Section key={name} name={name}>

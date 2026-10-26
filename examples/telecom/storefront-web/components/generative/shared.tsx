@@ -4,6 +4,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useT } from "web-shared";
 
 const FIG_NUMBERS: Record<string, string> = {
   plan_matrix: "01",
@@ -17,9 +18,10 @@ const FIG_NUMBERS: Record<string, string> = {
 };
 
 function FigCaption({ component, label }: { component: string; label: string }) {
+  const t = useT();
   return (
     <p className="am-fig mb-2 select-none">
-      FIG {FIG_NUMBERS[component] ?? "00"} <b>·</b> {label}
+      {t("FIG {n}", { n: FIG_NUMBERS[component] ?? "00" })} <b>·</b> {label}
     </p>
   );
 }

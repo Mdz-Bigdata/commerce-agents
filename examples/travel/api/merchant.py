@@ -9,7 +9,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from commerce_common.memory import MemoryStore
-from demo_common import REPO_ROOT, MerchantIdentity, build_merchant_router
+from demo_common import REPO_ROOT, MerchantIdentity, build_merchant_router, model_client
 from merchant_agent_runtime import MerchantAgent
 
 from .agent_config import build_merchant_config
@@ -27,6 +27,7 @@ def create_merchant_router(storefront: MockTravel, memory_store: MemoryStore) ->
         backend=merchant,
         skills_dir=REPO_ROOT / "merchant-agent" / "skills",
         config=config,
+        client=model_client(),
         memory_store=memory_store,
         extra_presentation_tools=[build_occupancy_extension(merchant)],
     )

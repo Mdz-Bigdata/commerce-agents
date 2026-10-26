@@ -3,7 +3,7 @@
 
 /** How each kind of supplier record shows: its label, icon, and tone. */
 
-import type { KindStyle, Tone } from "web-shared";
+import type { KindStyle, Tone, Translate } from "web-shared";
 import type { InventoryAlert, ListingStatus, OrderIssue } from "./types";
 
 export const ISSUE_KINDS: Record<OrderIssue["kind"], KindStyle> = {
@@ -38,6 +38,8 @@ export const BOOKING_STATUS: Record<string, { label: string; tone: Tone }> = {
 };
 
 /** The composer prompt for an availability or pacing alert; the same words on every surface. */
-export function inventoryPrompt(kind: InventoryAlert["kind"], ref: string): string {
-  return kind === "low_stock" ? `What are my options for ${ref}? It is running tight on availability.` : `Plan rates for ${ref}, which is pacing soft.`;
+export function inventoryPrompt(kind: InventoryAlert["kind"], ref: string, t: Translate): string {
+  return kind === "low_stock"
+    ? t("What are my options for {ref}? It is running tight on availability.", { ref })
+    : t("Plan rates for {ref}, which is pacing soft.", { ref });
 }

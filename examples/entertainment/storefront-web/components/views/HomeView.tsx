@@ -3,9 +3,10 @@
 
 "use client";
 
-import { formatMoney, formatWeekday, Greeting, HomeSection, MoreLink, Panel, plural, type Starter, Starters, useCatalogIndex, useStoreFrame } from "web-shared";
+import { formatMoney, formatWeekday, Greeting, HomeSection, MoreLink, Panel, type Starter, Starters, useCatalogIndex, useStoreFrame, useT } from "web-shared";
 import { fetchProducts } from "@/lib/api";
 import { dateBlock } from "@/lib/format";
+import { Rich, tPlural } from "@/lib/i18n-helpers";
 import { useLive } from "@/lib/live";
 import type { Product } from "@/lib/types";
 import { EMPTY_WALLET, shows, ticketAsk } from "@/lib/wallet";
@@ -42,23 +43,41 @@ function events(catalog: Record<string, Product>): EventTile[] {
 }
 
 function Brief() {
+  const t = useT();
   const { tickets, holds, waitlist, holdsLoaded } = useLive();
   const held = holds.reduce((sum, hold) => sum + hold.quantity, 0);
   const showCount = shows(tickets).length;
   if (!holdsLoaded || (!tickets.length && !held && !waitlist.length)) {
-    return <>Every price here is all-in. Ask what's on, or hold seats while you decide.</>;
+    return <>{t("Every price here is all-in. Ask what's on, or hold seats while you decide.")}</>;
   }
   return (
     <>
-      {tickets.length ? `${plural(tickets.length, "ticket")} in your wallet for ${plural(showCount, "show")}. ` : ""}
-      {held ? <span className="font-semibold text-(--warn)">{plural(held, "seat")} held and counting down. </span> : null}
-      {waitlist.length ? `You're #${Math.min(...waitlist.map((entry) => entry.position))} on ${waitlist.length === 1 ? "a waitlist" : plural(waitlist.length, "waitlist")}. ` : ""}
-      Ask about any of it, or find the next night out.
+      {tickets.length
+        ? `${t("{tickets} in your wallet for {shows}.", {
+            tickets: tPlural(t, tickets.length, "{n} ticket", "{n} tickets"),
+            shows: tPlural(t, showCount, "{n} show", "{n} shows"),
+          })} `
+        : ""}
+      {held ? (
+        <>
+          <span className="font-semibold text-(--warn)">
+            {t("{seats} held and counting down.", { seats: tPlural(t, held, "{n} seat", "{n} seats") })}
+          </span>{" "}
+        </>
+      ) : null}
+      {waitlist.length
+        ? `${t("You're #{position} on {lists}.", {
+            position: Math.min(...waitlist.map((entry) => entry.position)),
+            lists: tPlural(t, waitlist.length, "a waitlist", "{n} waitlists"),
+          })} `
+        : ""}
+      {t("Ask about any of it, or find the next night out.")}
     </>
   );
 }
 
 export default function HomeView({ fanName, onSeeTickets }: { fanName: string; onSeeTickets: () => void }) {
+  const t = useT();
   const { ask } = useStoreFrame();
   const { tickets } = useLive();
   const catalog = useCatalogIndex(fetchProducts);
@@ -69,21 +88,21 @@ export default function HomeView({ fanName, onSeeTickets }: { fanName: string; o
       <Greeting
         eyebrow={
           <span className="at-stub-caption">
-            <b>●</b> Box office open · {fanName}
+            <b>●</b> {t("Box office open · {name}", { name: fanName })}
           </span>
         }
         title={
           <h1 className="at-display text-[clamp(30px,3.8vw,44px)] uppercase leading-[0.98] text-(--ink)">
-            The house lights are down.
+            {t("The house lights are down.")}
             <br />
-            <span className="text-(--accent)">The fees are not hidden.</span>
+            <span className="text-(--accent)">{t("The fees are not hidden.")}</span>
           </h1>
         }
       >
         <Brief />
       </Greeting>
-      <Starters items={STARTERS} />
-      <Panel title="Your tickets" subtitle={tickets.length ? plural(tickets.length, "ticket") : undefined} action={<MoreLink label="All tickets" onClick={onSeeTickets} />}>
+      <Starters items={STARTERS.map((starter) => ({ ...starter, prompt: t(starter.prompt) }))} />
+      <Panel title={t("Your tickets")} subtitle={tickets.length ? tPlural(t, tickets.length, "{n} ticket", "{n} tickets") : undefined} action={<MoreLink label={t("All tickets")} onClick={onSeeTickets} />}>
         {wallet.length ? (
           <ul className="px-[18px] pb-2">
             {wallet.map(({ ticket, passes }) => {
@@ -92,23 +111,23 @@ export default function HomeView({ fanName, onSeeTickets }: { fanName: string; o
               return (
                 <li key={`${ticket.event}-${ticket.date}`} className="flex items-center gap-3 border-t border-(--line) py-2.5 first:border-t-0">
                   {date ? <DateSquare {...date} /> : null}
-                  <button type="button" onClick={() => ask(ticketAsk(ticket))} className="min-w-0 flex-1 text-left">
+                  <button type="button" onClick={() => ask(ticketAsk(ticket, t))} className="min-w-0 flex-1 text-left">
                     <span className="at-display block truncate text-[16px] uppercase leading-tight text-(--ink)">{ticket.event}</span>
                     <span className="block truncate text-[12px] text-(--ink-soft)">
                       {[ticket.venue, `${ticket.tier ?? ticket.seat} × ${passes.length}`].filter(Boolean).join(" · ")}
                     </span>
                   </button>
-                  <span className={`at-pill ${pending ? "at-pill--scarce" : "at-pill--calm"}`}>{pending ? "Transfer pending" : "Issued"}</span>
+                  <span className={`at-pill ${pending ? "at-pill--scarce" : "at-pill--calm"}`}>{pending ? t("Transfer pending") : t("Issued")}</span>
                 </li>
               );
             })}
           </ul>
         ) : (
-          <p className="px-[18px] pb-4 text-[13.5px] text-(--ink-soft)">{EMPTY_WALLET}</p>
+          <p className="px-[18px] pb-4 text-[13.5px] text-(--ink-soft)">{t(EMPTY_WALLET)}</p>
         )}
       </Panel>
       {onSale.length ? (
-        <HomeSection title="On sale" subtitle="Open one to see what is left">
+        <HomeSection title={t("On sale")} subtitle={t("Open one to see what is left")}>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {onSale.map((event) => {
               const date = dateBlock(event.date);
@@ -116,17 +135,26 @@ export default function HomeView({ fanName, onSeeTickets }: { fanName: string; o
                 <button
                   key={`${event.name}-${event.date}`}
                   type="button"
-                  onClick={() => ask(`What's still available for ${event.name}${event.date ? ` on ${formatWeekday(event.date)}` : ""}?`)}
+                  onClick={() =>
+                    ask(
+                      event.date
+                        ? t("What's still available for {name} on {date}?", { name: event.name, date: formatWeekday(event.date) })
+                        : t("What's still available for {name}?", { name: event.name }),
+                    )
+                  }
                   className="at-card flex flex-col gap-2 p-3 text-left transition-colors hover:border-(--accent)"
                 >
                   <div className="flex items-start gap-2.5">
                     {date ? <DateSquare {...date} /> : null}
-                    <span className={`at-pill ml-auto ${event.soldOut ? "at-pill--out" : "at-pill--calm"}`}>{event.soldOut ? "Sold out" : "On sale"}</span>
+                    <span className={`at-pill ml-auto ${event.soldOut ? "at-pill--out" : "at-pill--calm"}`}>{event.soldOut ? t("Sold out") : t("On sale")}</span>
                   </div>
                   <span className="at-display line-clamp-2 min-h-[34px] text-[16px] uppercase leading-[1.05] text-(--ink)">{event.name}</span>
                   <span className="truncate text-[11.5px] text-(--ink-soft)">{event.venue}</span>
                   <span className="at-mono text-[13px] font-semibold text-(--ink)">
-                    from {formatMoney(event.from)} <span className="at-eyebrow font-normal">all-in</span>
+                    <Rich
+                      text="from {price} {suffix}"
+                      vars={{ price: formatMoney(event.from), suffix: <span className="at-eyebrow font-normal">{t("all-in")}</span> }}
+                    />
                   </span>
                 </button>
               );

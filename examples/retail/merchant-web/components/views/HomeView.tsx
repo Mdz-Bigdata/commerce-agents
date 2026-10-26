@@ -6,10 +6,8 @@
 import { useMemo, useState } from "react";
 import {
   ApprovalsBanner,
-  askWhy,
   AttentionList,
   AttentionRow,
-  coverLabel,
   formatChangePct,
   formatComparisonLabel,
   formatDayMonth,
@@ -17,7 +15,6 @@ import {
   formatNumber,
   formatPeriodLabel,
   formatRate,
-  greeting,
   Icon,
   KindIcon,
   Notice,
@@ -25,7 +22,6 @@ import {
   PageHeader,
   Panel,
   Pill,
-  plural,
   QueueOverflow,
   ratioChangePct,
   RecentChanges,
@@ -34,10 +30,14 @@ import {
   Skeleton,
   StatStrip,
   StatTile,
+  type Translate,
+  useLocale,
+  useT,
   ViewLink,
 } from "web-shared";
 import { orderRows } from "@/lib/format";
 import { INVENTORY_KINDS, ISSUE_KINDS } from "@/lib/kinds";
+import { askWhyText, coverText, greetingText, pluralT } from "@/lib/labels";
 import type { HomeInsight, InventoryAlert, MetricPoint, OrderIssue, OverviewResponse } from "@/lib/types";
 
 type Filter = "all" | "orders" | "stock" | "slow";
@@ -46,17 +46,23 @@ type Row = { kind: "issue"; issue: OrderIssue } | { kind: "inventory"; alert: In
 const ROW_CAP = 6;
 
 /** One sentence from the overview: the sales move and what needs the operator. */
-function briefing(data: OverviewResponse): string {
+function briefing(data: OverviewResponse, t: Translate): string {
   const { snapshot, needs_attention } = data;
   const parts: string[] = [];
   if (snapshot.sales_change_pct != null) {
-    const direction = snapshot.sales_change_pct >= 0 ? "up" : "down";
-    parts.push(`Sales are ${direction} ${formatChangePct(Math.abs(snapshot.sales_change_pct)).replace("+", "")} on the week.`);
+    const pct = formatChangePct(Math.abs(snapshot.sales_change_pct)).replace("+", "");
+    parts.push(snapshot.sales_change_pct >= 0 ? t("Sales are up {pct} on the week.", { pct }) : t("Sales are down {pct} on the week.", { pct }));
   }
   const orders = needs_attention.order_issues.length;
   const listings = needs_attention.inventory.length;
-  const needs = [orders ? plural(orders, "order") : "", listings ? plural(listings, "listing") : ""].filter(Boolean);
-  parts.push(needs.length ? `${needs.join(" and ")} need you today.` : "Nothing needs you today.");
+  const needs = [orders ? pluralT(t, orders, "{count} order", "{count} orders") : "", listings ? pluralT(t, listings, "{count} listing", "{count} listings") : ""].filter(Boolean);
+  parts.push(
+    needs.length === 2
+      ? t("{a} and {b} need you today.", { a: needs[0], b: needs[1] })
+      : needs.length === 1
+        ? t("{a} need you today.", { a: needs[0] })
+        : t("Nothing needs you today."),
+  );
   return parts.join(" ");
 }
 
@@ -80,22 +86,24 @@ function rows(data: OverviewResponse, filter: Filter): Row[] {
 }
 
 function IssueRow({ issue, onAskAssistant }: { issue: OrderIssue; onAskAssistant: (text: string) => void }) {
+  const t = useT();
   const style = ISSUE_KINDS[issue.kind];
   return (
     <AttentionRow
       icon={style.icon}
       tone={style.tone}
       title={issue.summary}
-      meta={[style.label, `Order ${issue.order_id}`, issue.opened_at ? `opened ${formatDayMonth(issue.opened_at)}` : ""].filter(Boolean).join(" · ")}
+      meta={[t(style.label), t("Order {id}", { id: issue.order_id }), issue.opened_at ? t("opened {date}", { date: formatDayMonth(issue.opened_at) }) : ""].filter(Boolean).join(" · ")}
       action={{
-        label: issue.kind === "buyer_message" ? "Draft reply" : "Ask",
-        onClick: () => onAskAssistant(`What are my options for order ${issue.order_id}? ${issue.summary}.`),
+        label: issue.kind === "buyer_message" ? t("Draft reply") : t("Ask"),
+        onClick: () => onAskAssistant(t("What are my options for order {id}? {summary}.", { id: issue.order_id, summary: issue.summary })),
       }}
     />
   );
 }
 
 function InventoryRow({ alert, onAskAssistant }: { alert: InventoryAlert; onAskAssistant: (text: string) => void }) {
+  const t = useT();
   const style = INVENTORY_KINDS[alert.kind];
   const soldOut = alert.kind === "low_stock" && alert.stock === 0;
   const low = alert.kind === "low_stock";
@@ -110,14 +118,14 @@ function InventoryRow({ alert, onAskAssistant }: { alert: InventoryAlert; onAskA
       meta={
         <>
           <span className={soldOut ? "font-semibold text-(--danger)" : low ? "font-semibold text-(--warn)" : ""}>
-            {soldOut ? "Sold out" : `${formatNumber(alert.stock)} in stock`}
+            {soldOut ? t("Sold out") : t("{count} in stock", { count: formatNumber(alert.stock) })}
           </span>
           {[
             "",
-            alert.days_of_cover != null && !soldOut ? coverLabel(alert.days_of_cover) : "",
-            alert.sales_last_30d != null ? `${formatNumber(alert.sales_last_30d)} sold in 30 days` : "",
+            alert.days_of_cover != null && !soldOut ? coverText(t, alert.days_of_cover) : "",
+            alert.sales_last_30d != null ? t("{count} sold in 30 days", { count: formatNumber(alert.sales_last_30d) }) : "",
             alert.listing_id,
-            soldOut && alert.storefront_visible === false ? "hidden from the storefront" : "",
+            soldOut && alert.storefront_visible === false ? t("hidden from the storefront") : "",
           ]
             .filter((part, index) => index === 0 || part)
             .join(" · ")}
@@ -127,22 +135,23 @@ function InventoryRow({ alert, onAskAssistant }: { alert: InventoryAlert; onAskA
         // A paused listing still alerts here but shows no chip to shoppers.
         low && alert.stock > 0 && alert.storefront_visible ? (
           <Pill tone="warn" dot>
-            Storefront shows “Only {formatNumber(alert.stock)} left”
+            {t("Storefront shows “Only {count} left”", { count: formatNumber(alert.stock) })}
           </Pill>
         ) : null
       }
       action={{
-        label: low ? "Draft restock" : "Plan markdown",
-        onClick: () => onAskAssistant(low ? `Draft a restock plan for ${ref}.` : `Plan a markdown for ${ref}.`),
+        label: low ? t("Draft restock") : t("Plan markdown"),
+        onClick: () => onAskAssistant(low ? t("Draft a restock plan for {ref}.", { ref }) : t("Plan a markdown for {ref}.", { ref })),
       }}
     />
   );
 }
 
 function Insights({ insights, onAskAssistant }: { insights: HomeInsight[]; onAskAssistant: (text: string) => void }) {
+  const t = useT();
   if (insights.length === 0) return null;
   return (
-    <Panel title="From the assistant" icon={<KindIcon icon="spark" tone="accent" size={24} />}>
+    <Panel title={t("From the assistant")} icon={<KindIcon icon="spark" tone="accent" size={24} />}>
       <ul className="divide-y divide-(--line)">
         {insights.map((insight) => (
           <li key={insight.insight_id} className="px-[18px] py-2.5">
@@ -153,7 +162,7 @@ function Insights({ insights, onAskAssistant }: { insights: HomeInsight[]; onAsk
               onClick={() => onAskAssistant(insight.prompt)}
               className="mt-1.5 inline-flex items-center gap-1 text-[12.5px] font-semibold text-(--accent-ink) hover:underline"
             >
-              Ask <Icon name="arrow-right" size={13} />
+              {t("Ask")} <Icon name="arrow-right" size={13} />
             </button>
           </li>
         ))}
@@ -176,20 +185,23 @@ export default function HomeView({
   onAskAssistant: (text: string) => void;
   onNavigate: (view: "orders" | "inventory") => void;
 }) {
+  const t = useT();
+  const { locale } = useLocale();
   const [filter, setFilter] = useState<Filter>("all");
   const pending = useMemo(() => (data?.needs_attention.pending_changes ?? []).filter((change) => change.status === "staged"), [data]);
   const queue = useMemo(() => (data ? rows(data, filter) : []), [data, filter]);
   const now = useMemo(() => new Date(), []);
-  const title = `${greeting(now)}${operator ? `, ${operator}` : ""}`;
-  const today = now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  const greeting = greetingText(t, now);
+  const title = operator ? t("{greeting}, {name}", { greeting, name: operator }) : greeting;
+  const today = now.toLocaleDateString(locale === "zh" ? "zh-CN" : "en-US", { weekday: "long", month: "long", day: "numeric" });
 
   if (failed && !data) {
     return (
       <>
         <PageHeader title={title} subtitle={today} />
         <Notice>
-          The merchant API on port 8000 isn&apos;t reachable. Start it with{" "}
-          <code className="rounded bg-(--well) px-1 font-mono text-[13px]">uvicorn retail.api.main:app --app-dir examples --port 8000</code> and reload.
+          {t("The merchant API on port 8000 isn't reachable. Start it with")}{" "}
+          <code className="rounded bg-(--well) px-1 font-mono text-[13px]">uvicorn retail.api.main:app --app-dir examples --port 8000</code> {t("and reload.")}
         </Notice>
       </>
     );
@@ -220,70 +232,74 @@ export default function HomeView({
 
   return (
     <div className="ac-reveal flex flex-col gap-5">
-      <PageHeader title={title} subtitle={`${today} · ${briefing(data)}`} />
+      <PageHeader title={title} subtitle={`${today} · ${briefing(data, t)}`} />
 
-      <ApprovalsBanner changes={pending} onReview={() => onAskAssistant("Walk me through the changes awaiting my approval and what each one would do.")} />
+      <ApprovalsBanner changes={pending} onReview={() => onAskAssistant(t("Walk me through the changes awaiting my approval and what each one would do."))} />
 
-      <Panel title="This week" subtitle={`${formatPeriodLabel(snapshot.period)}${comparison ? ` · against the ${comparison}` : ""}`} bodyClassName="pb-1">
+      <Panel
+        title={t("This week")}
+        subtitle={comparison ? t("{period} · against the {comparison}", { period: formatPeriodLabel(snapshot.period), comparison: t(comparison) }) : formatPeriodLabel(snapshot.period)}
+        bodyClassName="pb-1"
+      >
         <StatStrip>
           <StatTile
-            label="Sales"
+            label={t("Sales")}
             value={formatMoney(snapshot.sales, currency, { whole: snapshot.sales >= 1000 })}
             changePct={snapshot.sales_change_pct}
             points={values(data.trends?.sales)}
             prior={values(data.trends_prior?.sales)}
-            onClick={() => onAskAssistant(askWhy("Sales", snapshot.sales_change_pct, comparison))}
-            ariaLabel="Sales: ask the assistant why"
+            onClick={() => onAskAssistant(askWhyText(t, "Sales", snapshot.sales_change_pct, comparison))}
+            ariaLabel={t("{label}: ask the assistant why", { label: t("Sales") })}
           />
           <StatTile
-            label="Orders"
+            label={t("Orders")}
             value={formatNumber(snapshot.orders)}
             changePct={snapshot.orders_change_pct}
             points={values(data.trends?.orders)}
             prior={values(data.trends_prior?.orders)}
-            onClick={() => onAskAssistant(askWhy("Orders", snapshot.orders_change_pct, comparison))}
-            ariaLabel="Orders: ask the assistant why"
+            onClick={() => onAskAssistant(askWhyText(t, "Orders", snapshot.orders_change_pct, comparison))}
+            ariaLabel={t("{label}: ask the assistant why", { label: t("Orders") })}
           />
           <StatTile
-            label="Conversion"
+            label={t("Conversion")}
             value={snapshot.conversion_rate != null ? formatRate(snapshot.conversion_rate) : "—"}
             changePct={snapshot.conversion_change_pct}
             points={values(data.trends?.conversion)}
             prior={values(data.trends_prior?.conversion)}
-            onClick={() => onAskAssistant(askWhy("Conversion", snapshot.conversion_change_pct, comparison))}
-            ariaLabel="Conversion: ask the assistant why"
+            onClick={() => onAskAssistant(askWhyText(t, "Conversion", snapshot.conversion_change_pct, comparison))}
+            ariaLabel={t("{label}: ask the assistant why", { label: t("Conversion") })}
           />
           <StatTile
-            label="Average order"
+            label={t("Average order")}
             value={snapshot.average_order_value != null ? formatMoney(snapshot.average_order_value, currency) : "—"}
             changePct={aovChangePct}
             points={values(data.trends?.average_order_value)}
             prior={values(data.trends_prior?.average_order_value)}
-            onClick={() => onAskAssistant(askWhy("Average order value", aovChangePct, comparison))}
-            ariaLabel="Average order value: ask the assistant why"
+            onClick={() => onAskAssistant(askWhyText(t, "Average order value", aovChangePct, comparison))}
+            ariaLabel={t("{label}: ask the assistant why", { label: t("Average order value") })}
           />
         </StatStrip>
       </Panel>
 
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
         <Panel
-          title="Needs you today"
+          title={t("Needs you today")}
           action={
             <Segmented<Filter>
-              label="Filter attention items"
+              label={t("Filter attention items")}
               value={filter}
               onChange={setFilter}
               options={[
-                { id: "all", label: "All", count: counts.orders + counts.stock + counts.slow },
-                { id: "orders", label: "Orders", count: counts.orders },
-                { id: "stock", label: "Low stock", count: counts.stock },
-                { id: "slow", label: "Slow", count: counts.slow },
+                { id: "all", label: t("All"), count: counts.orders + counts.stock + counts.slow },
+                { id: "orders", label: t("Orders"), count: counts.orders },
+                { id: "stock", label: t("Low stock"), count: counts.stock },
+                { id: "slow", label: t("Slow"), count: counts.slow },
               ]}
             />
           }
         >
           {queue.length === 0 ? (
-            <p className="px-[18px] pb-4 pt-1 text-[13.5px] text-(--ink-soft)">Nothing needs you today.</p>
+            <p className="px-[18px] pb-4 pt-1 text-[13.5px] text-(--ink-soft)">{t("Nothing needs you today.")}</p>
           ) : (
             <>
               <AttentionList>
@@ -298,7 +314,7 @@ export default function HomeView({
               <QueueOverflow
                 hidden={queue.length - ROW_CAP}
                 link={{
-                  label: "See all",
+                  label: t("See all"),
                   // The hidden rows are order issues first, so open Orders when any of them is one.
                   onClick: () => onNavigate(queue.slice(ROW_CAP).some((row) => row.kind === "issue") ? "orders" : "inventory"),
                 }}
@@ -309,11 +325,11 @@ export default function HomeView({
 
         <div className="flex flex-col gap-4">
           <Insights insights={data.insights ?? []} onAskAssistant={onAskAssistant} />
-          <Panel title="Recent orders" action={<ViewLink label="All orders" onClick={() => onNavigate("orders")} />}>
+          <Panel title={t("Recent orders")} action={<ViewLink label={t("All orders")} onClick={() => onNavigate("orders")} />}>
             {data.recent_orders.length === 0 ? (
-              <p className="px-[18px] pb-4 text-[13px] text-(--ink-soft)">No orders yet.</p>
+              <p className="px-[18px] pb-4 text-[13px] text-(--ink-soft)">{t("No orders yet.")}</p>
             ) : (
-              <RecordList rows={orderRows(data.recent_orders.slice(0, 4))} />
+              <RecordList rows={orderRows(data.recent_orders.slice(0, 4), t)} />
             )}
           </Panel>
           <RecentChanges changes={data.recent_changes} />

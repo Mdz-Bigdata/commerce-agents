@@ -4,7 +4,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { formatChangePct, formatDayMonth, formatMoney, formatNumber, formatPeriodLabel, formatRate, GenCard, GenCardHeader, Pill } from "web-shared";
+import { formatChangePct, formatDayMonth, formatMoney, formatNumber, formatPeriodLabel, formatRate, GenCard, GenCardHeader, Pill, useT } from "web-shared";
 import type { OccupancyCalendarPayload, OccupancyListing, OccupancyWeek } from "@/lib/types";
 
 /** Payload shape: examples/travel/api/occupancy.py; every field is optional. */
@@ -21,16 +21,18 @@ function rate(value: number | null | undefined): string | null {
 }
 
 function PaceChip({ pacePct }: { pacePct: number | null | undefined }) {
+  const t = useT();
   if (pacePct == null) return null;
   // The week's on-the-books pace, distinct from the 30-day pace the pricing summary quotes.
   return (
-    <Pill tone={pacePct >= 0 ? "ok" : "danger"} title="On-the-books pace for this week against the comparable period">
-      {formatChangePct(pacePct)} pace
+    <Pill tone={pacePct >= 0 ? "ok" : "danger"} title={t("On-the-books pace for this week against the comparable period")}>
+      {t("{change} pace", { change: formatChangePct(pacePct) })}
     </Pill>
   );
 }
 
 function WeekStrip({ children }: { children: React.ReactNode }) {
+  const t = useT();
   const ref = useRef<HTMLDivElement>(null);
   const [clippedLeft, setClippedLeft] = useState(false);
   const [clippedRight, setClippedRight] = useState(false);
@@ -75,7 +77,7 @@ function WeekStrip({ children }: { children: React.ReactNode }) {
           />
           <button
             type="button"
-            aria-label="Scroll to later weeks"
+            aria-label={t("Scroll to later weeks")}
             onClick={() => ref.current?.scrollBy({ left: 200, behavior: "smooth" })}
             className="absolute right-0.5 top-1/2 -translate-y-1/2 rounded-full border border-(--line-strong) bg-(--card) px-1.5 pb-0.5 text-[13px] leading-none text-(--ink-soft) shadow-(--shadow-sm) transition hover:text-(--ink)"
           >
@@ -88,6 +90,7 @@ function WeekStrip({ children }: { children: React.ReactNode }) {
 }
 
 function WeekCell({ week, baseRate }: { week: OccupancyWeek; baseRate?: number | null }) {
+  const t = useT();
   const occupancy = clampPct(week.occupancy_pct);
   const midweek = clampPct(week.midweek_occupancy_pct);
   const weekend = clampPct(week.weekend_occupancy_pct);
@@ -100,7 +103,7 @@ function WeekCell({ week, baseRate }: { week: OccupancyWeek; baseRate?: number |
       }`}
     >
       <div className="text-[11px] font-medium text-(--ink-soft)">
-        {week.week_start ? `Week of ${formatDayMonth(week.week_start)}` : "—"}
+        {week.week_start ? t("Week of {date}", { date: formatDayMonth(week.week_start) }) : "—"}
       </div>
       <div className="flex items-baseline gap-1.5">
         <span className="text-[13px] font-semibold tabular-nums leading-none text-(--ink)">
@@ -121,15 +124,15 @@ function WeekCell({ week, baseRate }: { week: OccupancyWeek; baseRate?: number |
             />
           </div>
           <div className="mt-0.5 text-[11px] tabular-nums text-(--ink-soft)">
-            {formatRate(occupancy)} booked
+            {t("{pct} booked", { pct: formatRate(occupancy) })}
           </div>
         </div>
       ) : null}
       {midweek != null || weekend != null ? (
         <div className="text-[11px] tabular-nums text-(--ink-soft)">
-          {midweek != null ? `MW ${Math.round(midweek)}%` : null}
+          {midweek != null ? t("MW {pct}%", { pct: Math.round(midweek) }) : null}
           {midweek != null && weekend != null ? " · " : null}
-          {weekend != null ? `WE ${Math.round(weekend)}%` : null}
+          {weekend != null ? t("WE {pct}%", { pct: Math.round(weekend) }) : null}
         </div>
       ) : null}
       <PaceChip pacePct={week.on_the_books_pace_pct} />
@@ -137,8 +140,7 @@ function WeekCell({ week, baseRate }: { week: OccupancyWeek; baseRate?: number |
         <div className="flex items-center gap-1 text-[11px] font-semibold text-(--accent-ink)">
           <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-(--accent)" aria-hidden />
           <span className="truncate">
-            Override
-            {override.ends ? ` to ${formatDayMonth(override.ends)}` : ""}
+            {override.ends ? t("Override to {date}", { date: formatDayMonth(override.ends) }) : t("Override")}
           </span>
         </div>
       ) : null}
@@ -147,6 +149,7 @@ function WeekCell({ week, baseRate }: { week: OccupancyWeek; baseRate?: number |
 }
 
 function ListingStrip({ listing }: { listing: OccupancyListing }) {
+  const t = useT();
   const weeks = listing.weeks ?? [];
   const baseRate = rate(listing.base_nightly_rate);
   return (
@@ -154,18 +157,18 @@ function ListingStrip({ listing }: { listing: OccupancyListing }) {
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <div className="min-w-0">
           <div className="truncate text-[13px] font-semibold text-(--ink)">
-            {listing.title ?? listing.listing_id ?? "Property"}
+            {listing.title ?? listing.listing_id ?? t("Property")}
           </div>
           <div className="text-[12px] tabular-nums text-(--ink-soft)">
             {[
               listing.listing_id,
-              listing.rooms != null ? `${formatNumber(listing.rooms)} rooms` : null,
+              listing.rooms != null ? t("{count} rooms", { count: formatNumber(listing.rooms) }) : null,
             ]
               .filter(Boolean)
               .join(" · ")}
           </div>
         </div>
-        {baseRate ? <div className="text-[12px] tabular-nums text-(--ink-soft)">Base {baseRate} / night</div> : null}
+        {baseRate ? <div className="text-[12px] tabular-nums text-(--ink-soft)">{t("Base {rate} / night", { rate: baseRate })}</div> : null}
       </div>
       {listing.note ? (
         <p className="mt-1 text-[12px] leading-snug text-(--ink-soft)">{listing.note}</p>
@@ -182,7 +185,7 @@ function ListingStrip({ listing }: { listing: OccupancyListing }) {
         </WeekStrip>
       ) : (
         <p className="mt-2 text-[12px] text-(--ink-soft)">
-          No weeks in this window for this property.
+          {t("No weeks in this window for this property.")}
         </p>
       )}
     </div>
@@ -190,6 +193,7 @@ function ListingStrip({ listing }: { listing: OccupancyListing }) {
 }
 
 export default function OccupancyCalendarCard({ payload }: { payload: OccupancyCalendarPayload }) {
+  const t = useT();
   const listings = payload.listings ?? [];
   const calendarWindow = payload.period
     ? formatPeriodLabel(payload.period)
@@ -202,7 +206,7 @@ export default function OccupancyCalendarCard({ payload }: { payload: OccupancyC
 
   return (
     <GenCard>
-      <GenCardHeader title={payload.title ?? "Occupancy & pacing"} aside={calendarWindow} />
+      <GenCardHeader title={payload.title ?? t("Occupancy & pacing")} aside={calendarWindow} />
       {listings.length ? (
         <div className="mt-2.5">
           {listings.map((listing, index) => (
@@ -210,12 +214,12 @@ export default function OccupancyCalendarCard({ payload }: { payload: OccupancyC
           ))}
         </div>
       ) : (
-        <p className="px-3.5 pb-3.5 pt-2 text-[13px] text-(--ink-soft)">No occupancy data was returned for this window.</p>
+        <p className="px-3.5 pb-3.5 pt-2 text-[13px] text-(--ink-soft)">{t("No occupancy data was returned for this window.")}</p>
       )}
       {anyOverride ? (
         <div className="flex items-center gap-1.5 border-t border-(--line) px-3.5 py-2 text-[11.5px] text-(--ink-soft)">
           <span className="h-1.5 w-1.5 rounded-full bg-(--accent)" aria-hidden />
-          Weeks with an applied rate override
+          {t("Weeks with an applied rate override")}
         </div>
       ) : null}
     </GenCard>

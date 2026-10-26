@@ -4,7 +4,7 @@
 "use client";
 
 import { useState } from "react";
-import { hasOptions, optionSummary, optionValuesLabel, priceLabel, useStoreFrame } from "web-shared";
+import { formatMoney, hasOptions, optionSummary, optionValuesLabel, priceLabel, type Translate, useStoreFrame, useT } from "web-shared";
 import type { Product } from "@/lib/types";
 import { flyToCart } from "@/lib/flight";
 import { attributeChips, productGlyph, productTileClass } from "@/lib/format";
@@ -26,10 +26,16 @@ export function ProductTitle({ title, className = "" }: { title: string; classNa
   );
 }
 
+/** "From $349" on a family record, in the shopper's language; the plain price otherwise. */
+export function priceText(product: Parameters<typeof priceLabel>[0], t: Translate): string {
+  return hasOptions(product) ? t("From {price}", { price: formatMoney(product.price, product.currency) }) : priceLabel(product);
+}
+
 function ReturnsPromise({ className = "" }: { className?: string }) {
+  const t = useT();
   return (
     <div className={`text-[11px] text-(--ink-soft) ${className}`}>
-      {STORE_POLICY.returnsShort}
+      {t(STORE_POLICY.returnsShort)}
     </div>
   );
 }
@@ -66,13 +72,14 @@ export function DeliveryPromise({
 
 /** `attributes.low_stock` is the inventory count the merchant portal shows. */
 function LowStockChip({ product, className = "" }: { product: Product; className?: string }) {
+  const t = useT();
   const count = product.attributes?.low_stock;
   if (!count || product.in_stock === false) return null;
   return (
     <span
       className={`whitespace-nowrap rounded-full bg-(--warn-soft) px-2 py-0.5 text-[11px] font-semibold text-(--warn) ${className}`}
     >
-      Only {count} left
+      {t("Only {count} left", { count })}
     </span>
   );
 }
@@ -113,6 +120,7 @@ export function AddButton({
   product: Product;
   onAdd: (product: Product) => boolean | void | Promise<boolean | void>;
 }) {
+  const t = useT();
   const [phase, setPhase] = useState<"idle" | "busy" | "done" | "error">("idle");
   const { ask } = useStoreFrame();
   if (hasOptions(product)) {
@@ -121,9 +129,9 @@ export function AddButton({
         type="button"
         onClick={(event) => {
           event.stopPropagation();
-          ask(`Add the ${product.title} (${product.product_id}) to my cart.`);
+          ask(t("Add the {title} ({id}) to my cart.", { title: product.title, id: product.product_id }));
         }}
-        aria-label={`Choose options for ${product.title}`}
+        aria-label={t("Choose options for {title}", { title: product.title })}
         className="pointer-events-auto absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-(--ink) text-lg font-semibold leading-none text-(--surface) shadow-(--shadow-sm) transition-all hover:scale-105"
       >
         +
@@ -144,7 +152,7 @@ export function AddButton({
         if (added) flyToCart(product, source);
         window.setTimeout(() => setPhase("idle"), added ? 1200 : 1600);
       }}
-      aria-label={`Add ${product.title} to cart`}
+      aria-label={t("Add {title} to cart", { title: product.title })}
       className={`pointer-events-auto absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full text-lg font-semibold leading-none text-(--surface) shadow-(--shadow-sm) transition-all hover:scale-105 ${
         phase === "done" ? "bg-(--ok)" : phase === "error" ? "bg-(--warn)" : "bg-(--ink)"
       } ${phase === "busy" ? "animate-pulse" : ""}`}
@@ -170,6 +178,7 @@ export default function ProductTile({
   onAdd?: (product: Product) => boolean | void | Promise<boolean | void>;
   onOpen?: (product: Product) => void;
 }) {
+  const t = useT();
   const clickable = Boolean(onOpen);
   const chips = compact ? [] : attributeChips(product);
   const imageHeight = compact ? "h-16" : fluid ? "h-28" : "h-24";
@@ -192,7 +201,7 @@ export default function ProductTile({
           <ProductImage product={product} className={`w-full ${imageHeight}`} />
           {product.in_stock === false ? (
             <span className="absolute right-1.5 top-1.5 rounded-full bg-(--ink)/85 px-2 py-0.5 text-[11px] font-medium text-(--surface)">
-              Out of stock
+              {t("Out of stock")}
             </span>
           ) : (
             <LowStockChip product={product} className="absolute right-1.5 top-1.5" />
@@ -220,7 +229,7 @@ export default function ProductTile({
             </div>
           )}
           <div className="mt-auto flex items-center justify-between gap-1 pt-0.5">
-            <span className="text-sm font-semibold">{priceLabel(product)}</span>
+            <span className="text-sm font-semibold">{priceText(product, t)}</span>
             <Rating rating={product.rating} count={compact ? undefined : product.review_count} />
           </div>
           <DeliveryPromise product={product} />
@@ -244,6 +253,7 @@ export function ProductRow({
   product: Product;
   onAdd?: (product: Product) => boolean | void | Promise<boolean | void>;
 }) {
+  const t = useT();
   return (
     <div className="flex w-full items-center gap-3 rounded-xl border border-(--line) bg-(--card) p-2 shadow-(--shadow-sm) transition-shadow hover:shadow-md">
       <div className="relative shrink-0">
@@ -263,11 +273,11 @@ export function ProductRow({
         />
         <OptionLine product={product} />
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold">{priceLabel(product)}</span>
+          <span className="text-sm font-semibold">{priceText(product, t)}</span>
           <Rating rating={product.rating} />
           {product.in_stock === false ? (
             <span className="rounded-full bg-(--ink)/85 px-2 py-0.5 text-[11px] font-medium text-(--surface)">
-              Out of stock
+              {t("Out of stock")}
             </span>
           ) : (
             <LowStockChip product={product} />

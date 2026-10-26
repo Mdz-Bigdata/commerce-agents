@@ -3,6 +3,7 @@
 
 "use client";
 
+import { useT } from "web-shared";
 import type { DisclosurePayload } from "@/lib/types";
 import { Stub } from "./shared";
 
@@ -10,13 +11,14 @@ import { Stub } from "./shared";
 const PRINT_STAGGER_MS = 90;
 
 export default function FeeBreakdown({ payload }: { payload: DisclosurePayload }) {
+  const t = useT();
   const rows = payload.rows ?? [];
   const totalRow = rows.find((row) => row.label === "All-in price");
   const detailRows = rows.filter((row) => row !== totalRow);
   const stampDelayMs = detailRows.length * PRINT_STAGGER_MS + 140;
 
   return (
-    <Stub component="disclosure" label="Price & terms">
+    <Stub component="disclosure" label={t("Price & terms")}>
       <div className="at-tape mx-auto w-full max-w-[360px]">
         <div className="pt-1 text-center">
           <h3 className="text-[15px] font-bold leading-snug text-(--ink)">
@@ -61,7 +63,7 @@ export default function FeeBreakdown({ payload }: { payload: DisclosurePayload }
               {totalRow.value}
             </p>
             <p className="at-eyebrow mt-1.5 !text-(--ink)">
-              {totalRow.label}, no fees added later
+              {t("All-in price, no fees added later")}
             </p>
             {totalRow.note ? (
               <p className="mt-1 text-[11px] leading-snug text-(--ink-soft)">
@@ -83,7 +85,7 @@ export default function FeeBreakdown({ payload }: { payload: DisclosurePayload }
 
         {payload.sources?.length ? (
           <div className="mt-2 flex flex-wrap items-center gap-1.5 pb-1 pt-1">
-            <span className="at-eyebrow">Sources</span>
+            <span className="at-eyebrow">{t("Sources")}</span>
             {payload.sources.map((source) => (
               <span key={source} className="at-pill">
                 {source}

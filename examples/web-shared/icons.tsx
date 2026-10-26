@@ -106,6 +106,19 @@ const PATHS = {
   ),
   check: <path d="m5 12.5 4.5 4.5L19 7.5" strokeWidth={2} />,
   x: <path d="M6 6l12 12M18 6 6 18" />,
+  "thumb-up": <path d="M7.5 11v9h-3v-9zM7.5 11l3.8-6.7a1.9 1.9 0 0 1 3.5 1.2L14 10h5a2 2 0 0 1 2 2.4l-1.3 6A2 2 0 0 1 17.7 20H7.5" />,
+  "thumb-down": (
+    <path
+      d="M7.5 11v9h-3v-9zM7.5 11l3.8-6.7a1.9 1.9 0 0 1 3.5 1.2L14 10h5a2 2 0 0 1 2 2.4l-1.3 6A2 2 0 0 1 17.7 20H7.5"
+      transform="rotate(180 12.75 12)"
+    />
+  ),
+  headset: (
+    <>
+      <path d="M4.5 14v-2a7.5 7.5 0 0 1 15 0v2" />
+      <path d="M4.5 14h3v5h-2a1 1 0 0 1-1-1zM19.5 14h-3v5h2a1 1 0 0 0 1-1z" />
+    </>
+  ),
   expand: <path d="M14 4.5h5.5V10M10 19.5H4.5V14M19.5 4.5 13.5 10.5M4.5 19.5l6-6" />,
   collapse: <path d="M19.5 10H14V4.5M4.5 14H10v5.5M14 10l5.5-5.5M10 14l-5.5 5.5" />,
   "arrow-up": <path d="M12 19V5M6 11l6-6 6 6" strokeWidth={2} />,

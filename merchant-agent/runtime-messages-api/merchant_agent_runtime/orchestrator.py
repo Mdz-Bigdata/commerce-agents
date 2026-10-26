@@ -156,6 +156,7 @@ class MerchantAgent:
             merchant_context=merchant_context,
             memory_facts=list(memory_facts or []),
             now=session.local_now(),
+            reply_language=session.reply_language,
             merchant_context_max_chars=self.config.max_context_chars,
         )
         system = build_system_blocks(self._static_system, context)

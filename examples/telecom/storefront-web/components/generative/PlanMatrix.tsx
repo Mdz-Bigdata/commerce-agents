@@ -6,6 +6,7 @@
 /** Renders present_plan_comparison; cell values come from the server. */
 
 import { useRef } from "react";
+import { type Translate, useT } from "web-shared";
 import { formatPrice, formatPriceWithUnit } from "@/lib/format";
 import { useOverflow } from "@/lib/overflow";
 import type { AccountUsage, PlanMatrixPayload, Product } from "@/lib/types";
@@ -14,14 +15,15 @@ import { Frame } from "./shared";
 function vsTodayDelta(
   plan: Product,
   current: PlanMatrixPayload["current_plan"],
+  t: Translate,
 ): string | null {
   const currentPrice = current?.price_per_month;
   if (currentPrice == null || plan.attributes?.price_unit !== "per_month") return null;
-  if (plan.product_id === current?.product_id) return "your plan today";
+  if (plan.product_id === current?.product_id) return t("your plan today");
   // Round to cents so float subtraction does not leak into the label.
   const delta = Math.round((plan.price - currentPrice) * 100) / 100;
-  if (delta === 0) return "same price as today";
-  return `${delta > 0 ? "+" : "−"}${formatPrice(Math.abs(delta))}/mo vs today`;
+  if (delta === 0) return t("same price as today");
+  return t("{sign}{amount}/mo vs today", { sign: delta > 0 ? "+" : "−", amount: formatPrice(Math.abs(delta)) });
 }
 
 function fitsUsage(plan: Product, avgGb: number): boolean | null {
@@ -42,6 +44,7 @@ function UsageBand({
   usage: AccountUsage;
   current: PlanMatrixPayload["current_plan"];
 }) {
+  const t = useT();
   const cycles = usage.cycles_gb_last_3 ?? [];
   if (cycles.length === 0) return null;
   const allowanceRaw = current?.data_allowance_gb;
@@ -59,7 +62,7 @@ function UsageBand({
         <div
           className="relative h-[46px] w-[76px]"
           role="img"
-          aria-label={usage.note ?? "Data used in each of the last 3 billing cycles"}
+          aria-label={usage.note ?? t("Data used in each of the last 3 billing cycles")}
         >
           <div className="absolute inset-0 flex items-end justify-between">
             {cycles.map((gb, index) => {
@@ -85,20 +88,22 @@ function UsageBand({
           ) : null}
         </div>
         <div>
-          <p className="am-meta">Your last 3 cycles</p>
+          <p className="am-meta">{t("Your last 3 cycles")}</p>
           {allowance != null ? (
             <p className="am-mono mt-0.5 text-[11px] leading-snug text-(--ink-soft)">
-              ---- {allowanceRaw} GB allowance{current?.name ? ` (${current.name})` : ""}
+              {current?.name
+                ? t("---- {gb} GB allowance ({name})", { gb: allowanceRaw ?? "", name: current.name })
+                : t("---- {gb} GB allowance", { gb: allowanceRaw ?? "" })}
             </p>
           ) : null}
         </div>
       </div>
       <p className="am-mono text-[12px] font-semibold text-(--ink)">
-        Avg {usage.avg_gb_per_month_last_3} GB/mo
+        {t("Avg {avg} GB/mo", { avg: usage.avg_gb_per_month_last_3 })}
         {usage.top_ups_last_3_months > 0 && spend != null ? (
           <span className="text-(--warn)">
             {" "}
-            · {usage.top_ups_last_3_months} top-ups ≈ {formatPrice(spend)} in 3 months
+            · {t("{n} top-ups ≈ {amount} in 3 months", { n: usage.top_ups_last_3_months, amount: formatPrice(spend) })}
           </span>
         ) : null}
       </p>
@@ -107,8 +112,9 @@ function UsageBand({
 }
 
 function MatrixSkeleton() {
+  const t = useT();
   return (
-    <div aria-label="Building the plan comparison" className="p-4">
+    <div aria-label={t("Building the plan comparison")} className="p-4">
       <div className="flex gap-3">
         <div className="w-[110px] shrink-0" />
         {[0, 1, 2, 3].map((column) => (
@@ -128,6 +134,7 @@ function MatrixSkeleton() {
 }
 
 export default function PlanMatrix({ payload }: { payload: PlanMatrixPayload }) {
+  const t = useT();
   const { plans, rows, annotations, recommended_plan_id: recommended } = payload;
   const bestFor = (planId: string) => annotations?.find((a) => a.plan_id === planId)?.best_for;
   const avgGb = payload.account_usage?.avg_gb_per_month_last_3;
@@ -144,7 +151,7 @@ export default function PlanMatrix({ payload }: { payload: PlanMatrixPayload }) 
 
   if (plans.length === 0) {
     return (
-      <Frame component="plan_matrix" label={payload.title ?? "Plan comparison"} flush>
+      <Frame component="plan_matrix" label={payload.title ?? t("Plan comparison")} flush>
         <MatrixSkeleton />
       </Frame>
     );
@@ -153,7 +160,7 @@ export default function PlanMatrix({ payload }: { payload: PlanMatrixPayload }) 
   return (
     <Frame
       component="plan_matrix"
-      label={payload.title ?? "Plan comparison"}
+      label={payload.title ?? t("Plan comparison")}
       flush
     >
       {payload.account_usage ? (
@@ -164,10 +171,10 @@ export default function PlanMatrix({ payload }: { payload: PlanMatrixPayload }) 
           <table className="w-full border-collapse text-left" style={{ minWidth: plans.length * 150 + 130 }}>
           <thead>
             <tr className="align-bottom">
-              <th className="sticky left-0 z-10 w-[130px] min-w-[130px] bg-(--surface) p-3 pb-4" aria-label="dimension" />
+              <th className="sticky left-0 z-10 w-[130px] min-w-[130px] bg-(--surface) p-3 pb-4" aria-label={t("dimension")} />
               {plans.map((plan) => {
                 const isRec = plan.product_id === recommended;
-                const delta = vsTodayDelta(plan, payload.current_plan);
+                const delta = vsTodayDelta(plan, payload.current_plan, t);
                 const fits = avgGb != null ? fitsUsage(plan, avgGb) : null;
                 const annotationText = bestFor(plan.product_id) ?? "";
                 const matchesPreference = isRec && PREFERENCE_FLAVOR.test(annotationText);
@@ -178,7 +185,7 @@ export default function PlanMatrix({ payload }: { payload: PlanMatrixPayload }) 
                   >
                     {isRec ? (
                       <span className="am-tag am-tag--accent absolute -top-0 left-3 translate-y-[-0%]">
-                        ✓ Recommended
+                        ✓ {t("Recommended")}
                       </span>
                     ) : null}
                     <p className="mt-5 text-[15px] font-bold leading-tight text-(--ink)">
@@ -203,7 +210,7 @@ export default function PlanMatrix({ payload }: { payload: PlanMatrixPayload }) 
                           fits ? "text-(--accent)" : "text-(--warn)"
                         }`}
                       >
-                        {fits ? `✓ fits your ${avgGb} GB avg` : `⚠ under your ${avgGb} GB avg`}
+                        {fits ? t("✓ fits your {avg} GB avg", { avg: avgGb ?? "" }) : t("⚠ under your {avg} GB avg", { avg: avgGb ?? "" })}
                       </p>
                     ) : null}
                     {bestFor(plan.product_id) ? (
@@ -216,7 +223,7 @@ export default function PlanMatrix({ payload }: { payload: PlanMatrixPayload }) 
                         <b aria-hidden className="text-(--accent)">
                           ●
                         </b>{" "}
-                        matches a saved preference
+                        {t("matches a saved preference")}
                       </span>
                     ) : null}
                   </th>
@@ -245,7 +252,7 @@ export default function PlanMatrix({ payload }: { payload: PlanMatrixPayload }) 
                     >
                       {value === "Unlimited" ? (
                         <span>
-                          <span className="am-tick">✓</span> Unlimited
+                          <span className="am-tick">✓</span> {t("Unlimited")}
                         </span>
                       ) : value === "—" ? (
                         <span className="text-(--ink-soft)/60">—</span>
@@ -268,7 +275,7 @@ export default function PlanMatrix({ payload }: { payload: PlanMatrixPayload }) 
             />
             <button
               onClick={() => nudge(-1)}
-              aria-label="Scroll to previous plans"
+              aria-label={t("Scroll to previous plans")}
               className="am-mono absolute left-[134px] top-10 rounded-(--radius) border border-(--line) bg-(--surface) px-2 py-1 text-sm text-(--ink) shadow-md transition hover:border-(--accent)"
             >
               ‹
@@ -283,7 +290,7 @@ export default function PlanMatrix({ payload }: { payload: PlanMatrixPayload }) 
             />
             <button
               onClick={() => nudge(1)}
-              aria-label="Scroll to more plans"
+              aria-label={t("Scroll to more plans")}
               className="am-mono absolute right-1 top-10 rounded-(--radius) border border-(--line) bg-(--surface) px-2 py-1 text-sm text-(--ink) shadow-md transition hover:border-(--accent)"
             >
               ›

@@ -3,8 +3,9 @@
 
 /** Retail-specific labels on top of web-shared's formatters. */
 
-import { formatDayMonth, formatMoney, plural, type RecordRowData, titleCase } from "web-shared";
+import { formatDayMonth, formatMoney, type RecordRowData, type Translate, titleCase } from "web-shared";
 import { ORDER_STATUS } from "./kinds";
+import { pluralT } from "./labels";
 import type { RecentOrder } from "./types";
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -21,15 +22,17 @@ const CATEGORY_LABELS: Record<string, string> = {
   travel: "Travel",
 };
 
-export function formatCategoryLabel(slug: string): string {
-  return CATEGORY_LABELS[slug] ?? titleCase(slug.replaceAll("-", "_"));
+export function formatCategoryLabel(slug: string, t: Translate): string {
+  return t(CATEGORY_LABELS[slug] ?? titleCase(slug.replaceAll("-", "_")));
 }
 
-export function orderRows(orders: RecentOrder[]): RecordRowData[] {
+export function orderRows(orders: RecentOrder[], t: Translate): RecordRowData[] {
   return orders.map((order) => ({
     id: order.order_id,
-    detail: plural(order.items, "item"),
+    detail: pluralT(t, order.items, "{count} item", "{count} items"),
     sub: `${formatDayMonth(order.placed_at)} · ${formatMoney(order.total)}`,
-    status: ORDER_STATUS[order.status] ?? { label: order.status.replaceAll("_", " "), tone: "muted" },
+    status: ORDER_STATUS[order.status]
+      ? { ...ORDER_STATUS[order.status], label: t(ORDER_STATUS[order.status].label) }
+      : { label: t(order.status.replaceAll("_", " ")), tone: "muted" },
   }));
 }

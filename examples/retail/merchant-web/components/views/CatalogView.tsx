@@ -7,7 +7,6 @@ import { useMemo, useState } from "react";
 import {
   AskButton,
   Button,
-  coverLabel,
   Fact,
   Facts,
   formatDate,
@@ -18,7 +17,6 @@ import {
   Notice,
   optionSummary,
   optionValuesLabel,
-  priceLabel,
   PageHeader,
   Panel,
   Pill,
@@ -31,28 +29,39 @@ import {
   Skeleton,
   Thumb,
   titleCase,
+  type Translate,
   useResource,
+  useT,
 } from "web-shared";
 import { api, fetchAlerts, fetchListingDetail, fetchListings } from "@/lib/api";
 import { formatCategoryLabel } from "@/lib/format";
 import { INVENTORY_KINDS, LISTING_STATUS } from "@/lib/kinds";
+import { coverText } from "@/lib/labels";
 import type { InventoryAlert, Listing } from "@/lib/types";
 
 type Filter = "all" | "active" | "low_stock" | "content" | "inactive";
 
+/** "From $349" on a family record, whose price is its lowest variant's; the plain price otherwise. */
+function priceText(listing: Listing, t: Translate): string {
+  const money = formatMoney(listing.price, listing.currency);
+  return hasOptions(listing) ? t("From {price}", { price: money }) : money;
+}
+
 function StatusPill({ status }: { status: Listing["status"] }) {
+  const t = useT();
   const style = LISTING_STATUS[status];
   return (
     <Pill tone={style.tone} dot>
-      {style.label}
+      {t(style.label)}
     </Pill>
   );
 }
 
 function ContentCell({ quality }: { quality: Listing["content_quality"] }) {
-  if (quality === "poor") return <Pill tone="danger">Poor content</Pill>;
-  if (quality === "needs_work") return <Pill tone="warn">Needs work</Pill>;
-  return <span className="text-[12.5px] text-(--ink-soft)">Good</span>;
+  const t = useT();
+  if (quality === "poor") return <Pill tone="danger">{t("Poor content")}</Pill>;
+  if (quality === "needs_work") return <Pill tone="warn">{t("Needs work")}</Pill>;
+  return <span className="text-[12.5px] text-(--ink-soft)">{t("Good")}</span>;
 }
 
 /** Why a listing sorts into the attention group; lower ranks list first. */
@@ -66,15 +75,16 @@ function attentionRank(listing: Listing, alert: InventoryAlert | undefined): num
 }
 
 function StockCell({ listing, alert }: { listing: Listing; alert?: InventoryAlert }) {
+  const t = useT();
   const soldOut = listing.stock === 0;
   const low = alert?.kind === "low_stock" && !soldOut;
   return (
     <div className={`text-right tabular-nums ${soldOut ? "text-(--danger)" : low ? "text-(--warn)" : "text-(--ink)"}`}>
       <div className={soldOut || low ? "font-semibold" : ""}>{formatNumber(listing.stock)}</div>
       {low && alert?.days_of_cover != null ? (
-        <div className="whitespace-nowrap text-[11.5px] font-medium text-(--ink-soft)">{coverLabel(alert.days_of_cover)}</div>
+        <div className="whitespace-nowrap text-[11.5px] font-medium text-(--ink-soft)">{coverText(t, alert.days_of_cover)}</div>
       ) : soldOut && alert?.sales_last_30d ? (
-        <div className="whitespace-nowrap text-[11.5px] font-medium text-(--ink-soft)">{formatNumber(alert.sales_last_30d)} sold in 30 days</div>
+        <div className="whitespace-nowrap text-[11.5px] font-medium text-(--ink-soft)">{t("{count} sold in 30 days", { count: formatNumber(alert.sales_last_30d) })}</div>
       ) : null}
     </div>
   );
@@ -91,6 +101,7 @@ function ListingSheet({
   onClose: () => void;
   onAskAssistant: (text: string) => void;
 }) {
+  const t = useT();
   const { data: detail, failed } = useResource(() => fetchListingDetail(listingId), [listingId]);
   const listing = detail?.listing;
   const pricing = detail?.pricing;
@@ -102,19 +113,19 @@ function ListingSheet({
 
   return (
     <Sheet
-      title="Listing"
+      title={t("Listing")}
       detail={listingId}
       onClose={onClose}
-      closeLabel="Close listing detail"
+      closeLabel={t("Close listing detail")}
       footer={
         listing ? (
           <>
-            <Button variant="primary" icon="spark" className="flex-1" onClick={() => ask(`Tell me how ${ref} is doing and what you would change.`)}>
-              Ask about this listing
+            <Button variant="primary" icon="spark" className="flex-1" onClick={() => ask(t("Tell me how {ref} is doing and what you would change.", { ref }))}>
+              {t("Ask about this listing")}
             </Button>
             {alert?.kind === "low_stock" ? (
-              <Button variant="secondary" onClick={() => ask(`Draft a restock plan for ${ref}.`)}>
-                Draft restock
+              <Button variant="secondary" onClick={() => ask(t("Draft a restock plan for {ref}.", { ref }))}>
+                {t("Draft restock")}
               </Button>
             ) : null}
           </>
@@ -122,7 +133,7 @@ function ListingSheet({
       }
     >
       {failed ? (
-        <p className="text-[13.5px] text-(--ink-soft)">Couldn&apos;t load this listing.</p>
+        <p className="text-[13.5px] text-(--ink-soft)">{t("Couldn't load this listing.")}</p>
       ) : !listing ? (
         <>
           <Skeleton className="h-24" />
@@ -138,19 +149,19 @@ function ListingSheet({
               <div className="mt-2 flex flex-wrap gap-1.5">
                 <StatusPill status={listing.status} />
                 {listing.content_quality && listing.content_quality !== "good" ? (
-                  <Pill tone={listing.content_quality === "poor" ? "danger" : "warn"}>Content {listing.content_quality === "poor" ? "is poor" : "needs work"}</Pill>
+                  <Pill tone={listing.content_quality === "poor" ? "danger" : "warn"}>{listing.content_quality === "poor" ? t("Content is poor") : t("Content needs work")}</Pill>
                 ) : null}
-                {listing.category ? <Pill>{formatCategoryLabel(listing.category)}</Pill> : null}
+                {listing.category ? <Pill>{formatCategoryLabel(listing.category, t)}</Pill> : null}
               </div>
             </div>
           </div>
 
           <Facts>
-            <Fact label={hasOptions(listing) ? "Price from" : "Price"} value={formatMoney(listing.price, listing.currency)} />
-            <Fact label="In stock" value={formatNumber(listing.stock)} tone={listing.stock === 0 ? "danger" : alert?.kind === "low_stock" ? "warn" : undefined} />
-            <Fact label="Sold, 30 days" value={listing.sales_last_30d != null ? formatNumber(listing.sales_last_30d) : null} />
+            <Fact label={hasOptions(listing) ? t("Price from") : t("Price")} value={formatMoney(listing.price, listing.currency)} />
+            <Fact label={t("In stock")} value={formatNumber(listing.stock)} tone={listing.stock === 0 ? "danger" : alert?.kind === "low_stock" ? "warn" : undefined} />
+            <Fact label={t("Sold, 30 days")} value={listing.sales_last_30d != null ? formatNumber(listing.sales_last_30d) : null} />
             <Fact
-              label={pricing?.margin_pct != null ? "Margin" : "Return rate"}
+              label={pricing?.margin_pct != null ? t("Margin") : t("Return rate")}
               value={pricing?.margin_pct != null ? formatRate(pricing.margin_pct) : listing.return_rate_pct != null ? formatRate(listing.return_rate_pct) : null}
             />
           </Facts>
@@ -161,25 +172,25 @@ function ListingSheet({
             <section>
               <SectionTitle
                 aside={[
-                  pricing.unit_cost != null ? `unit cost ${formatMoney(pricing.unit_cost)}` : "",
-                  pricing.demand_signal ? `demand ${titleCase(pricing.demand_signal).toLowerCase()}` : "",
-                  pricing.last_changed ? `changed ${formatDate(pricing.last_changed)}` : "",
+                  pricing.unit_cost != null ? t("unit cost {amount}", { amount: formatMoney(pricing.unit_cost) }) : "",
+                  pricing.demand_signal ? t("demand {signal}", { signal: t(titleCase(pricing.demand_signal)).toLowerCase() }) : "",
+                  pricing.last_changed ? t("changed {date}", { date: formatDate(pricing.last_changed) }) : "",
                 ]
                   .filter(Boolean)
                   .join(" · ")}
               >
-                Pricing
+                {t("Pricing")}
               </SectionTitle>
               {pricing.min_price != null && pricing.max_price != null ? <PriceBand current={pricing.current_price} floor={pricing.min_price} ceiling={pricing.max_price} /> : null}
               {listing.return_rate_pct != null && pricing.margin_pct != null ? (
-                <p className="mt-2 text-[12.5px] tabular-nums text-(--ink-soft)">Return rate {formatRate(listing.return_rate_pct)}</p>
+                <p className="mt-2 text-[12.5px] tabular-nums text-(--ink-soft)">{t("Return rate")} {formatRate(listing.return_rate_pct)}</p>
               ) : null}
             </section>
           ) : null}
 
           {listing.missing_attributes?.length ? (
             <section>
-              <SectionTitle>Missing from the listing</SectionTitle>
+              <SectionTitle>{t("Missing from the listing")}</SectionTitle>
               <div className="flex flex-wrap items-center gap-1.5">
                 {listing.missing_attributes.map((attribute) => (
                   <Pill key={attribute} tone="warn">
@@ -187,8 +198,8 @@ function ListingSheet({
                   </Pill>
                 ))}
                 <AskButton
-                  label="Draft these attributes"
-                  onClick={() => ask(`Draft the missing attributes (${listing.missing_attributes?.join(", ")}) for ${ref}.`)}
+                  label={t("Draft these attributes")}
+                  onClick={() => ask(t("Draft the missing attributes ({attributes}) for {ref}.", { attributes: listing.missing_attributes?.join(", ") ?? "", ref }))}
                 />
               </div>
             </section>
@@ -196,7 +207,7 @@ function ListingSheet({
 
           {listing.review_snippets?.length ? (
             <section>
-              <SectionTitle aside={<QuotedAsData subject="Customer-written" />}>What buyers say</SectionTitle>
+              <SectionTitle aside={<QuotedAsData subject={t("Customer-written")} />}>{t("What buyers say")}</SectionTitle>
               <div className="flex flex-col gap-1.5">
                 {listing.review_snippets.map((snippet, index) => (
                   <blockquote key={index} className="rounded-[10px] bg-(--ground) px-3 py-2 text-[13px] leading-snug text-(--ink-2)">
@@ -209,7 +220,7 @@ function ListingSheet({
 
           {listing.long_description ? (
             <section>
-              <SectionTitle>Description</SectionTitle>
+              <SectionTitle>{t("Description")}</SectionTitle>
               <p className="whitespace-pre-line text-[13px] leading-relaxed text-(--ink-2)">{listing.long_description}</p>
             </section>
           ) : null}
@@ -221,17 +232,18 @@ function ListingSheet({
 
 /** A family listing's variants: what price and stock are read and written against. */
 function VariantsTable({ variants, onAsk }: { variants: Listing[]; onAsk: (text: string) => void }) {
+  const t = useT();
   return (
     <section>
-      <SectionTitle aside={`${variants.length} variants · priced and stocked per variant`}>Variants</SectionTitle>
+      <SectionTitle aside={t("{count} variants · priced and stocked per variant", { count: variants.length })}>{t("Variants")}</SectionTitle>
       <div className="overflow-x-auto rounded-[10px] border border-(--line)">
         <table className="w-full border-collapse text-[13px]">
           <thead>
             <tr className="bg-(--ground) text-left text-[11.5px] font-medium uppercase tracking-[0.04em] text-(--ink-soft)">
-              <th className="px-3 py-1.5">Variant</th>
-              <th className="px-3 py-1.5 text-right">Stock</th>
-              <th className="px-3 py-1.5 text-right">Price</th>
-              <th className="px-3 py-1.5">Status</th>
+              <th className="px-3 py-1.5">{t("Variant")}</th>
+              <th className="px-3 py-1.5 text-right">{t("Stock")}</th>
+              <th className="px-3 py-1.5 text-right">{t("Price")}</th>
+              <th className="px-3 py-1.5">{t("Status")}</th>
             </tr>
           </thead>
           <tbody>
@@ -241,7 +253,7 @@ function VariantsTable({ variants, onAsk }: { variants: Listing[]; onAsk: (text:
                   <button
                     type="button"
                     className="text-left text-(--ink) hover:underline"
-                    onClick={() => onAsk(`How is ${variant.title} in ${optionValuesLabel(variant)} (${variant.listing_id}) priced, and would you change it?`)}
+                    onClick={() => onAsk(t("How is {title} in {options} ({id}) priced, and would you change it?", { title: variant.title, options: optionValuesLabel(variant), id: variant.listing_id }))}
                   >
                     <div className="font-medium">{optionValuesLabel(variant)}</div>
                     <div className="text-[11.5px] tabular-nums text-(--ink-soft)">{variant.listing_id}</div>
@@ -262,6 +274,7 @@ function VariantsTable({ variants, onAsk }: { variants: Listing[]; onAsk: (text:
 }
 
 function ListingRow({ listing, alert, onOpen }: { listing: Listing; alert?: InventoryAlert; onOpen: () => void }) {
+  const t = useT();
   return (
     <tr
       onClick={onOpen}
@@ -272,7 +285,7 @@ function ListingRow({ listing, alert, onOpen }: { listing: Listing; alert?: Inve
         }
       }}
       tabIndex={0}
-      aria-label={`Open ${listing.title}`}
+      aria-label={t("Open {title}", { title: listing.title })}
       className="cursor-pointer border-t border-(--line) transition-colors hover:bg-(--ground)/70 focus-visible:bg-(--ground)/70 focus-visible:outline-none"
     >
       <td className="py-2 pl-[18px] pr-3">
@@ -283,16 +296,16 @@ function ListingRow({ listing, alert, onOpen }: { listing: Listing; alert?: Inve
             <div className="text-[12px] tabular-nums text-(--ink-soft)">
               {listing.listing_id}
               {hasOptions(listing) ? <span> · {optionSummary(listing)}</span> : null}
-              {alert?.kind === "slow_mover" ? <span> · {INVENTORY_KINDS.slow_mover.label.toLowerCase()}</span> : null}
+              {alert?.kind === "slow_mover" ? <span> · {t(INVENTORY_KINDS.slow_mover.label).toLowerCase()}</span> : null}
             </div>
           </div>
         </div>
       </td>
-      <td className="hidden px-3 py-2 text-[13px] text-(--ink-soft) @4xl:table-cell">{listing.category ? formatCategoryLabel(listing.category) : "—"}</td>
+      <td className="hidden px-3 py-2 text-[13px] text-(--ink-soft) @4xl:table-cell">{listing.category ? formatCategoryLabel(listing.category, t) : "—"}</td>
       <td className="px-3 py-2">
         <StockCell listing={listing} alert={alert} />
       </td>
-      <td className="px-3 py-2 text-right text-[13.5px] tabular-nums text-(--ink)">{priceLabel(listing)}</td>
+      <td className="px-3 py-2 text-right text-[13.5px] tabular-nums text-(--ink)">{priceText(listing, t)}</td>
       <td className="px-3 py-2">
         <StatusPill status={listing.status} />
       </td>
@@ -304,17 +317,18 @@ function ListingRow({ listing, alert, onOpen }: { listing: Listing; alert?: Inve
 }
 
 function ListingTable({ listings, alerts, onOpen }: { listings: Listing[]; alerts: Map<string, InventoryAlert>; onOpen: (id: string) => void }) {
+  const t = useT();
   return (
     <div className="panel-scroll @container overflow-x-auto">
       <table className="w-full border-collapse">
         <thead>
           <tr className="text-left text-[12px] font-semibold text-(--ink-soft)">
-            <th className="py-2.5 pl-[18px] pr-3 font-semibold">Listing</th>
-            <th className="hidden px-3 py-2.5 font-semibold @4xl:table-cell">Category</th>
-            <th className="px-3 py-2.5 text-right font-semibold">Stock</th>
-            <th className="px-3 py-2.5 text-right font-semibold">Price</th>
-            <th className="px-3 py-2.5 font-semibold">Status</th>
-            <th className="hidden py-2.5 pl-3 pr-[18px] font-semibold @2xl:table-cell">Content</th>
+            <th className="py-2.5 pl-[18px] pr-3 font-semibold">{t("Listing")}</th>
+            <th className="hidden px-3 py-2.5 font-semibold @4xl:table-cell">{t("Category")}</th>
+            <th className="px-3 py-2.5 text-right font-semibold">{t("Stock")}</th>
+            <th className="px-3 py-2.5 text-right font-semibold">{t("Price")}</th>
+            <th className="px-3 py-2.5 font-semibold">{t("Status")}</th>
+            <th className="hidden py-2.5 pl-3 pr-[18px] font-semibold @2xl:table-cell">{t("Content")}</th>
           </tr>
         </thead>
         <tbody>
@@ -328,6 +342,7 @@ function ListingTable({ listings, alerts, onOpen }: { listings: Listing[]; alert
 }
 
 export default function CatalogView({ refreshKey, onAskAssistant }: { refreshKey: number; onAskAssistant: (text: string) => void }) {
+  const t = useT();
   const { data: listingData, failed } = useResource(fetchListings, [refreshKey]);
   // Inventory alerts annotate the rows with days of cover and the slow-mover mark.
   const { data: alertData } = useResource(fetchAlerts, [refreshKey]);
@@ -376,9 +391,11 @@ export default function CatalogView({ refreshKey, onAskAssistant }: { refreshKey
 
   const summary = listings
     ? [
-        total != null && total > listings.length ? `${formatNumber(listings.length)} of ${formatNumber(total)} listings` : `${formatNumber(total ?? listings.length)} listings`,
-        counts.low_stock ? `${counts.low_stock} low or out of stock` : "",
-        counts.content ? `${counts.content} need content work` : "",
+        total != null && total > listings.length
+          ? t("{count} of {total} listings", { count: formatNumber(listings.length), total: formatNumber(total) })
+          : t("{count} listings", { count: formatNumber(total ?? listings.length) }),
+        counts.low_stock ? t("{count} low or out of stock", { count: counts.low_stock }) : "",
+        counts.content ? t("{count} need content work", { count: counts.content }) : "",
       ]
         .filter(Boolean)
         .join(" · ")
@@ -386,46 +403,46 @@ export default function CatalogView({ refreshKey, onAskAssistant }: { refreshKey
 
   return (
     <div className="ac-reveal flex flex-col gap-4">
-      <PageHeader title="Catalog" subtitle={summary}>
-        <Button variant="secondary" icon="spark" onClick={() => onAskAssistant("Which listings need the most work right now, and why?")}>
-          Ask about the catalog
+      <PageHeader title={t("Catalog")} subtitle={summary}>
+        <Button variant="secondary" icon="spark" onClick={() => onAskAssistant(t("Which listings need the most work right now, and why?"))}>
+          {t("Ask about the catalog")}
         </Button>
       </PageHeader>
 
       {failed && !listings ? (
-        <Notice>The merchant API isn&apos;t reachable, so listings can&apos;t load.</Notice>
+        <Notice>{t("The merchant API isn't reachable, so listings can't load.")}</Notice>
       ) : !listings ? (
         <Skeleton className="h-96" />
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-2.5">
-            <SearchField value={query} onChange={setQuery} placeholder="Search by title, ID, or attribute" label="Search listings" className="min-w-[260px] flex-1 sm:max-w-sm" />
+            <SearchField value={query} onChange={setQuery} placeholder={t("Search by title, ID, or attribute")} label={t("Search listings")} className="min-w-[260px] flex-1 sm:max-w-sm" />
             <Segmented<Filter>
-              label="Filter listings"
+              label={t("Filter listings")}
               value={filter}
               onChange={setFilter}
               options={[
-                { id: "all", label: "All", count: counts.all },
-                { id: "active", label: "Active", count: counts.active },
-                { id: "low_stock", label: "Low stock", count: counts.low_stock },
-                { id: "content", label: "Needs content", count: counts.content },
-                { id: "inactive", label: "Inactive", count: counts.inactive },
+                { id: "all", label: t("All"), count: counts.all },
+                { id: "active", label: t("Active"), count: counts.active },
+                { id: "low_stock", label: t("Low stock"), count: counts.low_stock },
+                { id: "content", label: t("Needs content"), count: counts.content },
+                { id: "inactive", label: t("Inactive"), count: counts.inactive },
               ]}
             />
           </div>
 
           {attention.length === 0 && rest.length === 0 ? (
-            <Notice>No listings match.</Notice>
+            <Notice>{t("No listings match.")}</Notice>
           ) : null}
 
           {attention.length ? (
-            <Panel title="Needs attention" subtitle={`${attention.length} · sold out and low stock first`}>
+            <Panel title={t("Needs attention")} subtitle={t("{count} · sold out and low stock first", { count: attention.length })}>
               <ListingTable listings={attention} alerts={alerts} onOpen={setOpenListing} />
             </Panel>
           ) : null}
 
           {rest.length ? (
-            <Panel title={attention.length ? "Everything else" : "All listings"} subtitle={formatNumber(rest.length)}>
+            <Panel title={attention.length ? t("Everything else") : t("All listings")} subtitle={formatNumber(rest.length)}>
               <ListingTable listings={rest} alerts={alerts} onOpen={setOpenListing} />
             </Panel>
           ) : null}

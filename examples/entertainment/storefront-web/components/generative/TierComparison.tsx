@@ -4,9 +4,10 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { formatMoney } from "web-shared";
+import { formatMoney, useT } from "web-shared";
 import { scarcityLine, statusPill } from "@/lib/format";
 import type { ComparisonPayload } from "@/lib/types";
+import { Rich } from "@/lib/i18n-helpers";
 import { AllInPrice, Pill, RECOMMENDED_LABEL, Stub } from "./shared";
 
 const RIBBON_PAIR_QTY = 2;
@@ -65,6 +66,7 @@ export default function TierComparison({
   payload: ComparisonPayload;
   partial?: boolean;
 }) {
+  const t = useT();
   const entries = (payload.entries ?? []).slice(0, 4);
   // Computed from the entries shown, so the ribbon cannot cite a clipped card.
   const ribbon = deltaRibbon(entries, payload.recommended_product_id);
@@ -75,7 +77,7 @@ export default function TierComparison({
   const cardRows = { "--tc-rows": `span ${5 + maxPros + maxCons}` } as CSSProperties;
 
   return (
-    <Stub component="comparison" label={payload.title ?? "Tier comparison"}>
+    <Stub component="comparison" label={payload.title ?? t("Tier comparison")}>
       <div
         className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:[grid-template-columns:repeat(var(--tc-cols),minmax(0,1fr))]"
         style={{ "--tc-cols": columns } as CSSProperties}
@@ -83,7 +85,7 @@ export default function TierComparison({
         {entries.map((entry) => {
           const recommended = payload.recommended_product_id === entry.product_id;
           const attrs = entry.product.attributes ?? {};
-          const scarce = scarcityLine(entry.product);
+          const scarce = scarcityLine(entry.product, t);
           const pros = entry.pros ?? [];
           const cons = entry.cons ?? [];
           return (
@@ -98,7 +100,7 @@ export default function TierComparison({
             >
               <div className="min-h-[20px]">
                 {recommended ? (
-                  <span className="at-pill at-pill--accent">{RECOMMENDED_LABEL}</span>
+                  <span className="at-pill at-pill--accent">{t(RECOMMENDED_LABEL)}</span>
                 ) : null}
               </div>
               <h4 className="at-display text-[17px] uppercase leading-tight text-(--ink)">
@@ -118,7 +120,7 @@ export default function TierComparison({
               <div>
                 {entry.best_for ? (
                   <p className="rounded bg-(--card) px-2 py-1 text-[13px] leading-snug text-(--ink)">
-                    Best for: {entry.best_for}
+                    {t("Best for: {text}", { text: entry.best_for })}
                   </p>
                 ) : null}
               </div>
@@ -157,19 +159,25 @@ export default function TierComparison({
             {ribbon.cheaperIsLeft ? "←" : "→"}
           </span>
           <span className="text-[13px] leading-snug text-(--ink)">
-            <b>{ribbon.cheaperLabel}</b> saves{" "}
-            <span className="at-mono font-bold">Δ {formatMoney(ribbon.perTicket)}</span> per
-            ticket ·{" "}
-            <span className="at-mono font-bold">
-              {formatMoney(ribbon.perTicket * RIBBON_PAIR_QTY)}
-            </span>{" "}
-            for a pair vs {ribbon.pricierLabel}
+            <Rich
+              text="{cheaper} saves {delta} per ticket · {pair} for a pair vs {pricier}"
+              vars={{
+                cheaper: <b>{ribbon.cheaperLabel}</b>,
+                delta: <span className="at-mono font-bold">Δ {formatMoney(ribbon.perTicket)}</span>,
+                pair: (
+                  <span className="at-mono font-bold">
+                    {formatMoney(ribbon.perTicket * RIBBON_PAIR_QTY)}
+                  </span>
+                ),
+                pricier: ribbon.pricierLabel,
+              }}
+            />
           </span>
         </div>
       ) : null}
       {payload.dimensions?.length ? (
         <p className="at-eyebrow mt-3 !text-[12px] !normal-case !tracking-normal">
-          Compared on: {payload.dimensions.join(" · ")}
+          {t("Compared on: {dimensions}", { dimensions: payload.dimensions.join(" · ") })}
         </p>
       ) : null}
     </Stub>

@@ -19,29 +19,34 @@ import {
   RecordList,
   runwayLabel,
   Skeleton,
+  type Translate,
   useResource,
+  useT,
 } from "web-shared";
 import { fetchAlerts } from "@/lib/api";
 import { BOOKING_STATUS, INVENTORY_KINDS, inventoryPrompt, ISSUE_KINDS } from "@/lib/kinds";
 import type { InventoryAlert, OrderIssue, RecentOrder } from "@/lib/types";
 
-export function issuePrompt(issue: OrderIssue): string {
-  return `What are my options for booking ${issue.order_id}? ${issue.summary}.`;
+export function issuePrompt(issue: OrderIssue, t: Translate): string {
+  return t("What are my options for booking {id}? {summary}.", { id: issue.order_id, summary: issue.summary });
 }
 
-export function runway(alert: InventoryAlert): string | null {
-  return alert.days_of_cover == null || alert.stock === 0 ? null : runwayLabel(alert.days_of_cover);
+export function runway(alert: InventoryAlert, t: Translate): string | null {
+  return alert.days_of_cover == null || alert.stock === 0 ? null : runwayLabel(alert.days_of_cover, t);
 }
 
-export function bookingRows(bookings: RecentOrder[]) {
+export function bookingRows(bookings: RecentOrder[], t: Translate) {
   return bookings.map((booking) => ({
     id: booking.order_id,
     sub: `${formatDayMonth(booking.placed_at)} · ${formatMoney(booking.total, "USD", { whole: true })}`,
-    status: BOOKING_STATUS[booking.status] ?? { label: booking.status.replaceAll("_", " "), tone: "muted" as const },
+    status: BOOKING_STATUS[booking.status]
+      ? { ...BOOKING_STATUS[booking.status], label: t(BOOKING_STATUS[booking.status].label) }
+      : { label: booking.status.replaceAll("_", " "), tone: "muted" as const },
   }));
 }
 
 function IssueCard({ issue, onAskAssistant }: { issue: OrderIssue; onAskAssistant: (text: string) => void }) {
+  const t = useT();
   const style = ISSUE_KINDS[issue.kind];
   return (
     <li className="flex gap-3 px-[18px] py-3.5">
@@ -51,16 +56,16 @@ function IssueCard({ issue, onAskAssistant }: { issue: OrderIssue; onAskAssistan
           <div className="min-w-0 flex-1">
             <div className="text-[14px] font-medium leading-snug text-(--ink)">{issue.summary}</div>
             <div className="mt-0.5 text-[12.5px] tabular-nums text-(--ink-soft)">
-              {[style.label, `Booking ${issue.order_id}`, issue.listing_id, issue.opened_at ? `opened ${formatDayMonth(issue.opened_at)}` : ""].filter(Boolean).join(" · ")}
+              {[t(style.label), t("Booking {id}", { id: issue.order_id }), issue.listing_id, issue.opened_at ? t("opened {date}", { date: formatDayMonth(issue.opened_at) }) : ""].filter(Boolean).join(" · ")}
             </div>
           </div>
-          <AskButton label={issue.kind === "buyer_message" ? "Draft reply" : "Ask"} onClick={() => onAskAssistant(issuePrompt(issue))} />
+          <AskButton label={issue.kind === "buyer_message" ? t("Draft reply") : t("Ask")} onClick={() => onAskAssistant(issuePrompt(issue, t))} />
         </div>
         {issue.buyer_message_excerpt ? (
           <div className="mt-2 rounded-[10px] bg-(--ground) px-3 py-2">
             <blockquote className="text-[13px] leading-snug text-(--ink-2)">&ldquo;{issue.buyer_message_excerpt}&rdquo;</blockquote>
             {/* Some fixture excerpts are injection attempts, so the note sits beside the quote. */}
-            <QuotedAsData subject="Guest message" className="mt-1.5" />
+            <QuotedAsData subject={t("Guest message")} className="mt-1.5" />
           </div>
         ) : null}
       </div>
@@ -69,6 +74,7 @@ function IssueCard({ issue, onAskAssistant }: { issue: OrderIssue; onAskAssistan
 }
 
 function AlertRow({ alert, onAskAssistant }: { alert: InventoryAlert; onAskAssistant: (text: string) => void }) {
+  const t = useT();
   const style = INVENTORY_KINDS[alert.kind];
   const tight = alert.kind === "low_stock";
   return (
@@ -78,13 +84,13 @@ function AlertRow({ alert, onAskAssistant }: { alert: InventoryAlert; onAskAssis
       title={alert.title}
       meta={
         <>
-          <span className={tight ? "font-semibold text-(--warn)" : ""}>{formatNumber(alert.stock)} room-nights available</span>
-          {["", tight ? runway(alert) : null, alert.sales_last_30d != null ? `${formatNumber(alert.sales_last_30d)} booked in 30 days` : "", alert.listing_id]
+          <span className={tight ? "font-semibold text-(--warn)" : ""}>{t("{count} room-nights available", { count: formatNumber(alert.stock) })}</span>
+          {["", tight ? runway(alert, t) : null, alert.sales_last_30d != null ? t("{count} booked in 30 days", { count: formatNumber(alert.sales_last_30d) }) : "", alert.listing_id]
             .filter((part, index) => index === 0 || part)
             .join(" · ")}
         </>
       }
-      action={{ label: tight ? "Ask" : "Plan rates", onClick: () => onAskAssistant(inventoryPrompt(alert.kind, `${alert.title} (${alert.listing_id})`)) }}
+      action={{ label: tight ? t("Ask") : t("Plan rates"), onClick: () => onAskAssistant(inventoryPrompt(alert.kind, `${alert.title} (${alert.listing_id})`, t)) }}
     />
   );
 }
@@ -98,6 +104,7 @@ export default function BookingsView({
   recentBookings: RecentOrder[] | null;
   onAskAssistant: (text: string) => void;
 }) {
+  const t = useT();
   const { data, failed } = useResource(fetchAlerts, [refreshKey]);
   const issues = data?.order_issues ?? [];
   const tight = (data?.inventory ?? [])
@@ -108,11 +115,19 @@ export default function BookingsView({
   return (
     <div className="ac-reveal @container flex flex-col gap-4">
       <PageHeader
-        title="Bookings"
-        subtitle={data ? `${plural(issues.length, "open issue")} · ${formatNumber(tight.length)} tight on availability · ${formatNumber(soft.length)} pacing soft` : undefined}
+        title={t("Bookings")}
+        subtitle={
+          data
+            ? t("{issues} · {tight} tight on availability · {soft} pacing soft", {
+                issues: plural(issues.length, "open issue", "open issues", t),
+                tight: formatNumber(tight.length),
+                soft: formatNumber(soft.length),
+              })
+            : undefined
+        }
       />
       {failed && !data ? (
-        <Notice>The travel API isn&apos;t reachable, so booking and pacing alerts can&apos;t load.</Notice>
+        <Notice>{t("The travel API isn't reachable, so booking and pacing alerts can't load.")}</Notice>
       ) : !data ? (
         <div className="grid gap-4 @4xl:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]">
           <Skeleton className="h-96" />
@@ -121,9 +136,9 @@ export default function BookingsView({
       ) : (
         <div className="grid items-start gap-4 @4xl:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]">
           <div className="flex flex-col gap-4">
-            <Panel title="Open issues" subtitle={issues.length ? formatNumber(issues.length) : undefined}>
+            <Panel title={t("Open issues")} subtitle={issues.length ? formatNumber(issues.length) : undefined}>
               {issues.length === 0 ? (
-                <p className="px-[18px] pb-4 text-[13.5px] text-(--ink-soft)">No open booking issues.</p>
+                <p className="px-[18px] pb-4 text-[13.5px] text-(--ink-soft)">{t("No open booking issues.")}</p>
               ) : (
                 <ul className="divide-y divide-(--line)">
                   {issues.map((issue) => (
@@ -132,20 +147,20 @@ export default function BookingsView({
                 </ul>
               )}
             </Panel>
-            <Panel title="Recent bookings">
+            <Panel title={t("Recent bookings")}>
               {!recentBookings ? (
                 <Skeleton className="mx-[18px] mb-4 h-40" />
               ) : recentBookings.length === 0 ? (
-                <p className="px-[18px] pb-4 text-[13px] text-(--ink-soft)">No bookings yet.</p>
+                <p className="px-[18px] pb-4 text-[13px] text-(--ink-soft)">{t("No bookings yet.")}</p>
               ) : (
-                <RecordList rows={bookingRows(recentBookings)} />
+                <RecordList rows={bookingRows(recentBookings, t)} />
               )}
             </Panel>
           </div>
           <div className="flex flex-col gap-4">
-            <Panel title="Tight availability" subtitle="soonest to sell out first">
+            <Panel title={t("Tight availability")} subtitle={t("soonest to sell out first")}>
               {tight.length === 0 ? (
-                <p className="px-[18px] pb-4 text-[13.5px] text-(--ink-soft)">Every property has dates to sell.</p>
+                <p className="px-[18px] pb-4 text-[13.5px] text-(--ink-soft)">{t("Every property has dates to sell.")}</p>
               ) : (
                 <AttentionList>
                   {tight.map((alert) => (
@@ -154,9 +169,9 @@ export default function BookingsView({
                 </AttentionList>
               )}
             </Panel>
-            <Panel title="Soft pacing" subtitle="midweek occupancy under 55% in the coming weeks">
+            <Panel title={t("Soft pacing")} subtitle={t("midweek occupancy under 55% in the coming weeks")}>
               {soft.length === 0 ? (
-                <p className="px-[18px] pb-4 text-[13.5px] text-(--ink-soft)">Nothing is pacing soft.</p>
+                <p className="px-[18px] pb-4 text-[13.5px] text-(--ink-soft)">{t("Nothing is pacing soft.")}</p>
               ) : (
                 <AttentionList>
                   {soft.map((alert) => (

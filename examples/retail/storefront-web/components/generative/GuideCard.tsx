@@ -1,10 +1,12 @@
 // Copyright 2026 Anthropic PBC
 // SPDX-License-Identifier: Apache-2.0
 
+import { useT } from "web-shared";
 import type { GuidePayload } from "@/lib/types";
 import ProductTile from "../ProductTile";
 
 export default function GuideCard({ payload }: { payload: GuidePayload }) {
+  const t = useT();
   return (
     <section className="rounded-2xl border border-(--line) bg-(--card) p-4 shadow-(--shadow-sm)">
       <h3 className="text-[15px] font-semibold text-(--ink)">{payload.title}</h3>
@@ -24,7 +26,7 @@ export default function GuideCard({ payload }: { payload: GuidePayload }) {
         </div>
       ) : null}
       {payload.sources?.length ? (
-        <p className="mt-3 break-all text-[11px] text-(--ink-soft)/80">Sources: {payload.sources.join(" · ")}</p>
+        <p className="mt-3 break-all text-[11px] text-(--ink-soft)/80">{t("Sources: {sources}", { sources: payload.sources.join(" · ") })}</p>
       ) : null}
     </section>
   );

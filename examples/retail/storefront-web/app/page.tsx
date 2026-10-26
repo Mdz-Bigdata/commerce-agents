@@ -4,7 +4,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { type AgentEvent, formatMoney, OrdersView, plural, StoreShell, type StoreView, upcoming, useAgentTurn, useResource, useSession } from "web-shared";
+import { type AgentEvent, formatMoney, OrdersView, StoreShell, type StoreView, upcoming, useAgentTurn, useResource, useSession, useT } from "web-shared";
 import CartPanel from "@/components/CartPanel";
 import Chat from "@/components/Chat";
 import HomeView from "@/components/views/HomeView";
@@ -28,6 +28,7 @@ function Wordmark() {
 }
 
 export default function StorefrontPage() {
+  const t = useT();
   const session = useSession(api);
   const [view, setView] = useState<View>("assistant");
   const [cart, setCart] = useState<CartPayload | null>(null);
@@ -48,7 +49,7 @@ export default function StorefrontPage() {
     [handleCartUpdate],
   );
 
-  const chat = useAgentTurn(api, { ...session, unreachable: UNREACHABLE, onEvent });
+  const chat = useAgentTurn(api, { ...session, unreachable: t(UNREACHABLE), onEvent });
   // A reply may have started a return, so orders re-read after each one.
   const { data: orders, failed: ordersFailed } = useResource(session.sessionId ? () => api.fetchOrders() : null, [session.sessionId, chat.completed]);
 
@@ -58,10 +59,10 @@ export default function StorefrontPage() {
 
   const late = orders?.filter((order) => order.status === "delayed").length ?? 0;
   const views: StoreView<View>[] = [
-    { id: "assistant", label: "Assistant", icon: "spark" },
-    { id: "orders", label: "Orders", icon: "box", attention: late ? { count: late, label: `${late} delayed` } : null },
+    { id: "assistant", label: t("Assistant"), icon: "spark" },
+    { id: "orders", label: t("Orders"), icon: "box", attention: late ? { count: late, label: t("{count} delayed", { count: late }) } : null },
   ];
-  const shopper = session.shopper ?? { name: "Guest" };
+  const shopper = session.shopper ?? { name: t("Guest") };
   const count = cart?.item_count ?? 0;
 
   return (
@@ -74,11 +75,11 @@ export default function StorefrontPage() {
       api={api}
       assistantName={ASSISTANT}
       shopper={shopper}
-      bag={{ label: "Cart", count, noun: "item", figure: count ? formatMoney(cart?.subtotal ?? 0, cart?.currency) : null }}
+      bag={{ label: t("Cart"), count, noun: t("item"), figure: count ? formatMoney(cart?.subtotal ?? 0, cart?.currency) : null }}
       panel={<CartPanel cart={cart} checkoutStaged={checkoutStaged} />}
       panelOpen={panelOpen}
       onPanelOpenChange={setPanelOpen}
-      placeholder={view === "orders" ? "Ask about an order, a return, a delivery…" : "Ask about a product, a project, an order…"}
+      placeholder={view === "orders" ? t("Ask about an order, a return, a delivery…") : t("Ask about a product, a project, an order…")}
     >
       {/* The conversation stays mounted under the other view so its cards keep their state. */}
       <div className={view === "assistant" ? "h-full" : "hidden"}>
@@ -92,8 +93,13 @@ export default function StorefrontPage() {
           subtitle={
             orders
               ? late
-                ? `${plural(late, "order")} running late. Ask why, or ask about a return on anything delivered.`
-                : `${plural(upcoming(orders).length, "order")} on the way. Ask about any of them, or about a return on anything delivered.`
+                ? t(late === 1 ? "{count} order running late. Ask why, or ask about a return on anything delivered." : "{count} orders running late. Ask why, or ask about a return on anything delivered.", { count: late })
+                : t(
+                    upcoming(orders).length === 1
+                      ? "{count} order on the way. Ask about any of them, or about a return on anything delivered."
+                      : "{count} orders on the way. Ask about any of them, or about a return on anything delivered.",
+                    { count: upcoming(orders).length },
+                  )
               : undefined
           }
           thumb={(order) => <OrderThumb order={order} />}

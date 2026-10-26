@@ -4,7 +4,7 @@
 "use client";
 
 import { useState } from "react";
-import { formatMoney } from "web-shared";
+import { formatMoney, useT } from "web-shared";
 import {
   dateBlock,
   formatTime,
@@ -19,6 +19,7 @@ import type { Product, ProductsPayload } from "@/lib/types";
 import { AllInPrice, DateSquare, Pill, QueuePosition, Stub, ValueScoreChip, VenueLine } from "./shared";
 
 function HoldOrWaitlistButton({ product }: { product: Product }) {
+  const t = useT();
   const { hold, join, holdMinutes } = useLive();
   const [state, setState] = useState<"idle" | "busy" | "held" | "queued" | "failed">("idle");
   const [position, setPosition] = useState<number | null>(null);
@@ -47,14 +48,14 @@ function HoldOrWaitlistButton({ product }: { product: Product }) {
   if (state === "held") {
     return (
       <span className="at-mono text-[11px] font-semibold text-(--warn)">
-        ✓ Held for {holdMinutes}:00
+        ✓ {t("Held for {minutes}:00", { minutes: holdMinutes })}
       </span>
     );
   }
   if (state === "queued" && position != null) {
     return <QueuePosition productId={product.product_id} fallback={position} />;
   }
-  const holdLabel = unit > 1 ? `Hold pair (${unit})` : "Hold 1";
+  const holdLabel = unit > 1 ? t("Hold pair ({n})", { n: unit }) : t("Hold 1");
   return (
     <button
       onClick={() => void act()}
@@ -62,13 +63,13 @@ function HoldOrWaitlistButton({ product }: { product: Product }) {
       className={soldOut ? "at-btn-ghost !py-1.5 !text-[11px]" : "btn-primary !py-1.5 !text-[11px]"}
       title={
         soldOut
-          ? "Join the waitlist; you get a claim window if seats come back"
+          ? t("Join the waitlist; you get a claim window if seats come back")
           : unit > 1
-            ? `This pair sells together: a ${holdMinutes}-minute hold on both, not charged`
-            : `A ${holdMinutes}-minute hold, not charged; the seats release if the timer runs out`
+            ? t("This pair sells together: a {minutes}-minute hold on both, not charged", { minutes: holdMinutes })
+            : t("A {minutes}-minute hold, not charged; the seats release if the timer runs out", { minutes: holdMinutes })
       }
     >
-      {state === "busy" ? "…" : state === "failed" ? "Couldn't" : soldOut ? "Join waitlist" : holdLabel}
+      {state === "busy" ? "…" : state === "failed" ? t("Couldn't") : soldOut ? t("Join waitlist") : holdLabel}
     </button>
   );
 }
@@ -80,10 +81,11 @@ function EventCard({
   product: Product;
   reason?: string | null;
 }) {
+  const t = useT();
   const attrs = product.attributes ?? {};
   const date = dateBlock(attrs.event_date);
   const pill = statusPill(product);
-  const scarce = scarcityLine(product);
+  const scarce = scarcityLine(product, t);
   const time = formatTime(attrs.event_time);
 
   return (
@@ -100,7 +102,7 @@ function EventCard({
           </div>
           <div className="shrink-0 text-right">
             <AllInPrice price={product.price} currency={product.currency} />
-            <p className="at-eyebrow mt-0.5 !normal-case !tracking-normal">per ticket</p>
+            <p className="at-eyebrow mt-0.5 !normal-case !tracking-normal">{t("per ticket")}</p>
           </div>
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -127,22 +129,23 @@ function EventCard({
 }
 
 function ResaleTable({ items }: { items: { product: Product; reason?: string | null }[] }) {
+  const t = useT();
   const scored = items.map(({ product }) => ({ product, value: valueScore(product) }));
   const explained = scored.find((row) => row.value != null);
 
   return (
     <div className="mt-3">
-      <p className="at-eyebrow mb-1.5">Fan resale · capped listings, prices all-in</p>
+      <p className="at-eyebrow mb-1.5">{t("Fan resale · capped listings, prices all-in")}</p>
       <div className="overflow-x-auto rounded-(--radius) border border-(--line)">
         <table className="w-full min-w-[480px] border-collapse text-left">
           <thead>
             <tr className="border-b border-(--line) bg-(--well)/70">
-              <th className="at-eyebrow px-3 py-1.5 font-semibold">Section</th>
-              <th className="at-eyebrow px-3 py-1.5 font-semibold">Event</th>
-              <th className="at-eyebrow px-3 py-1.5 text-right font-semibold">Qty</th>
-              <th className="at-eyebrow px-3 py-1.5 text-right font-semibold">Value</th>
-              <th className="at-eyebrow px-3 py-1.5 text-right font-semibold">All-in</th>
-              <th className="px-2 py-1.5" aria-label="actions" />
+              <th className="at-eyebrow px-3 py-1.5 font-semibold">{t("Section")}</th>
+              <th className="at-eyebrow px-3 py-1.5 font-semibold">{t("Event")}</th>
+              <th className="at-eyebrow px-3 py-1.5 text-right font-semibold">{t("Qty")}</th>
+              <th className="at-eyebrow px-3 py-1.5 text-right font-semibold">{t("Value")}</th>
+              <th className="at-eyebrow px-3 py-1.5 text-right font-semibold">{t("All-in")}</th>
+              <th className="px-2 py-1.5" aria-label={t("actions")} />
             </tr>
           </thead>
           <tbody>
@@ -181,9 +184,10 @@ function ResaleTable({ items }: { items: { product: Product; reason?: string | n
       </div>
       {explained?.value ? (
         <p className="mt-1.5 text-[12px] leading-snug text-(--ink-soft)">
-          Value scores are computed by the box office: this{" "}
-          {(explained.product.attributes ?? {}).tier ?? "listing"} ask is{" "}
-          {valueScoreBasis(explained.value)}.
+          {t("Value scores are computed by the box office: this {tier} ask is {basis}.", {
+            tier: (explained.product.attributes ?? {}).tier ?? t("listing"),
+            basis: valueScoreBasis(explained.value, t),
+          })}
         </p>
       ) : null}
     </div>
@@ -197,12 +201,13 @@ export default function EventCards({
   payload: ProductsPayload;
   partial?: boolean;
 }) {
+  const t = useT();
   const items = payload.items ?? [];
   const primary = items.filter(({ product }) => product.category !== "resale");
   const resale = items.filter(({ product }) => product.category === "resale");
 
   return (
-    <Stub component="products" label={payload.title ?? "What's on"}>
+    <Stub component="products" label={payload.title ?? t("What's on")}>
       <div className="flex flex-col gap-2.5">
         {primary.map(({ product, reason }) => (
           <EventCard key={product.product_id} product={product} reason={reason} />

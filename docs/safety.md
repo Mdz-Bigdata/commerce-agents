@@ -81,6 +81,10 @@ The reference stops at the boundary of your systems. Before either agent is expo
   At `DEBUG` the request and response bodies are logged too. A request body contains every
   injected fact and the whole cart, so a `DEBUG` log needs the retention and access
   controls of the memory store.
+  The example APIs' operations log (`examples/demo_common/analytics.py`, `docs/metrics.md`)
+  holds the same session digest, tool names and statuses, and the record ids tool inputs
+  named, but no message text; ids can still identify what a person browsed, so it gets the
+  same retention rules.
 - **Approval surface.** The merchant approval surface and who may use it. The gate checks only that your code
   set the mark.
 - **Guardrail values.** The defaults in the two `config.py` modules are demonstration values.

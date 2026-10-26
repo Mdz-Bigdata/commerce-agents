@@ -4,7 +4,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { ActivityLine, type AgentTurn, type AssistantChatItem, Chat as ChatShell } from "web-shared";
+import { ActivityLine, type AgentTurn, type AssistantChatItem, Chat as ChatShell, useT } from "web-shared";
 import GenerativeBlock from "./generative";
 import { TextBones } from "./generative/Bones";
 
@@ -15,12 +15,13 @@ function Caption({ text }: { text: string }) {
 }
 
 function Pending({ item }: { item: AssistantChatItem }) {
+  const t = useT();
   if (item.segments.some((segment) => segment.type === "ui" && segment.status === "pending")) {
     return null;
   }
   if (item.segments.length) return <ActivityLine item={item} />;
   return (
-    <div role="status" aria-label="Working" className="flex flex-col gap-2">
+    <div role="status" aria-label={t("Working")} className="flex flex-col gap-2">
       {item.activity ? <Caption text={item.activity} /> : null}
       <TextBones />
     </div>

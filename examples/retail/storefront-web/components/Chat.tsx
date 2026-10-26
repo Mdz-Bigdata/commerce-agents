@@ -4,7 +4,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { ActivityLine, type AgentTurn, type AssistantChatItem, Chat as ChatShell } from "web-shared";
+import { ActivityLine, type AgentTurn, type AssistantChatItem, Chat as ChatShell, useT } from "web-shared";
 import { addToCart } from "@/lib/api";
 import type { CartPayload } from "@/lib/types";
 import GenerativeBlock from "./generative";
@@ -13,11 +13,12 @@ const WIDE = new Set(["comparison", "plan"]);
 
 /** Shimmers where the carousel will land while a search runs. */
 function Pending({ item }: { item: AssistantChatItem }) {
+  const t = useT();
   const searching = item.tools.includes("search_products") && !item.segments.some((s) => s.type === "ui");
   if (!searching) return <ActivityLine item={item} />;
   return (
     <section role="status" className="rounded-2xl border border-(--line) bg-(--card) p-3 shadow-(--shadow-sm)">
-      <div className="mb-3 animate-pulse text-[15px] text-(--ink-soft)">{item.activity ?? "Searching the catalog…"}</div>
+      <div className="mb-3 animate-pulse text-[15px] text-(--ink-soft)">{item.activity ?? t("Searching the catalog…")}</div>
       <div className="flex gap-3 overflow-hidden pb-1">
         {[0, 1, 2, 3].map((slot) => (
           <div key={slot} className="ac-skeleton h-[150px] w-48 shrink-0 rounded-xl" />

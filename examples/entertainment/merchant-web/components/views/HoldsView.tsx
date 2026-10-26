@@ -3,11 +3,11 @@
 
 "use client";
 
-import { AskButton, formatDate, formatDayMonth, formatNumber, KindIcon, Notice, PageHeader, Panel, plural, Skeleton, useResource } from "web-shared";
+import { AskButton, formatDate, formatDayMonth, formatNumber, KindIcon, Notice, PageHeader, Panel, Skeleton, useResource, useT } from "web-shared";
 import { releasableTotal } from "@/components/PacingParts";
 import { fetchPacing } from "@/lib/api";
 import type { PacingEvent, PacingTier, StagedWindow, VenueRecord } from "@/lib/types";
-import { formatDaysToEvent } from "@/lib/format";
+import { countLabel, formatDaysToEvent } from "@/lib/format";
 
 function sectionState(tier: PacingTier | undefined): {
   fill: string;
@@ -46,17 +46,19 @@ function LegendKey({ swatch, label }: { swatch: string; label: string }) {
 }
 
 function SchematicLegend() {
+  const t = useT();
   return (
     <div className="at-mono mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-(--ink-soft)">
-      <LegendKey swatch="border border-(--accent) bg-(--accent)/60" label="open" />
-      <LegendKey swatch="border border-(--accent)/50 bg-(--accent)/20" label="selling" />
-      <LegendKey swatch="border border-(--line) bg-(--well)" label="sold out" />
-      <LegendKey swatch="border border-dashed border-(--line)" label="not on sale" />
+      <LegendKey swatch="border border-(--accent) bg-(--accent)/60" label={t("open")} />
+      <LegendKey swatch="border border-(--accent)/50 bg-(--accent)/20" label={t("selling")} />
+      <LegendKey swatch="border border-(--line) bg-(--well)" label={t("sold out")} />
+      <LegendKey swatch="border border-dashed border-(--line)" label={t("not on sale")} />
     </div>
   );
 }
 
 function VenueSchematic({ venue, tiers }: { venue: VenueRecord; tiers: PacingTier[] }) {
+  const t = useT();
   const byCode = new Map<string, PacingTier>();
   for (const tier of tiers) {
     const code = tier.tier_code;
@@ -78,7 +80,7 @@ function VenueSchematic({ venue, tiers }: { venue: VenueRecord; tiers: PacingTie
         viewBox={`0 0 ${venue.viewbox.width} ${venue.viewbox.height}`}
         className="w-full max-w-md"
         role="img"
-        aria-label={`${venue.name} seat map, sections shaded by live sell-through`}
+        aria-label={t("{venue} seat map, sections shaded by live sell-through", { venue: venue.name })}
       >
         {venue.sections.map((section) => {
           const tier = section.tier_code != null ? byCode.get(section.tier_code) : undefined;
@@ -94,13 +96,23 @@ function VenueSchematic({ venue, tiers }: { venue: VenueRecord; tiers: PacingTie
             countHost.get(section.tier_code ?? "") === section.section_id &&
             section.w >= 16 &&
             section.h >= 8;
+          const tierVars = {
+            section: section.label,
+            tier: tier ? (tier.tier ?? tier.product_id) : "",
+            n: tier?.remaining != null ? formatNumber(tier.remaining) : "",
+            capacity: tier?.capacity != null ? formatNumber(tier.capacity) : "",
+          };
           const title = isStage
             ? section.label
             : tier
-              ? `${section.label}, ${tier.tier ?? tier.product_id}: ${
-                  tier.remaining != null ? `${formatNumber(tier.remaining)} open` : "open unknown"
-                }${tier.capacity != null ? ` of ${formatNumber(tier.capacity)}` : ""}`
-              : `${section.label}, not on sale`;
+              ? tier.remaining != null
+                ? tier.capacity != null
+                  ? t("{section}, {tier}: {n} open of {capacity}", tierVars)
+                  : t("{section}, {tier}: {n} open", tierVars)
+                : tier.capacity != null
+                  ? t("{section}, {tier}: open unknown of {capacity}", tierVars)
+                  : t("{section}, {tier}: open unknown", tierVars)
+              : t("{section}, not on sale", tierVars);
           return (
             <g key={section.section_id}>
               <rect
@@ -136,7 +148,7 @@ function VenueSchematic({ venue, tiers }: { venue: VenueRecord; tiers: PacingTie
                   fill="var(--ink-soft)"
                   className="pointer-events-none"
                 >
-                  {formatNumber(tier.remaining ?? 0)} open
+                  {t("{n} open", { n: formatNumber(tier.remaining ?? 0) })}
                 </text>
               ) : null}
             </g>
@@ -157,13 +169,20 @@ function AllocationRow({
   tier: PacingTier;
   onAskAssistant: (text: string) => void;
 }) {
+  const t = useT();
   const holds = tier.holds ?? {};
   const releasable = releasableTotal(holds);
-  const releasePrompt = `Release ${formatNumber(releasable)} held seats on ${
-    event.event_name ?? event.event_id
-  } ${tier.tier ?? tier.product_id} (${tier.product_id}): ${formatNumber(
-    holds.promoter_hold ?? 0,
-  )} promoter and ${formatNumber(holds.production_hold ?? 0)} production hold. What would that do to pacing?`;
+  const releasePrompt = t(
+    "Release {n} held seats on {event} {tier} ({id}): {promoter} promoter and {production} production hold. What would that do to pacing?",
+    {
+      n: formatNumber(releasable),
+      event: event.event_name ?? event.event_id,
+      tier: tier.tier ?? tier.product_id,
+      id: tier.product_id,
+      promoter: formatNumber(holds.promoter_hold ?? 0),
+      production: formatNumber(holds.production_hold ?? 0),
+    },
+  );
   return (
     <tr className="border-t border-(--line)">
       <td className="py-2.5 pl-[18px] pr-3">
@@ -177,7 +196,7 @@ function AllocationRow({
       <td className="at-mono px-3 py-2.5 text-right font-semibold text-(--ink)">{formatNumber(releasable)}</td>
       <td className="at-mono px-3 py-2.5 text-right text-(--ink)">{tier.remaining != null ? formatNumber(tier.remaining) : "—"}</td>
       <td className="py-2.5 pl-3 pr-[18px] text-right">
-        {releasable > 0 ? <AskButton label="Release holds" onClick={() => onAskAssistant(releasePrompt)} /> : null}
+        {releasable > 0 ? <AskButton label={t("Release holds")} onClick={() => onAskAssistant(releasePrompt)} /> : null}
       </td>
     </tr>
   );
@@ -192,12 +211,13 @@ function EventAllocations({
   venue?: VenueRecord;
   onAskAssistant: (text: string) => void;
 }) {
+  const t = useT();
   const releasable = event.tiers.reduce((sum, tier) => sum + releasableTotal(tier.holds), 0);
   return (
     <Panel
       title={<span className="at-display text-[19px]">{event.event_name ?? event.event_id}</span>}
-      subtitle={[event.venue, formatDate(event.event_date), formatDaysToEvent(event.days_to_event)].filter(Boolean).join(" · ")}
-      action={<span className="at-mono text-[12px] text-(--ink-soft)">{formatNumber(releasable)} releasable</span>}
+      subtitle={[event.venue, formatDate(event.event_date), formatDaysToEvent(event.days_to_event, t)].filter(Boolean).join(" · ")}
+      action={<span className="at-mono text-[12px] text-(--ink-soft)">{t("{n} releasable", { n: formatNumber(releasable) })}</span>}
     >
       <div className="grid gap-4 pt-1 @4xl:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
         {venue ? (
@@ -209,13 +229,13 @@ function EventAllocations({
           <table className="w-full border-collapse text-[13px]">
             <thead>
               <tr className="text-left text-[12px] text-(--ink-soft)">
-                <th className="py-2 pl-[18px] pr-3 font-semibold">Tier</th>
-                <th className="px-3 py-2 text-right font-semibold">Promoter</th>
-                <th className="px-3 py-2 text-right font-semibold">Production</th>
-                <th className="px-3 py-2 text-right font-semibold">Comps</th>
-                <th className="px-3 py-2 text-right font-semibold">Kills</th>
-                <th className="px-3 py-2 text-right font-semibold">Releasable</th>
-                <th className="px-3 py-2 text-right font-semibold">Open</th>
+                <th className="py-2 pl-[18px] pr-3 font-semibold">{t("Tier")}</th>
+                <th className="px-3 py-2 text-right font-semibold">{t("Promoter")}</th>
+                <th className="px-3 py-2 text-right font-semibold">{t("Production")}</th>
+                <th className="px-3 py-2 text-right font-semibold">{t("Comps")}</th>
+                <th className="px-3 py-2 text-right font-semibold">{t("Kills")}</th>
+                <th className="px-3 py-2 text-right font-semibold">{t("Releasable")}</th>
+                <th className="px-3 py-2 text-right font-semibold">{t("Open")}</th>
                 <th className="py-2 pl-3 pr-[18px]" />
               </tr>
             </thead>
@@ -232,13 +252,14 @@ function EventAllocations({
 }
 
 function StagedWindows({ windows }: { windows: StagedWindow[] }) {
+  const t = useT();
   if (!windows.length) return null;
   return (
     <section className="flex flex-wrap items-start gap-x-4 gap-y-2 rounded-2xl border border-(--violet)/25 bg-(--violet-soft) px-[18px] py-3">
       <KindIcon icon="calendar" tone="violet" size={32} />
       <div className="min-w-0 flex-1">
         <div className="text-[14px] font-semibold text-(--ink)">
-          {plural(windows.length, "staged promotion window")} awaiting approval
+          {countLabel(t, windows.length, "{n} staged promotion window awaiting approval", "{n} staged promotion windows awaiting approval")}
         </div>
         <ul className="mt-1 space-y-0.5 text-[12.5px] text-(--ink-soft)">
           {windows.map((window) => (
@@ -262,17 +283,25 @@ export default function HoldsView({
   refreshKey: number;
   onAskAssistant: (text: string) => void;
 }) {
+  const t = useT();
   const { data, failed } = useResource(fetchPacing, [refreshKey]);
   const releasable = data?.events.reduce((sum, event) => sum + event.tiers.reduce((inner, tier) => inner + releasableTotal(tier.holds), 0), 0);
 
   return (
     <div className="ac-reveal @container flex flex-col gap-4">
       <PageHeader
-        title="Holds"
-        subtitle={data ? `${formatNumber(releasable ?? 0)} releasable seats across ${plural(data.events.length, "event")} · promoter and production holds release; comps and kills never do` : undefined}
+        title={t("Holds")}
+        subtitle={
+          data
+            ? t("{seats} releasable seats across {events} · promoter and production holds release; comps and kills never do", {
+                seats: formatNumber(releasable ?? 0),
+                events: countLabel(t, data.events.length, "{n} event", "{n} events"),
+              })
+            : undefined
+        }
       />
       {failed && !data ? (
-        <Notice>The entertainment API isn&apos;t reachable, so the allocation book can&apos;t load.</Notice>
+        <Notice>{t("The entertainment API isn't reachable, so the allocation book can't load.")}</Notice>
       ) : !data ? (
         <>
           <Skeleton className="h-56" />
@@ -282,7 +311,7 @@ export default function HoldsView({
         <>
           <StagedWindows windows={data.staged_windows} />
           {data.events.length === 0 ? (
-            <Notice>No events in the allocation book.</Notice>
+            <Notice>{t("No events in the allocation book.")}</Notice>
           ) : (
             data.events.map((event) => (
               <EventAllocations

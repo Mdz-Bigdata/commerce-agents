@@ -13,10 +13,10 @@ paths each, four vertical examples, and a Claude Code plugin.
 - `*/runtime-messages-api/`: `ShoppingAgent`, `MerchantAgent`, the merchant analysis delegate.
 - `*/runtime-agent-sdk/`: each agent as `ClaudeAgentOptions`, with a console.
 - `*/managed-agents/`: the manifest directory (with the derived `system.md`) and the role's MCP server.
-- `examples/demo_common/` and `examples/web-shared/`: what the verticals' APIs and web apps share; `examples/` is the npm workspace.
+- `examples/demo_common/` and `examples/web-shared/`: what the verticals' APIs and web apps share (the model provider in `model_provider.py`, the operations log in `analytics.py`, the English/Chinese switch in `i18n.tsx`); `examples/` is the npm workspace.
 - `examples/<vertical>/`: `api/`, `data/`, `storefront-web/`, `merchant-web/`; ports 8000-8003, 3000-3003, 3100-3103.
 - `plugins/commerce-builder/`: six skills, four commands; `.claude-plugin/marketplace.json` points at it.
-- `docs/`: `safety.md`, `backends.md`, `deployment.md`. `scripts/`: install, demo, smoke, screenshots, check, deploy, verify.
+- `docs/`: `safety.md`, `backends.md`, `deployment.md`, `metrics.md`. `scripts/`: install, demo, start-all, metrics, smoke, screenshots, check, deploy, verify.
 - `tests/`: the suites that span packages (both roles on all three paths); each package keeps its own `tests/`.
 
 `requirements.txt` installs the seven packages and their pinned dependencies (`requirements-dev.txt`
@@ -36,7 +36,9 @@ adds pytest and ruff); `scripts/install.sh` runs it.
 No real company, brand, product, or person appears: the only company is ACME and its
 lines; every brand, prompt, schema, and figure is invented here. Two exceptions:
 deployment and integration targets (the README's "MCP connectors" section; platform and
-SDK names in `docs/deployment.md`, the README's deploying section, and the platform tests),
+SDK names in `docs/deployment.md`, the README's deploying section, and the platform tests;
+the model provider presets in `examples/demo_common/model_provider.py`, `.env.example`, and
+the READMEs that list them),
 and CC0 category photos listed in the `IMAGE-CREDITS.md` beside them. When in doubt,
 redesign rather than rename.
 

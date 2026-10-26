@@ -3,14 +3,16 @@
 
 "use client";
 
-import { AskLink, BagPanel, CheckoutButton, formatMoney, optionValuesLabel, plural, RemoveLink, Stepper, TotalRow, useCatalogIndex, useStoreFrame } from "web-shared";
+import { AskLink, BagPanel, CheckoutButton, formatMoney, optionValuesLabel, RemoveLink, Stepper, TotalRow, useCatalogIndex, useStoreFrame, useT } from "web-shared";
 import { fetchProducts } from "@/lib/api";
+import { rich } from "@/lib/rich";
 import { STORE_POLICY } from "@/lib/storePolicy";
 import type { CartItem, CartPayload, Product } from "@/lib/types";
 import { DeliveryPromise, ProductImage, ProductTitle } from "./ProductTile";
 
 /** The policy says "over" the threshold, so a cart at exactly the threshold is not free. */
 function FreeShippingMeter({ subtotal }: { subtotal: number }) {
+  const t = useT();
   const threshold = STORE_POLICY.freeShippingThreshold;
   const free = subtotal > threshold;
   const remaining = threshold - subtotal;
@@ -19,19 +21,19 @@ function FreeShippingMeter({ subtotal }: { subtotal: number }) {
     <div data-free-shipping-meter className="mb-3">
       <div className={`text-[13px] ${free ? "font-semibold text-(--ok)" : "text-(--ink-2)"}`}>
         {free ? (
-          <>Free shipping on this order ✓</>
+          <>{t("Free shipping on this order ✓")}</>
         ) : remaining > 0 ? (
           <>
-            <span className="font-bold text-(--ink)">{formatMoney(remaining)}</span> away from free shipping
+            {rich(t("{amount} away from free shipping"), { amount: <span className="font-bold text-(--ink)">{formatMoney(remaining)}</span> })}
           </>
         ) : (
-          <>Anything more ships free</>
+          <>{t("Anything more ships free")}</>
         )}
       </div>
       <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-(--well)">
         <div className={`h-full rounded-full transition-[width] duration-500 ease-out ${free ? "bg-(--ok)" : "bg-(--accent)"}`} style={{ width: `${pct}%` }} />
       </div>
-      {!free ? <div className="mt-1 text-[11.5px] text-(--ink-soft)">Standard shipping is free on orders over {formatMoney(threshold)}.</div> : null}
+      {!free ? <div className="mt-1 text-[11.5px] text-(--ink-soft)">{t("Standard shipping is free on orders over {amount}.", { amount: formatMoney(threshold) })}</div> : null}
     </div>
   );
 }
@@ -60,6 +62,7 @@ function lineName(item: CartItem): string {
 
 /** The docked cart. Quantity and checkout are messages to the assistant, so every write is one it made. */
 export default function CartPanel({ cart, checkoutStaged = false }: { cart: CartPayload | null; checkoutStaged?: boolean }) {
+  const t = useT();
   const { ask } = useStoreFrame();
   const items = cart?.items ?? [];
   const count = cart?.item_count ?? 0;
@@ -67,24 +70,24 @@ export default function CartPanel({ cart, checkoutStaged = false }: { cart: Cart
 
   return (
     <BagPanel
-      title="Cart"
-      count={plural(count, "item")}
+      title={t("Cart")}
+      count={t(count === 1 ? "{count} item" : "{count} items", { count })}
       isEmpty={items.length === 0}
       empty={
         <>
-          Nothing in the cart yet.
+          {t("Nothing in the cart yet.")}
           <br />
-          Ask ACME Assistant for anything in the store.
+          {t("Ask ACME Assistant for anything in the store.")}
         </>
       }
       footer={
         <>
           {items.length ? <FreeShippingMeter subtotal={cart?.subtotal ?? 0} /> : null}
-          <TotalRow label={count ? `Subtotal · ${plural(count, "item")}` : "Subtotal"} value={formatMoney(cart?.subtotal ?? 0, cart?.currency)} />
-          <CheckoutButton staged={checkoutStaged} disabled={items.length === 0} prompt="Check out my cart." />
+          <TotalRow label={count ? t(count === 1 ? "Subtotal · {count} item" : "Subtotal · {count} items", { count }) : t("Subtotal")} value={formatMoney(cart?.subtotal ?? 0, cart?.currency)} />
+          <CheckoutButton staged={checkoutStaged} disabled={items.length === 0} prompt={t("Check out my cart.")} />
           {items.length ? (
             <div className="mt-2.5 flex justify-center">
-              <AskLink label="Ask about this cart" prompt="Look over my cart: anything missing or worth swapping?" />
+              <AskLink label={t("Ask about this cart")} prompt={t("Look over my cart: anything missing or worth swapping?")} />
             </div>
           ) : null}
         </>
@@ -106,7 +109,7 @@ export default function CartPanel({ cart, checkoutStaged = false }: { cart: Cart
                   </div>
                   <div className="shrink-0 text-right">
                     <div className="text-[14px] font-bold tabular-nums text-(--ink)">{formatMoney(item.line_total)}</div>
-                    {item.quantity > 1 ? <div className="text-[11px] text-(--ink-soft)">{formatMoney(item.price)} each</div> : null}
+                    {item.quantity > 1 ? <div className="text-[11px] text-(--ink-soft)">{t("{price} each", { price: formatMoney(item.price) })}</div> : null}
                   </div>
                 </div>
                 <DeliveryPromise product={product} className="mt-0.5" />
@@ -115,10 +118,14 @@ export default function CartPanel({ cart, checkoutStaged = false }: { cart: Cart
                     quantity={item.quantity}
                     itemTitle={lineName(item)}
                     onChange={(quantity) =>
-                      ask(quantity < 1 ? `Remove the ${lineName(item)} from my cart.` : `Change the ${lineName(item)} quantity to ${quantity}.`)
+                      ask(
+                        quantity < 1
+                          ? t("Remove the {name} from my cart.", { name: lineName(item) })
+                          : t("Change the {name} quantity to {quantity}.", { name: lineName(item), quantity }),
+                      )
                     }
                   />
-                  <RemoveLink itemTitle={lineName(item)} onClick={() => ask(`Remove the ${lineName(item)} from my cart.`)} />
+                  <RemoveLink itemTitle={lineName(item)} onClick={() => ask(t("Remove the {name} from my cart.", { name: lineName(item) }))} />
                 </div>
               </div>
             </li>

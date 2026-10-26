@@ -4,6 +4,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import { type Translate, useT } from "web-shared";
 import {
   formatPrice,
   priceUnitLabel,
@@ -88,11 +89,11 @@ const MATRIX_ORDER = [
 
 const MAX_MATRIX_ROWS = 6;
 
-function matrixLabel(key: string): string {
+function matrixLabel(key: string, t: Translate): string {
   const mapped = MATRIX_LABELS[key];
-  if (mapped) return mapped;
+  if (mapped) return t(mapped);
   const spaced = key.replace(/_/g, " ");
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+  return t(spaced.charAt(0).toUpperCase() + spaced.slice(1));
 }
 
 type MatrixCell =
@@ -100,17 +101,17 @@ type MatrixCell =
   | { kind: "no" }
   | { kind: "value"; text: string };
 
-function matrixCell(product: Product, key: string): MatrixCell {
+function matrixCell(product: Product, key: string, t: Translate): MatrixCell {
   const raw = product.attributes?.[key];
   if (raw == null) return { kind: "no" };
   if (key === "refundable") {
     if (!/^(yes|true)$/i.test(raw)) return { kind: "no" };
     const until = shortDate(product.attributes?.free_cancellation_until);
-    return { kind: "yes", detail: until ? `until ${until}` : undefined };
+    return { kind: "yes", detail: until ? t("until {date}", { date: until }) : undefined };
   }
   if (/^(yes|true)$/i.test(raw)) return { kind: "yes" };
   if (/^(no|false|none)$/i.test(raw)) return { kind: "no" };
-  if (key === "duration_hours") return { kind: "value", text: `${raw} hrs` };
+  if (key === "duration_hours") return { kind: "value", text: t("{n} hrs", { n: raw }) };
   return { kind: "value", text: raw };
 }
 
@@ -158,13 +159,13 @@ function MatrixRow({ label, cell }: { label: string; cell: MatrixCell }) {
 }
 
 /** What the pricier entry has that the cheaper one lacks. */
-function deltaBuys(high: Product, low: Product, keys: string[]): string[] {
+function deltaBuys(high: Product, low: Product, keys: string[], t: Translate): string[] {
   const buys: string[] = [];
   for (const key of keys) {
-    const highCell = matrixCell(high, key);
-    const lowCell = matrixCell(low, key);
+    const highCell = matrixCell(high, key, t);
+    const lowCell = matrixCell(low, key, t);
     if (highCell.kind === "yes" && lowCell.kind === "no") {
-      buys.push(key === "refundable" ? "full refundability" : matrixLabel(key).toLowerCase());
+      buys.push(key === "refundable" ? t("full refundability") : matrixLabel(key, t).toLowerCase());
     } else if (
       highCell.kind === "value" &&
       (lowCell.kind !== "value" || lowCell.text !== highCell.text)
@@ -199,6 +200,7 @@ export default function ComparisonSpread({
   payload: ComparisonPayload;
   partial?: boolean;
 }) {
+  const t = useT();
   const entries = payload.entries ?? [];
   const skeletons = partial ? (entries.length === 0 ? 2 : entries.length < 4 ? 1 : 0) : 0;
   const columns = Math.max(1, Math.min(entries.length + skeletons, 4));
@@ -220,9 +222,9 @@ export default function ComparisonSpread({
     : undefined;
   const buys =
     useMatrix && delta && highEntry && lowEntry
-      ? deltaBuys(highEntry.product, lowEntry.product, keys)
+      ? deltaBuys(highEntry.product, lowEntry.product, keys, t)
       : [];
-  const deltaUnit = highEntry ? priceUnitLabel(highEntry.product.attributes?.price_unit) : null;
+  const deltaUnit = highEntry ? priceUnitLabel(highEntry.product.attributes?.price_unit, t) : null;
 
   return (
     <section className="al-reveal" style={{ ...CARD, padding: 24 }}>
@@ -239,7 +241,7 @@ export default function ComparisonSpread({
         {entries.map((entry, i) => {
           const recommended = payload.recommended_product_id === entry.product_id;
           const product = entry.product;
-          const unit = productPriceUnit(product);
+          const unit = productPriceUnit(product, t);
           return (
             <div
               key={entry.product_id}
@@ -258,7 +260,7 @@ export default function ComparisonSpread({
               <div className="h-4">
                 {recommended ? (
                   <span style={{ ...META, fontSize: 11, letterSpacing: "0.1em", color: "var(--accent)" }}>
-                    ◈ {RECOMMENDED_LABEL}
+                    ◈ {t(RECOMMENDED_LABEL)}
                   </span>
                 ) : null}
               </div>
@@ -314,7 +316,7 @@ export default function ComparisonSpread({
 
               {useMatrix
                 ? keys.map((key) => (
-                    <MatrixRow key={key} label={matrixLabel(key)} cell={matrixCell(product, key)} />
+                    <MatrixRow key={key} label={matrixLabel(key, t)} cell={matrixCell(product, key, t)} />
                   ))
                 : [
                     // Padded to the longest column so the k-th pro / k-th con of every
@@ -340,8 +342,9 @@ export default function ComparisonSpread({
           style={{ fontFamily: BODY, fontSize: 14, color: "var(--ink)" }}
         >
           <span style={{ fontWeight: 700, color: "var(--accent)" }}>
-            +{formatPrice(delta.amount)}
-            {deltaUnit ? ` ${deltaUnit}` : ""} buys:
+            {deltaUnit
+              ? t("+{amount} {unit} buys:", { amount: formatPrice(delta.amount), unit: deltaUnit })
+              : t("+{amount} buys:", { amount: formatPrice(delta.amount) })}
           </span>{" "}
           {buys.join(" · ")}
         </p>
@@ -349,7 +352,7 @@ export default function ComparisonSpread({
 
       {payload.dimensions?.length ? (
         <p className="mt-4" style={{ ...META, fontSize: 12 }}>
-          Compared on: {payload.dimensions.join(" · ")}
+          {t("Compared on: {dimensions}", { dimensions: payload.dimensions.join(" · ") })}
         </p>
       ) : null}
     </section>

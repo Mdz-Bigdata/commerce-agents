@@ -138,6 +138,7 @@ class ShoppingAgent:
             cart=cart,
             page=session.page,
             now=session.local_now(),
+            reply_language=session.reply_language,
             account=account,
             account_max_chars=self.config.max_context_chars,
         )

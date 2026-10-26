@@ -31,7 +31,16 @@ export function Chat({
           {chat.items.length === 0 ? (
             home
           ) : (
-            <Transcript items={chat.items} busy={chat.busy} send={chat.send} renderBlock={renderBlock} renderPending={renderPending} wide={wide} />
+            <Transcript
+              items={chat.items}
+              busy={chat.busy}
+              send={chat.send}
+              renderBlock={renderBlock}
+              renderPending={renderPending}
+              wide={wide}
+              onRate={chat.rate}
+              onHandoff={(turn) => void chat.handoff(turn)}
+            />
           )}
         </div>
       </div>

@@ -4,7 +4,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { formatMoney } from "web-shared";
+import { formatMoney, useT } from "web-shared";
 import type { StatusPill } from "@/lib/format";
 import { useLive } from "@/lib/live";
 import type { Product } from "@/lib/types";
@@ -51,7 +51,8 @@ export function Stub({
 }
 
 export function Pill({ pill }: { pill: StatusPill }) {
-  return <span className={`at-pill at-pill--${pill.tone}`}>{pill.label}</span>;
+  const t = useT();
+  return <span className={`at-pill at-pill--${pill.tone}`}>{t(pill.label)}</span>;
 }
 
 export function CountdownArc({
@@ -101,6 +102,7 @@ export function QueuePosition({
   productId: string;
   fallback: number;
 }) {
+  const t = useT();
   const { waitlist } = useLive();
   const entry = waitlist.find((row) => row.product_id === productId);
   const position = entry?.position ?? fallback;
@@ -109,9 +111,9 @@ export function QueuePosition({
     <span className="inline-flex items-center gap-2">
       <CountdownArc fraction={1 / Math.max(1, position)} tone="var(--accent)" size={18} strokeWidth={3.5} />
       <span className="at-mono text-[11.5px] font-semibold text-(--ink)">
-        #{position} in line
+        {t("#{position} in line", { position })}
         <span className="ml-1.5 font-normal text-(--ink-soft)">
-          {ahead ? `· ${ahead} ahead of you` : "· you're next"} · updates automatically
+          {ahead ? `· ${t("{ahead} ahead of you", { ahead })}` : `· ${t("you're next")}`} · {t("updates automatically")}
         </span>
       </span>
     </span>
@@ -129,6 +131,7 @@ export function AllInPrice({
   size?: "sm" | "md" | "lg" | "xl";
   suffix?: string;
 }) {
+  const t = useT();
   const sizeClass =
     size === "xl"
       ? "text-[30px]"
@@ -142,7 +145,7 @@ export function AllInPrice({
       <span className={`at-mono font-bold leading-none tracking-tight text-(--ink) ${sizeClass}`}>
         {formatMoney(price, currency)}
       </span>
-      <span className="at-eyebrow !text-(--ink-soft)">{suffix}</span>
+      <span className="at-eyebrow !text-(--ink-soft)">{t(suffix)}</span>
     </span>
   );
 }
@@ -154,6 +157,7 @@ export function ValueScoreChip({
   score: number;
   verdict: "green" | "amber" | "red";
 }) {
+  const t = useT();
   const toneClass =
     verdict === "green"
       ? "border-(--ok)/45 bg-(--ok-soft) text-(--ok)"
@@ -163,7 +167,7 @@ export function ValueScoreChip({
   return (
     <span
       className={`at-mono inline-flex items-center gap-1 rounded-[6px] border px-1.5 py-0.5 text-[12px] font-bold ${toneClass}`}
-      title="Value score, computed by the box office from live listing and inventory data"
+      title={t("Value score, computed by the box office from live listing and inventory data")}
     >
       {score}/10
     </span>

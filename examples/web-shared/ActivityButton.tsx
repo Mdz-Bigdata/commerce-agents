@@ -3,6 +3,8 @@
 
 "use client";
 
+import { useT } from "./i18n";
+
 /** Opens the Activity panel; pulses while a reply streams and counts facts saved this session. */
 export function ActivityButton({
   streaming,
@@ -13,6 +15,7 @@ export function ActivityButton({
   newMemoryCount: number;
   onClick: () => void;
 }) {
+  const t = useT();
   return (
     <button
       type="button"
@@ -25,11 +28,15 @@ export function ActivityButton({
           <span className="relative inline-flex h-2 w-2 rounded-full bg-(--accent)" />
         </span>
       ) : null}
-      Activity
+      {t("Activity")}
       {newMemoryCount > 0 ? (
         <span
           className="rounded-full bg-(--accent-soft) px-1.5 py-0.5 text-[11px] font-bold text-(--ink)"
-          title={`${newMemoryCount} fact${newMemoryCount === 1 ? "" : "s"} saved this session`}
+          title={
+            newMemoryCount === 1
+              ? t("{n} fact saved this session", { n: newMemoryCount })
+              : t("{n} facts saved this session", { n: newMemoryCount })
+          }
         >
           {newMemoryCount}
         </span>

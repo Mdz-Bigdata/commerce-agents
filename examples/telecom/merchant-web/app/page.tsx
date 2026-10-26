@@ -14,6 +14,7 @@ import {
   useMerchantChat,
   useResource,
   useSession,
+  useT,
 } from "web-shared";
 import AssistantPanel from "@/components/AssistantPanel";
 import BaseView from "@/components/views/BaseView";
@@ -33,6 +34,7 @@ function StoreMark() {
 }
 
 export default function PortalPage() {
+  const t = useT();
   const session = useSession(api);
   const [view, setView] = useState<PortalView>("home");
   const [assistantOpen, setAssistantOpen] = useState(false);
@@ -44,7 +46,7 @@ export default function PortalPage() {
 
   const chat = useMerchantChat<StagedChange>(api, {
     ...session,
-    unreachable: UNREACHABLE,
+    unreachable: t(UNREACHABLE),
     onPortalRefresh: refreshPortal,
   });
 
@@ -64,25 +66,25 @@ export default function PortalPage() {
   const nav = useMemo<PortalNavItem<PortalView>[]>(() => {
     const alerts = overview?.snapshot.alerts;
     return [
-      { id: "home", label: "Home", icon: "home" },
+      { id: "home", label: t("Home"), icon: "home" },
       {
         id: "plans",
-        label: "Catalog",
+        label: t("Catalog"),
         icon: "tag",
         count: alerts ? (alerts.low_stock ?? 0) + (alerts.slow_movers ?? 0) : null,
       },
-      { id: "base", label: "Base", icon: "signal" },
+      { id: "base", label: t("Base"), icon: "signal" },
     ];
-  }, [overview]);
+  }, [overview, t]);
 
   return (
     <>
       <PortalShell
-        brand={{ mark: <StoreMark />, name: "ACME Mobile", detail: "Operator workspace" }}
+        brand={{ mark: <StoreMark />, name: "ACME Mobile", detail: t("Operator workspace") }}
         nav={nav}
         view={view}
         onViewChange={setView}
-        operator={{ name: session.operator ?? "Operator", role: "Commercial operations" }}
+        operator={{ name: session.operator ?? t("Operator"), role: t("Commercial operations") }}
         assistantOpen={assistantOpen}
         assistantBusy={chat.busy}
         onToggleAssistant={() => setAssistantOpen((open) => !open)}
@@ -118,7 +120,7 @@ export default function PortalPage() {
           trace={chat.trace}
           memory={chat.memory}
           newMemoryKeys={chat.newMemoryKeys}
-          memoryTitle="Business memory"
+          memoryTitle={t("Business memory")}
           onClose={() => setActivityOpen(false)}
         />
       ) : null}

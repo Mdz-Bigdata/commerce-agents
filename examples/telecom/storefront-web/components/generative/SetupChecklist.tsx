@@ -5,6 +5,7 @@
 
 /** Renders present_plan. */
 
+import { useT } from "web-shared";
 import PlanTile from "@/components/PlanTile";
 import { formatPriceWithUnit } from "@/lib/format";
 import type { PlanPayload } from "@/lib/types";
@@ -17,9 +18,10 @@ export default function SetupChecklist({
   payload: PlanPayload;
   partial?: boolean;
 }) {
+  const t = useT();
   const steps = payload.steps ?? [];
   return (
-    <Frame component="plan" label={payload.title ?? "Setup plan"}>
+    <Frame component="plan" label={payload.title ?? t("Setup plan")}>
       {payload.intro ? (
         <p className="mb-3 text-[15px] leading-relaxed text-(--ink-soft)">{payload.intro}</p>
       ) : null}

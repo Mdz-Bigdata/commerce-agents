@@ -20,6 +20,7 @@ runtimes import both. One module per mechanism:
 | `agent_sdk.py` | The SDK runtimes' shared plumbing and its `round_closes_turn` hook (needs `claude-agent-sdk`) |
 | `mcp_server.py` | The MCP servers' shared plumbing: `registrar` (leaves out switched-off tools and the `status` argument) and the loopback bind guard (needs `mcp`) |
 | `manifest.py` | Resolves a Managed Agents manifest; run by `scripts/deploy_managed_agent.sh` |
+| `openai_compat.py` | `OpenAICompatibleClient`: `messages.create` and `messages.stream` over an OpenAI-compatible `/chat/completions` endpoint, translated to and from Messages API requests, events, and messages; `ModelAuthenticationError`, `ModelProviderError` |
 | `testing.py` | Scripted stand-ins for the streaming and `create` client calls, plus a spy memory store, for credential-free tests |
 | `types.py` | `MemoryFact`, `MemoryCategory`, `ClockContext` |
 

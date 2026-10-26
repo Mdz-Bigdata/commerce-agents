@@ -7,8 +7,6 @@ import {
   ApproveBar,
   type ChangeAction,
   ChangeStatusPill,
-  coverLabel,
-  describeProposer,
   DiffRows,
   formatDate,
   formatMoney,
@@ -20,12 +18,15 @@ import {
   titleCase,
   useChangeActions,
   useResource,
+  useT,
 } from "web-shared";
 import { fetchListingDetail } from "@/lib/api";
+import { coverText, proposerText } from "@/lib/labels";
 import type { ChangeItem, ChangePreviewPayload, StagedChange } from "@/lib/types";
 
 /** Days of cover = new stock / (sales_last_30d / 30). */
 function RestockMath({ item }: { item: ChangeItem }) {
+  const t = useT();
   const { data: detail } = useResource(() => fetchListingDetail(item.target), [item.target]);
   const sales30 = detail?.listing.sales_last_30d ?? null;
   if (typeof item.before !== "number" || typeof item.after !== "number") return null;
@@ -35,8 +36,8 @@ function RestockMath({ item }: { item: ChangeItem }) {
   const coverDays = item.after / perDay;
   return (
     <p className="mx-3.5 mt-2 text-[12.5px] tabular-nums text-(--ink-soft)">
-      +{added} units · sells <b className="font-semibold text-(--ink)">{perDay.toFixed(1)} a day</b> · {item.after} on hand ≈{" "}
-      <b className="font-semibold text-(--ink)">{coverLabel(coverDays)}</b>
+      {t("+{added} units", { added })} · {t("sells")} <b className="font-semibold text-(--ink)">{t("{rate} a day", { rate: perDay.toFixed(1) })}</b> ·{" "}
+      {t("{count} on hand ≈", { count: item.after })} <b className="font-semibold text-(--ink)">{coverText(t, coverDays)}</b>
     </p>
   );
 }
@@ -49,6 +50,7 @@ export default function ChangePreviewCard({
   payload: ChangePreviewPayload;
   onAct?: (changeId: string, action: ChangeAction) => Promise<StagedChange | null>;
 }) {
+  const t = useT();
   const { change, busy, error, act, canAct } = useChangeActions(payload.change, onAct);
   const shortItems = change.items.filter((item) => !isLongTextDiff(item));
   const longItems = change.items.filter(isLongTextDiff);
@@ -56,13 +58,13 @@ export default function ChangePreviewCard({
   return (
     <GenCard>
       <GenCardHeader
-        title={payload.headline ?? "Proposed change"}
+        title={payload.headline ?? t("Proposed change")}
         meta={
           <>
             <ChangeStatusPill status={change.status} />
-            <span>{titleCase(change.kind)}</span>
+            <span>{t(titleCase(change.kind))}</span>
             <span aria-hidden>·</span>
-            <span>{describeProposer(change)}</span>
+            <span>{proposerText(t, change)}</span>
             <span aria-hidden>·</span>
             <span>{formatDate(change.created_at)}</span>
           </>
@@ -81,7 +83,7 @@ export default function ChangePreviewCard({
 
       {change.margin_impact != null ? (
         <p className="mx-3.5 mt-2 text-[12.5px] tabular-nums text-(--ink-soft)">
-          Margin impact{" "}
+          {t("Margin impact")}{" "}
           <b className={`font-semibold ${change.margin_impact < 0 ? "text-(--danger)" : "text-(--ok)"}`}>
             {change.margin_impact > 0 ? "+" : ""}
             {formatMoney(change.margin_impact, change.currency ?? undefined)}

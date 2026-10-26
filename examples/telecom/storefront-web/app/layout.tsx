@@ -3,6 +3,10 @@
 
 import type { Metadata } from "next";
 import { Barlow, Spline_Sans_Mono } from "next/font/google";
+import { cookies } from "next/headers";
+import { LocaleProvider } from "web-shared/i18n";
+import { htmlLang, LOCALE_COOKIE, parseLocale } from "web-shared/locale";
+import { ZH } from "../lib/i18n-zh";
 import "./globals.css";
 
 // Barlow at both ends of its weight range: 100 for display, 700/800 for labels.
@@ -25,14 +29,17 @@ export const metadata: Metadata = {
   description: "Compare plans and manage your line with the ACME Assistant.",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const locale = parseLocale((await cookies()).get(LOCALE_COOKIE)?.value);
   return (
-    <html lang="en" className={`${barlow.variable} ${splineSansMono.variable}`}>
-      <body>
-        <div className="am-grid" aria-hidden />
-        <div className="relative z-[2] h-full">
-          {children}
-        </div>
+    <html lang={htmlLang(locale)} suppressHydrationWarning className={`${barlow.variable} ${splineSansMono.variable}`}>
+      <body suppressHydrationWarning>
+        <LocaleProvider initial={locale} messages={ZH}>
+          <div className="am-grid" aria-hidden />
+          <div className="relative z-[2] h-full">
+            {children}
+          </div>
+        </LocaleProvider>
       </body>
     </html>
   );

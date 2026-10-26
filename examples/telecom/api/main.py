@@ -21,6 +21,7 @@ from demo_common import (
     MemorySeeder,
     build_storefront_host,
     load_demo_env,
+    model_client,
 )
 from shopping_agent_runtime import ShoppingAgent
 
@@ -36,6 +37,7 @@ agent = ShoppingAgent(
     backend=backend,
     skills_dir=REPO_ROOT / "shopping-agent" / "skills",
     config=build_shopping_config(),
+    client=model_client(),
     memory_store=InMemoryMemoryStore(),
     extra_presentation_tools=[build_plan_matrix_extension()],
 )

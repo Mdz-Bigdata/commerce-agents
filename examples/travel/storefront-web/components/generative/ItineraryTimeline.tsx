@@ -3,6 +3,7 @@
 
 "use client";
 
+import { useT } from "web-shared";
 import { formatPrice } from "@/lib/format";
 import type { ItineraryPayload } from "@/lib/types";
 import { CARD, DISPLAY, META, display } from "./shared";
@@ -35,6 +36,7 @@ export default function ItineraryTimeline({
   payload: ItineraryPayload;
   partial?: boolean;
 }) {
+  const t = useT();
   const days = payload.days ?? [];
 
   // Day numbers parsed from labels ("Day 3 Evening" -> 3), else the sequence position.
@@ -225,10 +227,10 @@ export default function ItineraryTimeline({
       {partial ? (
         <p className="mt-3" style={{ ...META, fontSize: 11 }} aria-live="polite">
           {expectedDays == null
-            ? `Planning day ${days.length + 1}…`
+            ? t("Planning day {n}…", { n: days.length + 1 })
             : days.length < expectedDays
-              ? `Planning day ${days.length + 1} of ${expectedDays}…`
-              : "Finishing the plan…"}
+              ? t("Planning day {n} of {total}…", { n: days.length + 1, total: expectedDays })
+              : t("Finishing the plan…")}
         </p>
       ) : null}
 
@@ -239,28 +241,29 @@ export default function ItineraryTimeline({
         >
           <span style={META}>
             {stayGroups
-              .map(
-                (group) =>
-                  `${group.nights} night${group.nights === 1 ? "" : "s"} · ${group.prices
-                    .map((price) => formatPrice(price))
-                    .join(" or ")}/night`,
-              )
+              .map((group) => {
+                const prices = group.prices.map((price) => formatPrice(price)).join(` ${t("or")} `);
+                return group.nights === 1
+                  ? t("{n} night · {prices}/night", { n: group.nights, prices })
+                  : t("{n} nights · {prices}/night", { n: group.nights, prices });
+              })
               .join(" + ")}
           </span>
           <span className="text-right">
             <span style={{ fontFamily: DISPLAY, fontSize: 20, fontWeight: 700, color: "var(--ink)" }}>
               {stayGroups.length === 1 && stayGroups[0].prices.length === 2
-                ? `${formatPrice(stayGroups[0].nights * stayGroups[0].prices[0])} or ${formatPrice(
-                    stayGroups[0].nights * stayGroups[0].prices[1],
-                  )}`
+                ? t("{low} or {high}", {
+                    low: formatPrice(stayGroups[0].nights * stayGroups[0].prices[0]),
+                    high: formatPrice(stayGroups[0].nights * stayGroups[0].prices[1]),
+                  })
                 : hasAlternatives
-                  ? `from ${formatPrice(stayTotal)}`
+                  ? t("from {price}", { price: formatPrice(stayTotal) })
                   : formatPrice(stayTotal)}
             </span>
             <span style={{ ...META, fontSize: 11, marginLeft: 5 }}>
               {hasAlternatives
-                ? "stay total · your pick of stay · all-in"
-                : "stay total · all-in, fees included"}
+                ? t("stay total · your pick of stay · all-in")
+                : t("stay total · all-in, fees included")}
             </span>
           </span>
         </div>

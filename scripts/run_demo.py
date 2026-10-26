@@ -15,7 +15,8 @@ stops everything on Ctrl-C. Python packages and the examples/ npm workspace are 
 first run. Ports are preferences: this vertical's API already running on its port is reused;
 any other busy port moves the server to the next free one, and the web apps are pointed at
 wherever the API is. Chat credentials come from the environment, the vertical's .env, the
-repo-root .env, then the SDK's credential chain; browsing and /showcase need none.
+repo-root .env (MODEL_PROVIDER picks Anthropic or an OpenAI-compatible provider; see
+.env.example), then the SDK's credential chain; browsing and /showcase need none.
 """
 
 from __future__ import annotations
@@ -81,15 +82,32 @@ def find_free_port(preferred: int, span: int = 50) -> int:
         return sock.getsockname()[1]
 
 
-def env_file_has_key(path: Path) -> bool:
-    """True when the file sets a non-empty ANTHROPIC_API_KEY (a copied placeholder does not)."""
-    if not path.exists():
-        return False
-    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-        key, _, value = line.strip().partition("=")
-        if key.strip() == "ANTHROPIC_API_KEY" and value.strip().strip("\"'"):
-            return True
-    return False
+def provider_key_status(vertical: str) -> tuple[str, bool, str] | None:
+    """``(provider label, has a key, where the key goes)`` for the model the vertical's API
+    will call, read the way the API reads it (environment, the vertical's .env, the
+    repo-root .env); None when the packages are not installed yet."""
+    try:
+        from dotenv import dotenv_values
+
+        sys.path.insert(0, str(EXAMPLES_DIR))
+        from demo_common.model_provider import resolve_provider
+    except ImportError:
+        return None
+    values = {
+        **dotenv_values(REPO_ROOT / ".env"),
+        **dotenv_values(EXAMPLES_DIR / vertical / ".env"),
+        **os.environ,
+    }
+    saved = dict(os.environ)
+    try:
+        os.environ.update({key: value for key, value in values.items() if value is not None})
+        provider = resolve_provider()
+        return provider.label, provider.has_key(), provider.key_hint
+    except ValueError as error:
+        sys.exit(f"Model settings: {error}")
+    finally:
+        os.environ.clear()
+        os.environ.update(saved)
 
 
 def healthy_demo_api(port: int, store: str) -> bool:
@@ -185,11 +203,15 @@ def start_api(vertical: str, port: int, federated: bool) -> subprocess.Popen:
     return spawn(command, REPO_ROOT, env)
 
 
-def start_web(app_dir: Path, port: int, api_port: int, prod: bool) -> subprocess.Popen:
+def start_web(
+    app_dir: Path, port: int, api_port: int, prod: bool, webpack: bool
+) -> subprocess.Popen:
     env = {**os.environ, "NEXT_PUBLIC_API_URL": f"http://localhost:{api_port}"}
+    bundler = ["--webpack"] if webpack else []
     if prod:
-        subprocess.run([str(NEXT), "build"], cwd=app_dir, check=True, env=env)
-    return spawn([str(NEXT), "start" if prod else "dev", "--port", str(port)], app_dir, env)
+        subprocess.run([str(NEXT), "build", *bundler], cwd=app_dir, check=True, env=env)
+        return spawn([str(NEXT), "start", "--port", str(port)], app_dir, env)
+    return spawn([str(NEXT), "dev", *bundler, "--port", str(port)], app_dir, env)
 
 
 def reset_persisted_memory(vertical: str) -> str:
@@ -239,6 +261,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--no-install", action="store_true", help="fail instead of installing")
     parser.add_argument("--prod", action="store_true", help="next build + start instead of dev")
+    parser.add_argument(
+        "--webpack",
+        action="store_true",
+        help="bundle with webpack instead of Turbopack (for font URLs Turbopack cannot load)",
+    )
     parser.add_argument(
         "--federated",
         action="store_true",
@@ -290,14 +317,15 @@ def main() -> int:
             print(f"{YELLOW}Port {port} is busy — starting the {label} on :{moved}.{RESET}")
             webs[index] = (label, app_dir, moved)
 
-    if run_api and not reuse_api and not args.federated and not os.environ.get("ANTHROPIC_API_KEY"):
-        env_file = EXAMPLES_DIR / args.vertical / ".env"
-        if not env_file_has_key(env_file) and not env_file_has_key(REPO_ROOT / ".env"):
-            print(
-                f"{YELLOW}No ANTHROPIC_API_KEY found; chat uses the SDK's credential chain if "
-                f"one is configured and otherwise returns an error event. To use a key:{RESET}\n"
-                "  cp .env.example .env   # at the repo root; fill in the key and restart"
-            )
+    status = provider_key_status(args.vertical) if run_api and not reuse_api else None
+    if status is not None and not args.federated and not status[1]:
+        label, _, key_hint = status
+        print(
+            f"{YELLOW}No API key for {label} found; chat returns an error event until one is "
+            f"set (Anthropic also tries the SDK's credential chain). To use a key:{RESET}\n"
+            f"  set {key_hint} in .env at the repo root (MODEL_PROVIDER picks the model), "
+            "then restart"
+        )
 
     processes: list[tuple[str, subprocess.Popen]] = []
     try:
@@ -311,7 +339,7 @@ def main() -> int:
         if webs:
             ensure_web_deps(install=not args.no_install)
         for label, app_dir, port in webs:
-            process = start_web(app_dir, port, api_port, args.prod)
+            process = start_web(app_dir, port, api_port, args.prod, args.webpack)
             processes.append((label, process))
             pipe_output(process, f"{args.vertical}-{app_dir.name}")
             if not wait_for(f"http://localhost:{port}", 180, process):

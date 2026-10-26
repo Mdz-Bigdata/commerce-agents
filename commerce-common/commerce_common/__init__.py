@@ -18,5 +18,6 @@
 ``agent_sdk``         plumbing for the Agent SDK runtimes (needs ``claude-agent-sdk``)
 ``mcp_server``        plumbing for the reference MCP servers (needs ``mcp``)
 ``manifest``          resolves a Managed Agent manifest; ``scripts/deploy_managed_agent.sh`` runs it
+``openai_compat``     a ``client=`` for OpenAI-compatible Chat Completions endpoints
 ``testing``           a scripted fake model client
 """

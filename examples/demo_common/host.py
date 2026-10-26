@@ -13,7 +13,7 @@ import os
 from collections.abc import AsyncIterator, Awaitable, Callable, Coroutine, Sequence
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 import anthropic
 from dotenv import load_dotenv
@@ -23,15 +23,62 @@ from fastapi.responses import StreamingResponse
 from starlette.background import BackgroundTask
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from commerce_common.openai_compat import ModelAuthenticationError, ModelProviderError
 from commerce_common.streaming import AgentEvent, to_sse
 from commerce_common.turn import session_tag
 from shopping_agent import Cart, Order, ProductDetails, ShoppingSessionContext
 
+from .analytics import OperationsLog
+from .model_provider import ModelProvider, resolve_provider
 from .sessions import SessionConflictError, SessionRecord, SessionStore
 
 logger = logging.getLogger(__name__)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+
+# The web apps' two languages; a chat request names one and the agent replies in it.
+Locale = Literal["en", "zh"]
+REPLY_LANGUAGES: dict[str, str] = {"en": "English", "zh": "Simplified Chinese"}
+
+# The error events a chat turn can end with, in each language. ``{label}`` is the model
+# provider, ``{key_hint}`` the variable its key goes in, ``{env_hint}`` the example's .env.
+_ERROR_TEXT: dict[str, dict[str, str]] = {
+    "no_key": {
+        "en": "No API key is configured for {label}, so chat can't run. Set {key_hint} in "
+        "{env_hint} or the repo-root .env and restart; everything except chat works without one.",
+        "zh": "尚未为 {label} 配置 API 密钥，聊天暂不可用。请在 {env_hint} 或仓库根目录的 .env 中"
+        "设置 {key_hint} 后重启；除聊天外的功能都可正常使用。",
+    },
+    "auth_failed": {
+        "en": "{label} rejected the API key. Check {key_hint} in {env_hint} or the repo-root "
+        ".env, and unset any stale key exported by your shell.",
+        "zh": "{label} 拒绝了 API 密钥。请检查 {env_hint} 或仓库根目录 .env 中的 {key_hint}，"
+        "并清除 shell 中导出的过期密钥。",
+    },
+    "provider_error": {
+        "en": "{label} could not complete the request ({status}). Check MODEL_NAME and "
+        "MODEL_BASE_URL in the .env, then try again.",
+        "zh": "{label} 无法完成请求（{status}）。请检查 .env 中的 MODEL_NAME 和 MODEL_BASE_URL 后重试。",
+    },
+    "generic": {
+        "en": "Something went wrong on our side. Please try again.",
+        "zh": "我们这边出了点问题，请稍后重试。",
+    },
+}
+
+
+def reply_language(locale: Locale | None) -> str | None:
+    """The language name a session context carries for the locale a request names."""
+    return REPLY_LANGUAGES.get(locale) if locale else None
+
+
+def chat_error_text(
+    kind: str, locale: Locale | None, provider: ModelProvider, env_hint: str, status: object = ""
+) -> str:
+    template = _ERROR_TEXT[kind]["zh" if locale == "zh" else "en"]
+    return template.format(
+        label=provider.label, key_hint=provider.key_hint, env_hint=env_hint, status=status
+    )
 
 
 class DemoStorefront(Protocol):
@@ -88,11 +135,19 @@ def spawn_background(coro: Coroutine[Any, Any, object]) -> None:
 def _lifespan(on_startup: Sequence[Callable[[], Awaitable[None]]]):
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-        if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
+        provider = resolve_provider()
+        logger.info(
+            "model provider: %s, model %s", provider.label, provider.model or "(config default)"
+        )
+        if not provider.has_key():
             logger.info(
-                "No API key in the environment or .env files; the Anthropic SDK falls back "
-                "to its own credential chain. If chat returns auth errors, set "
-                "ANTHROPIC_API_KEY in a .env file (repo root or the example's directory)."
+                "No API key for %s in the environment or .env files%s. If chat returns auth "
+                "errors, set %s in a .env file (repo root or the example's directory).",
+                provider.label,
+                "; the Anthropic SDK falls back to its own credential chain"
+                if provider.is_anthropic
+                else "",
+                provider.key_hint,
             )
         for step in on_startup:
             await step()
@@ -161,45 +216,48 @@ def stream_turn(
     session: Any,
     *,
     env_hint: str,
+    locale: Locale | None = None,
+    log: OperationsLog | None = None,
 ) -> StreamingResponse:
     """Stream one turn as SSE; the record is written back once the stream has ended (the
-    request dependency wrote back before it began). Credential failures become a readable
-    error event naming ``env_hint`` (the example's ``.env`` path); anything else is logged
-    and reported generically. Memory extraction runs after the response has streamed."""
+    request dependency wrote back before it began). Credential and provider failures become
+    a readable error event, in the request's ``locale``, naming ``env_hint`` (the example's
+    ``.env`` path); anything else is logged and reported generically. Memory extraction
+    runs after the response has streamed. With ``log``, the turn's record goes to the
+    operations log and ``turn_complete`` carries its ``turn_id``."""
+    provider = resolve_provider()
+    recorder = log.turn(record.session_id, locale) if log is not None else None
+
+    def error(kind: str, status: object = "") -> str:
+        if recorder is not None:
+            recorder.failed(kind)
+        return to_sse(AgentEvent.error(chat_error_text(kind, locale, provider, env_hint, status)))
 
     async def event_stream() -> AsyncIterator[str]:
         try:
             async for event in agent.stream_turn(record.messages, session, record.state):
                 if event.type == "turn_complete" and event.data.get("results_cleared"):
                     record.stored_messages = 0  # earlier messages changed: rewrite the transcript
-                yield to_sse(event)
-        except anthropic.AuthenticationError:
+                yield to_sse(recorder.observe(event) if recorder is not None else event)
+        except (anthropic.AuthenticationError, ModelAuthenticationError) as failure:
             logger.exception("chat turn failed: API authentication")
-            yield to_sse(
-                AgentEvent.error(
-                    f"Anthropic API authentication failed (401). Check ANTHROPIC_API_KEY in "
-                    f"{env_hint} or the repo-root .env, unset any stale key exported by your "
-                    "shell, or restart with COMMERCE_DEMO_AUTH=sdk to use the SDK's own "
-                    "credential chain."
-                )
-            )
-        except Exception as error:  # the client gets a safe event, the log gets the rest
+            missing = isinstance(failure, ModelAuthenticationError) and failure.status is None
+            yield error("no_key" if missing else "auth_failed")
+        except ModelProviderError as failure:
+            logger.exception("chat turn failed: model provider")
+            yield error("provider_error", failure.status or "")
+        except Exception as failure:  # the client gets a safe event, the log gets the rest
             logger.exception("chat turn failed")
-            described = str(error).lower()
+            described = str(failure).lower()
             if any(word in described for word in ("authentication", "credential", "api_key")):
-                yield to_sse(
-                    AgentEvent.error(
-                        "No Anthropic API credentials are configured, so chat can't run. Set "
-                        f"ANTHROPIC_API_KEY in {env_hint} or the repo-root .env and restart; "
-                        "everything except chat works without one."
-                    )
-                )
+                yield error("no_key")
             else:
-                yield to_sse(
-                    AgentEvent.error("Something went wrong on our side. Please try again.")
-                )
+                yield error("generic")
         else:
             spawn_background(agent.update_memory(record.messages, session))
+        finally:
+            if recorder is not None:
+                recorder.write()
 
     def write_back() -> None:
         try:

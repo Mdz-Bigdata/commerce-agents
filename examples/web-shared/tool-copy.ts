@@ -1,6 +1,9 @@
 // Copyright 2026 Anthropic PBC
 // SPDX-License-Identifier: Apache-2.0
 
+import { english } from "./english";
+import type { Translate } from "./i18n";
+
 const TOOL_COPY: Record<string, string> = {
   search_products: "Searching the catalog…",
   get_product_details: "Reading the details…",
@@ -39,14 +42,14 @@ const QUERY_TOOLS = new Set([
   "web_search",
 ]);
 
-export function describeToolCall(tool: string, input: Record<string, unknown> = {}): string {
+export function describeToolCall(tool: string, input: Record<string, unknown> = {}, t: Translate = english): string {
   const copy = TOOL_COPY[tool];
   const query = typeof input.query === "string" ? input.query.trim() : "";
   if (copy && query && QUERY_TOOLS.has(tool)) {
-    return `${copy.replace(/…$/, "")} · “${query}”`;
+    return `${t(copy).replace(/…$/, "")} · “${query}”`;
   }
-  if (copy) return copy;
-  if (tool.startsWith("present_")) return "Composing the answer…";
-  if (tool.startsWith("stage_")) return "Staging a change for review…";
+  if (copy) return t(copy);
+  if (tool.startsWith("present_")) return t("Composing the answer…");
+  if (tool.startsWith("stage_")) return t("Staging a change for review…");
   return `${tool.replaceAll("_", " ")}…`;
 }

@@ -3,10 +3,12 @@
 
 "use client";
 
+import { useT } from "web-shared";
 import type { GuidePayload } from "@/lib/types";
 import { Stub } from "./shared";
 
 export default function GuideCard({ payload }: { payload: GuidePayload }) {
+  const t = useT();
   return (
     <Stub component="guide" label={payload.title}>
       <div className="space-y-3">
@@ -21,7 +23,7 @@ export default function GuideCard({ payload }: { payload: GuidePayload }) {
       </div>
       {payload.sources?.length ? (
         <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-(--line) pt-2">
-          <span className="at-eyebrow">Sources</span>
+          <span className="at-eyebrow">{t("Sources")}</span>
           {payload.sources.map((source) => (
             <span key={source} className="at-pill">
               {source}

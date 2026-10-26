@@ -3,8 +3,8 @@
 
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { type AgentEvent, type Profile, StoreShell, type StoreView, useAgentTurn, useCatalogIndex, useResource, useSession } from "web-shared";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { type AgentEvent, type Profile, StoreShell, type StoreView, useAgentTurn, useCatalogIndex, useResource, useSession, useT } from "web-shared";
 import Chat from "@/components/Chat";
 import OrderPanel from "@/components/OrderPanel";
 import AccountView from "@/components/views/AccountView";
@@ -48,6 +48,7 @@ export default function StorefrontPage() {
 }
 
 function Storefront({ profile, onSwitchProfile }: { profile: Profile; onSwitchProfile: (id: string) => void }) {
+  const t = useT();
   const session = useSession(api, { profile: profile.id });
   const [view, setView] = useState<View>("assistant");
   const [cart, setCart] = useState<CartPayload | null>(null);
@@ -68,27 +69,28 @@ function Storefront({ profile, onSwitchProfile }: { profile: Profile; onSwitchPr
   }, [session.sessionId]);
 
   const { monthly, today } = splitCart(cart?.items ?? [], catalog);
-  const figure = [monthly > 0 ? `${formatPrice(monthly)}/mo` : null, today > 0 ? `${formatPrice(today)} today` : null].filter(Boolean).join(" + ");
+  const figure = [monthly > 0 ? t("{price}/mo", { price: formatPrice(monthly) }) : null, today > 0 ? t("{price} today", { price: formatPrice(today) }) : null].filter(Boolean).join(" + ");
+  const views = useMemo(() => VIEWS.map((entry) => ({ ...entry, label: t(entry.label) })), [t]);
   const shopper = session.shopper ?? { name: profile.name };
 
   return (
     <StoreShell
       brand={<Wordmark />}
-      views={VIEWS}
+      views={views}
       view={view}
       onViewChange={setView}
       chat={chat}
       api={api}
-      assistantName={ASSISTANT}
+      assistantName={t(ASSISTANT)}
       shopper={shopper}
       profiles={PROFILES}
       profileId={profile.id}
       onSwitchProfile={onSwitchProfile}
-      bag={{ label: "Order", count: cart?.item_count ?? 0, noun: "item", figure: figure || null }}
+      bag={{ label: t("Order"), count: cart?.item_count ?? 0, noun: "item", figure: figure || null }}
       panel={<OrderPanel cart={cart} account={account.data?.account ?? null} />}
       panelOpen={panelOpen}
       onPanelOpenChange={setPanelOpen}
-      placeholder={view === "account" ? "Ask about your plan, an upgrade, a charge…" : "Ask about plans, phones, a fee…"}
+      placeholder={view === "account" ? t("Ask about your plan, an upgrade, a charge…") : t("Ask about plans, phones, a fee…")}
     >
       {/* The conversation stays mounted under the other view so its cards keep their state. */}
       <div className={view === "assistant" ? "h-full" : "hidden"}>

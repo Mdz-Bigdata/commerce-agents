@@ -3,18 +3,21 @@
 
 "use client";
 
-import { AskButton, coverLabel, formatNumber, KindIcon, MiniBar, Notice, optionValuesLabel, PageHeader, Panel, Pill, plural, Skeleton, useResource } from "web-shared";
+import { AskButton, formatNumber, KindIcon, MiniBar, Notice, optionValuesLabel, PageHeader, Panel, Pill, Skeleton, useResource, useT } from "web-shared";
 import { fetchAlerts } from "@/lib/api";
 import { INVENTORY_KINDS } from "@/lib/kinds";
+import { coverText, pluralT } from "@/lib/labels";
 import type { InventoryAlert } from "@/lib/types";
 
 function AlertRow({ alert, onAskAssistant }: { alert: InventoryAlert; onAskAssistant: (text: string) => void }) {
+  const t = useT();
   const style = INVENTORY_KINDS[alert.kind];
   const soldOut = alert.stock === 0;
   const low = alert.kind === "low_stock";
   const chosen = optionValuesLabel(alert);
-  const name = chosen ? `${alert.title} in ${chosen}` : alert.title;
-  const prompt = low ? `Draft a restock plan for ${name} (${alert.listing_id}).` : `Plan a markdown for ${name} (${alert.listing_id}).`;
+  const name = chosen ? t("{title} in {options}", { title: alert.title, options: chosen }) : alert.title;
+  const ref = `${name} (${alert.listing_id})`;
+  const prompt = low ? t("Draft a restock plan for {ref}.", { ref }) : t("Plan a markdown for {ref}.", { ref });
   return (
     <li className="flex items-center gap-3 px-[18px] py-3">
       <KindIcon icon={style.icon} tone={soldOut ? "danger" : style.tone} />
@@ -25,33 +28,34 @@ function AlertRow({ alert, onAskAssistant }: { alert: InventoryAlert; onAskAssis
         </div>
         <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[12.5px] tabular-nums text-(--ink-soft)">
           <span>{alert.listing_id}</span>
-          {alert.sales_last_30d != null ? <span>· {formatNumber(alert.sales_last_30d)} sold in 30 days</span> : null}
-          {low && alert.threshold != null ? <span>· reorder at {formatNumber(alert.threshold)}</span> : null}
+          {alert.sales_last_30d != null ? <span>· {t("{count} sold in 30 days", { count: formatNumber(alert.sales_last_30d) })}</span> : null}
+          {low && alert.threshold != null ? <span>· {t("reorder at {count}", { count: formatNumber(alert.threshold) })}</span> : null}
           {low && alert.stock > 0 && alert.storefront_visible ? (
             <Pill tone="warn" dot>
-              Storefront shows “Only {formatNumber(alert.stock)} left”
+              {t("Storefront shows “Only {count} left”", { count: formatNumber(alert.stock) })}
             </Pill>
           ) : null}
-          {soldOut && alert.storefront_visible === false ? <span>· hidden from the storefront</span> : null}
+          {soldOut && alert.storefront_visible === false ? <span>· {t("hidden from the storefront")}</span> : null}
         </div>
       </div>
       <div className="w-32 shrink-0 whitespace-nowrap text-right tabular-nums">
         <div className={`text-[15px] font-semibold ${soldOut ? "text-(--danger)" : low ? "text-(--warn)" : "text-(--ink)"}`}>
           {soldOut ? "0" : formatNumber(alert.stock)}
-          <span className="ml-1 text-[11.5px] font-medium text-(--ink-soft)">in stock</span>
+          <span className="ml-1 text-[11.5px] font-medium text-(--ink-soft)">{t("in stock")}</span>
         </div>
         <div className="mt-0.5 flex items-center justify-end gap-1.5 text-[11.5px] text-(--ink-soft)">
           {/* Stock against the reorder threshold: empty at zero, full at twice the threshold. */}
           {low && alert.threshold ? <MiniBar value={alert.stock / (alert.threshold * 2)} tone={soldOut ? "danger" : "warn"} /> : null}
-          {alert.days_of_cover != null && !soldOut ? <span>{coverLabel(alert.days_of_cover)}</span> : soldOut ? <span>sold out</span> : null}
+          {alert.days_of_cover != null && !soldOut ? <span>{coverText(t, alert.days_of_cover)}</span> : soldOut ? <span>{t("sold out")}</span> : null}
         </div>
       </div>
-      <AskButton label={low ? "Draft restock" : "Plan markdown"} onClick={() => onAskAssistant(prompt)} />
+      <AskButton label={low ? t("Draft restock") : t("Plan markdown")} onClick={() => onAskAssistant(prompt)} />
     </li>
   );
 }
 
 export default function InventoryView({ refreshKey, onAskAssistant }: { refreshKey: number; onAskAssistant: (text: string) => void }) {
+  const t = useT();
   const { data, failed } = useResource(fetchAlerts, [refreshKey]);
 
   const lowStock = (data?.inventory ?? [])
@@ -63,11 +67,19 @@ export default function InventoryView({ refreshKey, onAskAssistant }: { refreshK
   return (
     <div className="ac-reveal @container flex flex-col gap-4">
       <PageHeader
-        title="Inventory"
-        subtitle={data ? `${lowStock.length} low or out of stock · ${plural(slowMovers.length, "slow mover")}${tiedUp ? ` with ${formatNumber(tiedUp)} units tied up` : ""}` : undefined}
+        title={t("Inventory")}
+        subtitle={
+          data
+            ? t(tiedUp ? "{low} low or out of stock · {slow} with {units} units tied up" : "{low} low or out of stock · {slow}", {
+                low: lowStock.length,
+                slow: pluralT(t, slowMovers.length, "{count} slow mover", "{count} slow movers"),
+                units: formatNumber(tiedUp),
+              })
+            : undefined
+        }
       />
       {failed && !data ? (
-        <Notice>The merchant API isn&apos;t reachable, so inventory alerts can&apos;t load.</Notice>
+        <Notice>{t("The merchant API isn't reachable, so inventory alerts can't load.")}</Notice>
       ) : !data ? (
         <div className="grid gap-4 @4xl:grid-cols-2">
           <Skeleton className="h-72" />
@@ -75,9 +87,9 @@ export default function InventoryView({ refreshKey, onAskAssistant }: { refreshK
         </div>
       ) : (
         <div className="grid items-start gap-4 @4xl:grid-cols-2">
-          <Panel title="Low stock" subtitle="soonest to run out first">
+          <Panel title={t("Low stock")} subtitle={t("soonest to run out first")}>
             {lowStock.length === 0 ? (
-              <p className="px-[18px] pb-4 text-[13.5px] text-(--ink-soft)">No low-stock listings.</p>
+              <p className="px-[18px] pb-4 text-[13.5px] text-(--ink-soft)">{t("No low-stock listings.")}</p>
             ) : (
               <ul className="divide-y divide-(--line)">
                 {lowStock.map((alert) => (
@@ -86,9 +98,9 @@ export default function InventoryView({ refreshKey, onAskAssistant }: { refreshK
               </ul>
             )}
           </Panel>
-          <Panel title="Slow movers" subtitle="stock well above the last 30 days of sales">
+          <Panel title={t("Slow movers")} subtitle={t("stock well above the last 30 days of sales")}>
             {slowMovers.length === 0 ? (
-              <p className="px-[18px] pb-4 text-[13.5px] text-(--ink-soft)">No slow movers.</p>
+              <p className="px-[18px] pb-4 text-[13.5px] text-(--ink-soft)">{t("No slow movers.")}</p>
             ) : (
               <ul className="divide-y divide-(--line)">
                 {slowMovers.map((alert) => (

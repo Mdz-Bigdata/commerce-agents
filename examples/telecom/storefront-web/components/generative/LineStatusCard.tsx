@@ -5,7 +5,7 @@
 
 /** Renders present_order_status. */
 
-import { formatDate, orderStatusLabel } from "web-shared";
+import { formatDate, orderStatusLabel, useT } from "web-shared";
 import { formatPrice } from "@/lib/format";
 import type { OrderStatusPayload } from "@/lib/types";
 import { Frame } from "./shared";
@@ -19,12 +19,13 @@ const STATUS_STYLE: Record<string, { className: string; pulse?: boolean }> = {
 };
 
 export default function LineStatusCard({ payload }: { payload: OrderStatusPayload }) {
+  const t = useT();
   const order = payload.order;
   const status = (order?.status ?? "processing").toLowerCase();
   const style = STATUS_STYLE[status] ?? {};
 
   return (
-    <Frame component="order_status" label={`Order ${payload.order_id}`}>
+    <Frame component="order_status" label={t("Order {id}", { id: payload.order_id })}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className={`am-tag ${style.className} !px-3 !py-1.5 !text-[12px]`}>
           {style.pulse ? <span className="am-live" aria-hidden /> : <span aria-hidden>■</span>}
@@ -32,7 +33,7 @@ export default function LineStatusCard({ payload }: { payload: OrderStatusPayloa
         </span>
         {order?.estimated_delivery ? (
           <p className="am-mono text-[13px] text-(--ink-soft)">
-            ETA <span className="font-semibold text-(--ink)">{formatDate(order.estimated_delivery)}</span>
+            {t("ETA")} <span className="font-semibold text-(--ink)">{formatDate(order.estimated_delivery)}</span>
           </p>
         ) : null}
       </div>
@@ -58,7 +59,7 @@ export default function LineStatusCard({ payload }: { payload: OrderStatusPayloa
             </div>
           ))}
           <div className="am-rule-bold mt-1 flex items-baseline justify-between pt-1.5">
-            <span className="am-meta">Total</span>
+            <span className="am-meta">{t("Total")}</span>
             <span className="am-mono text-[15px] font-semibold text-(--ink)">
               {formatPrice(order.total, order.currency)}
             </span>

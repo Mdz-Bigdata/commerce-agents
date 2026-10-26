@@ -3,9 +3,9 @@
 
 "use client";
 
-import { AskLink, BagPanel, CheckoutButton, plural, RemoveLink, Stepper, TotalRow, useCatalogIndex, useStoreFrame } from "web-shared";
+import { AskLink, BagPanel, CheckoutButton, RemoveLink, Stepper, type Translate, TotalRow, useCatalogIndex, useStoreFrame, useT } from "web-shared";
 import { fetchProducts } from "@/lib/api";
-import { formatPrice, productCity, productPlace, quantityLabel, shortDate } from "@/lib/format";
+import { bookingCount, formatPrice, productCity, productPlace, quantityLabel, shortDate } from "@/lib/format";
 import type { CartItem, CartPayload, Product } from "@/lib/types";
 import { PostcardWindow } from "./PostcardWindow";
 
@@ -16,28 +16,30 @@ function quantityNoun(item: CartItem): "night" | "guest" | null {
   return null;
 }
 
-function quantityMessage(item: CartItem, quantity: number): string {
-  const s = quantity === 1 ? "" : "s";
-  return quantityNoun(item) === "night" ? `Make the ${item.title} ${quantity} night${s}.` : `Make the ${item.title} for ${quantity} guest${s}.`;
+function quantityMessage(item: CartItem, quantity: number, t: Translate): string {
+  const vars = { title: item.title, n: quantity };
+  if (quantityNoun(item) === "night") return quantity === 1 ? t("Make the {title} {n} night.", vars) : t("Make the {title} {n} nights.", vars);
+  return quantity === 1 ? t("Make the {title} for {n} guest.", vars) : t("Make the {title} for {n} guests.", vars);
 }
 
-function cancellationLine(product?: Product): { text: string; free: boolean } | null {
+function cancellationLine(t: Translate, product?: Product): { text: string; free: boolean } | null {
   if (!product?.attributes) return null;
   const refundable = /^(yes|true)$/i.test(product.attributes.refundable ?? "");
   if (refundable) {
     const until = shortDate(product.attributes.free_cancellation_until);
-    return { text: until ? `Cancel free until ${until}` : "Free cancellation", free: true };
+    return { text: until ? t("Cancel free until {date}", { date: until }) : t("Free cancellation"), free: true };
   }
   if (/^(no|false|none)$/i.test((product.attributes.refundable ?? "").trim())) {
-    return { text: "Non-refundable", free: false };
+    return { text: t("Non-refundable"), free: false };
   }
   return null;
 }
 
 function CartRow({ item, product }: { item: CartItem; product?: Product }) {
+  const t = useT();
   const { ask } = useStoreFrame();
   const noun = quantityNoun(item);
-  const cancellation = cancellationLine(product);
+  const cancellation = cancellationLine(t, product);
   const nights = noun === "night" ? item.quantity : 0;
   return (
     <div>
@@ -68,7 +70,7 @@ function CartRow({ item, product }: { item: CartItem; product?: Product }) {
                 ))}
               </span>
               <span className="text-[11px] font-semibold text-(--ink-soft)">
-                {nights} night{nights === 1 ? "" : "s"}
+                {nights === 1 ? t("{n} night", { n: nights }) : t("{n} nights", { n: nights })}
               </span>
             </div>
           ) : null}
@@ -87,7 +89,7 @@ function CartRow({ item, product }: { item: CartItem; product?: Product }) {
       {/* Line totals share the trip total's right edge. */}
       <div className="mt-1.5 flex items-baseline justify-between gap-3 pl-[100px]">
         <span className="text-[12px] text-(--ink-soft)">
-          {formatPrice(item.price)} {quantityLabel(item.product_id, item.quantity)}
+          {formatPrice(item.price)} {quantityLabel(item.product_id, item.quantity, t)}
         </span>
         <span className="al-display shrink-0 text-[15px] font-bold text-(--ink)">
           {formatPrice(item.line_total)}
@@ -99,10 +101,10 @@ function CartRow({ item, product }: { item: CartItem; product?: Product }) {
             quantity={item.quantity}
             unit={noun}
             itemTitle={item.title}
-            onChange={(quantity) => ask(quantity < 1 ? `Remove the ${item.title} from my trip.` : quantityMessage(item, quantity))}
+            onChange={(quantity) => ask(quantity < 1 ? t("Remove the {title} from my trip.", { title: item.title }) : quantityMessage(item, quantity, t))}
           />
         ) : null}
-        <RemoveLink itemTitle={item.title} onClick={() => ask(`Remove the ${item.title} from my trip.`)} />
+        <RemoveLink itemTitle={item.title} onClick={() => ask(t("Remove the {title} from my trip.", { title: item.title }))} />
       </div>
     </div>
   );
@@ -118,6 +120,7 @@ export default function TripPanel({
   checkoutStaged?: boolean;
   productIndex?: Record<string, Product>;
 }) {
+  const t = useT();
   const catalog = useCatalogIndex(fetchProducts);
   const index = productIndex ?? catalog;
   const items = cart?.items ?? [];
@@ -125,23 +128,23 @@ export default function TripPanel({
   const count = items.length;
   return (
     <BagPanel
-      title="Trip"
-      count={plural(count, "booking")}
+      title={t("Trip")}
+      count={bookingCount(t, count)}
       isEmpty={count === 0}
       empty={
         <>
-          Nothing booked yet.
+          {t("Nothing booked yet.")}
           <br />
-          Ask ACME Assistant where to go.
+          {t("Ask ACME Assistant where to go.")}
         </>
       }
       footer={
         <>
-          <TotalRow label="Trip total" value={formatPrice(cart?.subtotal ?? 0)} note={count ? "All-in; nothing is charged until you check out." : undefined} />
-          <CheckoutButton staged={checkoutStaged} disabled={count === 0} prompt="Check out my trip." />
+          <TotalRow label={t("Trip total")} value={formatPrice(cart?.subtotal ?? 0)} note={count ? t("All-in; nothing is charged until you check out.") : undefined} />
+          <CheckoutButton staged={checkoutStaged} disabled={count === 0} prompt={t("Check out my trip.")} />
           {count ? (
             <div className="mt-2.5 flex justify-center">
-              <AskLink label="Ask about this trip" prompt="Look over my trip: anything missing or worth changing?" />
+              <AskLink label={t("Ask about this trip")} prompt={t("Look over my trip: anything missing or worth changing?")} />
             </div>
           ) : null}
         </>

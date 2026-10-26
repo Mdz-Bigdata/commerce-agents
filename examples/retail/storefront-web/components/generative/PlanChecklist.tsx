@@ -3,7 +3,8 @@
 
 "use client";
 
-import { formatMoney } from "web-shared";
+import { formatMoney, useT } from "web-shared";
+import { rich } from "@/lib/rich";
 import type { PlanPayload, Product } from "@/lib/types";
 import ProductTile, { ProductRow } from "../ProductTile";
 
@@ -11,6 +12,7 @@ const SEGMENT_CLASSES = ["bg-sky-400", "bg-emerald-400", "bg-violet-400", "bg-am
 
 /** Each priced step contributes its cheapest option. */
 function BudgetBar({ steps }: { steps: PlanPayload["steps"] }) {
+  const t = useT();
   const priced = steps.map((step) =>
     step.products.length ? Math.min(...step.products.map((product) => product.price)) : 0,
   );
@@ -34,12 +36,14 @@ function BudgetBar({ steps }: { steps: PlanPayload["steps"] }) {
       </div>
       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-(--ink-soft)">
         <span>
-          Planned picks <span className="font-semibold text-(--ink)">{formatMoney(total)}</span>
-          {steps.some((step) => step.products.length > 1) ? " (cheapest option per step)" : ""}
+          {rich(
+            t(steps.some((step) => step.products.length > 1) ? "Planned picks {amount} (cheapest option per step)" : "Planned picks {amount}"),
+            { amount: <span className="font-semibold text-(--ink)">{formatMoney(total)}</span> },
+          )}
         </span>
         {withoutItems > 0 ? (
           <span>
-            {withoutItems} step{withoutItems === 1 ? "" : "s"} with no items to show
+            {t(withoutItems === 1 ? "{count} step with no items to show" : "{count} steps with no items to show", { count: withoutItems })}
           </span>
         ) : null}
       </div>
@@ -56,6 +60,7 @@ export default function PlanChecklist({
   onAdd?: (product: Product) => boolean | void | Promise<boolean | void>;
   partial?: boolean;
 }) {
+  const t = useT();
   const steps = payload.steps ?? [];
   return (
     <section className="rounded-2xl border border-(--line) bg-(--card) p-3.5 shadow-(--shadow-sm)">
@@ -82,7 +87,7 @@ export default function PlanChecklist({
                   ))}
                 </div>
               ) : partial ? null : (
-                <div className="mt-1 text-[13px] text-(--ink-soft)/80">No items to show for this step.</div>
+                <div className="mt-1 text-[13px] text-(--ink-soft)/80">{t("No items to show for this step.")}</div>
               )}
             </div>
           </li>

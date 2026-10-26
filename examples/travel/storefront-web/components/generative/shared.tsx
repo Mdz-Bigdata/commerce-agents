@@ -4,6 +4,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import { useLocale, useT } from "web-shared";
 import { formatPrice, productPlace, productPriceUnit } from "@/lib/format";
 import type { Product } from "@/lib/types";
 import { PostcardWindow } from "../PostcardWindow";
@@ -76,6 +77,7 @@ function parseDateFlex(raw?: string): DateFlexCell[] | null {
 }
 
 export function DateFlexStrip({ raw }: { raw?: string }) {
+  const { locale, t } = useLocale();
   const cells = parseDateFlex(raw);
   if (!cells) return null;
   const cheapest = Math.min(...cells.map((cell) => cell.rate));
@@ -90,7 +92,7 @@ export function DateFlexStrip({ raw }: { raw?: string }) {
           return (
             <span
               key={cell.iso}
-              title={`${cell.weekday}: $${cell.rate}/night`}
+              title={t("{day}: ${rate}/night", { day: t(cell.weekday), rate: cell.rate })}
               className="flex min-w-0 flex-1 flex-col items-center rounded-md py-1"
               style={{
                 fontFamily: BODY,
@@ -99,7 +101,7 @@ export function DateFlexStrip({ raw }: { raw?: string }) {
               }}
             >
               <span style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-soft)" }}>
-                {cell.weekday[0]}
+                {locale === "zh" ? t(cell.weekday).slice(-1) : cell.weekday[0]}
                 <span style={{ fontWeight: 400 }}>{cell.day}</span>
               </span>
               <span
@@ -117,7 +119,7 @@ export function DateFlexStrip({ raw }: { raw?: string }) {
       </div>
       {savings >= 15 && bestCell ? (
         <p className="mt-1" style={{ fontFamily: BODY, fontSize: 11, fontWeight: 600, color: "var(--accent)" }}>
-          Save ${savings} by arriving {bestCell.weekday}
+          {t("Save ${savings} by arriving {day}", { savings, day: t(bestCell.weekday) })}
         </p>
       ) : null}
     </div>
@@ -147,6 +149,7 @@ const RATE_POSITION_LABELS: Record<RatePosition["position"], string> = {
 };
 
 export function RateGauge({ price, band }: { price: number; band?: string }) {
+  const t = useT();
   const parsed = ratePosition(price, band);
   if (!parsed) return null;
   const span = parsed.high - parsed.low;
@@ -182,13 +185,14 @@ export function RateGauge({ price, band }: { price: number; band?: string }) {
           color: lower ? "var(--accent)" : "var(--ink-soft)",
         }}
       >
-        {RATE_POSITION_LABELS[parsed.position]}
+        {t(RATE_POSITION_LABELS[parsed.position])}
       </span>
     </div>
   );
 }
 
 export function ScarcityChip({ unitsLeft }: { unitsLeft?: string }) {
+  const t = useT();
   const count = Number(unitsLeft);
   if (!unitsLeft || !Number.isInteger(count) || count < 1) return null;
   return (
@@ -203,7 +207,7 @@ export function ScarcityChip({ unitsLeft }: { unitsLeft?: string }) {
         background: "var(--surface)",
       }}
     >
-      {count} left for your dates
+      {t("{n} left for your dates", { n: count })}
     </span>
   );
 }
@@ -224,7 +228,8 @@ export function Stars({ rating, count }: { rating?: number | null; count?: numbe
 }
 
 export function MiniProductCard({ product }: { product: Product }) {
-  const unit = productPriceUnit(product);
+  const t = useT();
+  const unit = productPriceUnit(product, t);
   return (
     <div
       className={`flex shrink-0 items-center gap-2.5 p-2 pr-3 ${HOVER_LIFT}`}

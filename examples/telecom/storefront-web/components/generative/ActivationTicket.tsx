@@ -5,7 +5,7 @@
 
 /** Renders checkout as an activation ticket. */
 
-import { useCatalogIndex, safeHandoffs } from "web-shared";
+import { safeHandoffs, useCatalogIndex, useT } from "web-shared";
 import PlanTile from "@/components/PlanTile";
 import { fetchProducts } from "@/lib/api";
 import { billAfterOrder, formatPrice, priceUnitOf, splitCart } from "@/lib/format";
@@ -62,6 +62,7 @@ function BillDeltaStrip({
 }: {
   bill: { before: number; after: number; replacesPlan: boolean };
 }) {
+  const t = useT();
   const delta = Math.round((bill.after - bill.before) * 100) / 100;
   // The "after" figure counts from today's bill to its new value.
   const animatedDelta = useCountUp(delta, COUNT_MS);
@@ -69,22 +70,22 @@ function BillDeltaStrip({
   return (
     <div className="am-rule mt-3 pt-2.5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <p className="am-meta">Your bill</p>
+        <p className="am-meta">{t("Your bill")}</p>
         <p className="am-mono text-[13.5px] font-semibold text-(--ink)">
-          {formatPrice(bill.before)}/mo → {formatPrice(after)}/mo{" "}
+          {t("{before}/mo → {after}/mo", { before: formatPrice(bill.before), after: formatPrice(after) })}{" "}
           <span className={delta < 0 ? "text-(--accent)" : "text-(--ink-soft)"}>
             (
             {delta === 0
-              ? "no change"
-              : `${delta > 0 ? "+" : "−"}${formatPrice(Math.abs(delta))}/mo`}
+              ? t("no change")
+              : t("{sign}{amount}/mo", { sign: delta > 0 ? "+" : "−", amount: formatPrice(Math.abs(delta)) })}
             )
           </span>
         </p>
       </div>
       <p className="mt-0.5 text-[11px] leading-snug text-(--ink-soft)">
         {bill.replacesPlan
-          ? "your current plan is replaced at activation; existing device installments continue unchanged"
-          : "added to your current bill; existing device installments continue unchanged"}
+          ? t("your current plan is replaced at activation; existing device installments continue unchanged")
+          : t("added to your current bill; existing device installments continue unchanged")}
       </p>
     </div>
   );
@@ -97,6 +98,7 @@ export default function ActivationTicket({
   payload: CheckoutPayload;
   account?: AccountContext | null;
 }) {
+  const t = useT();
   const handoffs = safeHandoffs(payload.handoffs);
   const catalog = useCatalogIndex(fetchProducts);
   const items = payload.cart?.items ?? [];
@@ -106,7 +108,7 @@ export default function ActivationTicket({
   return (
     <Frame
       component="checkout"
-      label="Activation order for your confirmation"
+      label={t("Activation order for your confirmation")}
       flush
     >
       <div className="flex flex-col sm:flex-row">
@@ -114,13 +116,13 @@ export default function ActivationTicket({
         <div className="flex-1 p-4 sm:p-5">
           <div className="flex items-baseline justify-between">
             <h3 className="text-[16px] font-extrabold uppercase tracking-[0.04em] text-(--ink)">
-              Activation order
+              {t("Activation order")}
             </h3>
             <span
               className="am-stamp am-mono text-[11px] text-(--ink-soft)"
               style={{ animationDelay: `${QR_ASSEMBLY_MS + COUNT_MS - 200}ms` }}
             >
-              NOT CHARGED
+              {t("NOT CHARGED")}
             </span>
           </div>
 
@@ -136,7 +138,7 @@ export default function ActivationTicket({
                     <span className="am-mono shrink-0 text-[14px] font-semibold text-(--ink)">
                       {formatPrice(item.line_total)}
                       {priceUnitOf(item.product_id, catalog) === "per_month" ? (
-                        <span className="text-[11px] font-normal text-(--ink-soft)">/mo</span>
+                        <span className="text-[11px] font-normal text-(--ink-soft)">{t("/mo")}</span>
                       ) : null}
                     </span>
                   }
@@ -147,11 +149,11 @@ export default function ActivationTicket({
 
           <div className="am-rule-heavy mt-2 grid grid-cols-2 gap-3 pt-3">
             <div>
-              <p className="am-meta">Monthly</p>
-              <CountUpPrice value={monthly} suffix="/mo" />
+              <p className="am-meta">{t("Monthly")}</p>
+              <CountUpPrice value={monthly} suffix={t("/mo")} />
             </div>
             <div>
-              <p className="am-meta">Due today</p>
+              <p className="am-meta">{t("Due today")}</p>
               <CountUpPrice value={today} />
             </div>
           </div>
@@ -166,9 +168,9 @@ export default function ActivationTicket({
         {/* eSIM stub */}
         <div className="flex shrink-0 items-center justify-between gap-4 border-t-2 border-dashed border-(--line) bg-(--well)/60 p-4 sm:w-[180px] sm:flex-col sm:items-start sm:justify-center sm:border-l-2 sm:border-t-0 sm:p-5">
           <div>
-            <p className="am-meta">eSIM ready</p>
+            <p className="am-meta">{t("eSIM ready")}</p>
             <p className="mt-0.5 text-[11.5px] leading-snug text-(--ink-soft)">
-              Activates in minutes after you check out.
+              {t("Activates in minutes after you check out.")}
             </p>
           </div>
           <QrPlate seed={items.map((i) => i.product_id).join("|") || "acme-mobile"} />
@@ -187,7 +189,7 @@ export default function ActivationTicket({
               aria-describedby="am-activation-demo-note"
               className="w-full rounded-(--radius) bg-(--ink) py-2.5 text-center text-[14px] font-semibold text-(--surface)"
             >
-              {h.label ?? (h.seller ? `Continue to checkout with ${h.seller}` : "Continue to checkout")}
+              {h.label ?? (h.seller ? t("Continue to checkout with {seller}", { seller: h.seller }) : t("Continue to checkout"))}
             </a>
           ))}
         </div>
@@ -197,7 +199,7 @@ export default function ActivationTicket({
         id="am-activation-demo-note"
         className="border-t border-(--line) px-4 py-2 text-center text-[11px] font-medium text-(--ink-soft)"
       >
-        Nothing is charged here. Payment happens when you check out.
+        {t("Nothing is charged here. Payment happens when you check out.")}
       </p>
     </Frame>
   );

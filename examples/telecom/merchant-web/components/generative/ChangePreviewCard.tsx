@@ -8,7 +8,6 @@ import {
   type ChangeAction,
   ChangeStatusPill,
   DiffRows,
-  describeProposer,
   formatDate,
   formatMoney,
   GenCard,
@@ -19,7 +18,9 @@ import {
   MarginHeadroom,
   titleCase,
   useChangeActions,
+  useT,
 } from "web-shared";
+import { proposerText } from "@/lib/copy";
 import type { ChangePreviewPayload, StagedChange } from "@/lib/types";
 
 export default function ChangePreviewCard({
@@ -29,6 +30,7 @@ export default function ChangePreviewCard({
   payload: ChangePreviewPayload;
   onAct?: (changeId: string, action: ChangeAction) => Promise<StagedChange | null>;
 }) {
+  const t = useT();
   const { change, busy, error, act, canAct } = useChangeActions(payload.change, onAct);
   const shortItems = change.items.filter((item) => !isLongTextDiff(item));
   const longItems = change.items.filter(isLongTextDiff);
@@ -36,13 +38,13 @@ export default function ChangePreviewCard({
   return (
     <GenCard>
       <GenCardHeader
-        title={payload.headline ?? "Proposed change"}
+        title={payload.headline ?? t("Proposed change")}
         meta={
           <>
             <ChangeStatusPill status={change.status} />
-            <span>{titleCase(change.kind)}</span>
+            <span>{t(titleCase(change.kind))}</span>
             <span aria-hidden>·</span>
-            <span>{describeProposer(change)}</span>
+            <span>{proposerText(t, change)}</span>
             <span aria-hidden>·</span>
             <span>{formatDate(change.created_at)}</span>
           </>
@@ -55,11 +57,11 @@ export default function ChangePreviewCard({
       {longItems.map((item, index) => (
         <LongTextDiff key={`${item.target}-${item.field}-${index}`} item={item} />
       ))}
-      <MarginHeadroom change={change} costLabel="Unit cost" />
+      <MarginHeadroom change={change} costLabel={t("Unit cost")} />
 
       {change.margin_impact != null ? (
         <p className="am-mono mx-3.5 mt-2 text-[12.5px] text-(--ink-soft)">
-          Margin impact{" "}
+          {t("Margin impact")}{" "}
           <b className={`font-semibold ${change.margin_impact < 0 ? "text-(--danger)" : "text-(--ok)"}`}>
             {change.margin_impact > 0 ? "+" : ""}
             {formatMoney(change.margin_impact, change.currency ?? undefined)}

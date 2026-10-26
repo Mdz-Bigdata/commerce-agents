@@ -4,6 +4,7 @@
 "use client";
 
 import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react";
+import { type Translate, useT } from "web-shared";
 import { formatPrice, productCity, productPlace, productPriceUnit } from "@/lib/format";
 import type { Product, ProductsPayload } from "@/lib/types";
 import { PostcardWindow } from "../PostcardWindow";
@@ -34,14 +35,14 @@ const HIDDEN_ATTRS = new Set([
   "units_left_for_dates",
 ]);
 
-function specChips(product: Product): string[] {
+function specChips(product: Product, t: Translate): string[] {
   return Object.entries(product.attributes ?? {})
     .filter(([key]) => !HIDDEN_ATTRS.has(key) && !/cancel|refund/i.test(key))
     .map(([key, value]) => {
-      if (/^(yes|true)$/i.test(value)) return key.replace(/_/g, " ").replace(/\bincluded\b/, "incl.");
+      if (/^(yes|true)$/i.test(value)) return t(key.replace(/_/g, " ").replace(/\bincluded\b/, "incl."));
       if (/^(no|false)$/i.test(value)) return null;
-      if (key === "duration_hours") return `${value} hrs`;
-      if (key === "group_size_max") return `groups of ${value}`;
+      if (key === "duration_hours") return t("{n} hrs", { n: value });
+      if (key === "group_size_max") return t("groups of {n}", { n: value });
       return value;
     })
     .filter((chip): chip is string => Boolean(chip))
@@ -75,12 +76,13 @@ function isNonRefundable(product: Product): boolean {
 }
 
 function SoldOutBand() {
+  const t = useT();
   return (
     <span
       className="absolute inset-x-0 top-1/2 z-10 -translate-y-1/2 py-1.5 text-center"
       style={{ ...META, fontSize: 11, color: "var(--surface)", background: "rgba(31,61,51,0.82)" }}
     >
-      Sold out for these dates
+      {t("Sold out for these dates")}
     </span>
   );
 }
@@ -98,9 +100,10 @@ export function TravelCard({
   className?: string;
   style?: CSSProperties;
 }) {
+  const t = useT();
   const city = productCity(product);
-  const unit = productPriceUnit(product);
-  const chips = specChips(product);
+  const unit = productPriceUnit(product, t);
+  const chips = specChips(product, t);
   const soldOut = product.in_stock === false;
   const deadline = cancellationDeadline(product);
 
@@ -153,8 +156,7 @@ export function TravelCard({
                 background: "var(--accent-soft)",
               }}
             >
-              ✓ Free cancellation
-              {deadline ? ` until ${deadline}` : ""}
+              {deadline ? t("✓ Free cancellation until {date}", { date: deadline }) : t("✓ Free cancellation")}
             </span>
           ) : isNonRefundable(product) ? (
             <span
@@ -167,7 +169,7 @@ export function TravelCard({
                 background: "var(--well)",
               }}
             >
-              Non-refundable
+              {t("Non-refundable")}
             </span>
           ) : null}
           <ScarcityChip unitsLeft={product.attributes?.units_left_for_dates} />
@@ -181,7 +183,7 @@ export function TravelCard({
           </span>
           {unit ? (
             <span style={{ ...META, fontSize: 11, marginLeft: 3 }}>
-              {unit} · all-in
+              {t("{unit} · all-in", { unit })}
             </span>
           ) : null}
         </span>

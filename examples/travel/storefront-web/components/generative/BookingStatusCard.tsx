@@ -3,6 +3,7 @@
 
 "use client";
 
+import { useT } from "web-shared";
 import { formatPrice } from "@/lib/format";
 import type { OrderStatusPayload } from "@/lib/types";
 import { BODY, CARD, DISPLAY, META, display } from "./shared";
@@ -28,6 +29,7 @@ function formatEta(raw: string): string {
 }
 
 function StatusStamp({ status }: { status: string }) {
+  const t = useT();
   const alert = ALERT_STATUSES.has(status);
   const color = alert ? "var(--accent)" : "var(--ink)";
   return (
@@ -41,18 +43,19 @@ function StatusStamp({ status }: { status: string }) {
         letterSpacing: "0.14em",
       }}
     >
-      {(BOOKING_STATUS_LABELS[status] ?? status).replaceAll("_", " ")}
+      {t((BOOKING_STATUS_LABELS[status] ?? status).replaceAll("_", " "))}
     </span>
   );
 }
 
 export default function BookingStatusCard({ payload }: { payload: OrderStatusPayload }) {
+  const t = useT();
   const order = payload.order;
   return (
     <section className="al-reveal" style={{ ...CARD, padding: 24 }}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div style={META}>Booking</div>
+          <div style={META}>{t("Booking")}</div>
           <h3 className="mt-0.5" style={display(20, 600)}>
             {payload.order_id}
           </h3>
@@ -96,14 +99,14 @@ export default function BookingStatusCard({ payload }: { payload: OrderStatusPay
             className="mt-1.5 flex items-baseline justify-between border-t pt-1.5"
             style={{ borderColor: "var(--line)" }}
           >
-            <span style={META}>Total</span>
+            <span style={META}>{t("Total")}</span>
             <span style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 17, color: "var(--ink)" }}>
               {formatPrice(order.total)}
             </span>
           </div>
           {order.estimated_delivery ? (
             <div className="mt-1.5" style={{ ...META, fontSize: 11 }}>
-              ETA · {formatEta(order.estimated_delivery)}
+              {t("ETA · {date}", { date: formatEta(order.estimated_delivery) })}
             </div>
           ) : null}
         </div>

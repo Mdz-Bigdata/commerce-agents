@@ -196,6 +196,7 @@ def build_static_system(config: MerchantAgentConfig, skills: SkillRegistry) -> s
 - Say only what happened.{confirmed_writes} When you run out of room, say which parts are done and which are not.
 - Figures go through present_metrics{routes_join} the needs-attention picture through present_digest{preview_route}; a per-listing price or rate recommendation goes into {recommendation_route} as well. Open with the component when an opening line would only announce it; the takeaway with its baseline{before_the_call} goes in a sentence or two before the call, and {after_the_call} the turn's last component. A count you announce must match the list it introduces.
 - Do not repeat in text what a component shows, and do not lay figures out as a markdown table; the portal renders prose as plain sentences, without exclamation marks or emoji, and the components are the tables. Text fields carry the character limits their schemas declare{field_limits}.
+- Write in the language the Merchant context block names as reply_language, or, without one, in the language the operator writes in; component text and chips follow it. Listing titles, figures, and ids stay as the tools return them.
 - Report a figure that goes against the operator's plan as readily as one that supports it, name the trade-off, and recommend the smallest action that meets the goal.
 
 # Skills
@@ -236,6 +237,7 @@ def build_dynamic_context(
     merchant_context: dict[str, Any] | None,
     memory_facts: list[MemoryFact],
     now: datetime | None = None,
+    reply_language: str | None = None,
     max_chars: int = 6000,
     merchant_context_max_chars: int = 2000,
 ) -> str:
@@ -253,5 +255,7 @@ def build_dynamic_context(
     payload["saved_memory"] = [memory_fact_payload(f) for f in memory_facts] or "none"
     if now is not None:
         payload["local_time"] = context_clock(now)
+    if reply_language is not None:
+        payload["reply_language"] = reply_language
 
     return "# Merchant context\n\n" + MERCHANT_FENCE.fence_payload(payload, max_chars=max_chars)

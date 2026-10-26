@@ -8,7 +8,7 @@ import { formatPrice, quantityLabel } from "@/lib/format";
 import type { CheckoutPayload } from "@/lib/types";
 import { PostcardWindow } from "../PostcardWindow";
 import { BODY, CARD, DISPLAY, META, display } from "./shared";
-import { safeHandoffs } from "web-shared";
+import { safeHandoffs, useT } from "web-shared";
 
 /** Keyed by the checkout tool's fulfillment enum. */
 const FULFILLMENT_LABELS: Record<string, string> = {
@@ -34,6 +34,7 @@ const BARCODE: CSSProperties = {
 };
 
 export default function BoardingPass({ payload }: { payload: CheckoutPayload }) {
+  const t = useT();
   const cart = payload.cart;
   const handoffs = safeHandoffs(payload.handoffs);
   const items = cart?.items ?? [];
@@ -41,9 +42,9 @@ export default function BoardingPass({ payload }: { payload: CheckoutPayload }) 
     <section className="al-reveal" data-checkout-card>
       <div className="flex overflow-hidden" style={CARD}>
         <div className="min-w-0 flex-1 p-6">
-          <div style={META}>Boarding pass · not charged</div>
+          <div style={META}>{t("Boarding pass · not charged")}</div>
           <h3 className="mt-1" style={display(20, 600)}>
-            Your trip, ready to book
+            {t("Your trip, ready to book")}
           </h3>
           {payload.note ? (
             <p
@@ -77,14 +78,14 @@ export default function BoardingPass({ payload }: { payload: CheckoutPayload }) 
                 />
                 <span className="min-w-0 flex-1 truncate" title={item.title}>
                   {item.title}
-                  {item.quantity > 1 ? ` ${quantityLabel(item.product_id, item.quantity)}` : ""}
+                  {item.quantity > 1 ? ` ${quantityLabel(item.product_id, item.quantity, t)}` : ""}
                 </span>
                 <span className="shrink-0">{formatPrice(item.line_total)}</span>
               </div>
             ))}
             {!items.length ? (
               <p style={{ fontFamily: BODY, fontSize: 13, color: "var(--ink-soft)" }}>
-                Your trip basket is empty.
+                {t("Your trip basket is empty.")}
               </p>
             ) : null}
           </div>
@@ -94,9 +95,9 @@ export default function BoardingPass({ payload }: { payload: CheckoutPayload }) 
             style={{ borderColor: "var(--line)" }}
           >
             <span style={META}>
-              Total
+              {t("Total")}
               <span style={{ display: "block", fontSize: 11, opacity: 0.8, textTransform: "none", letterSpacing: 0 }}>
-                all-in, fees included; final total confirmed at checkout
+                {t("all-in, fees included; final total confirmed at checkout")}
               </span>
             </span>
             <span style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 26, color: "var(--accent)" }}>
@@ -123,7 +124,7 @@ export default function BoardingPass({ payload }: { payload: CheckoutPayload }) 
                     fontSize: 15,
                   }}
                 >
-                  {h.label ?? (h.seller ? `Continue to checkout with ${h.seller}` : "Continue to checkout")}
+                  {h.label ?? (h.seller ? t("Continue to checkout with {seller}", { seller: h.seller }) : t("Continue to checkout"))}
                 </a>
               ))}
             </div>
@@ -143,7 +144,7 @@ export default function BoardingPass({ payload }: { payload: CheckoutPayload }) 
                 opacity: 0.92,
               }}
             >
-              Continue to checkout
+              {t("Continue to checkout")}
             </button>
           )}
           <p
@@ -151,7 +152,7 @@ export default function BoardingPass({ payload }: { payload: CheckoutPayload }) 
             className="mt-2 text-center"
             style={{ fontFamily: BODY, fontSize: 12, color: "var(--ink-soft)" }}
           >
-            Nothing is charged here. Payment happens when you check out.
+            {t("Nothing is charged here. Payment happens when you check out.")}
           </p>
         </div>
 
@@ -187,8 +188,8 @@ export default function BoardingPass({ payload }: { payload: CheckoutPayload }) 
             className="al-passport-stamp al-stamp-thump -mr-2 self-end"
             style={{ color: "rgba(247,243,236,0.88)", fontSize: 10, letterSpacing: "0.13em" }}
           >
-            <span>Not</span>
-            <span>charged</span>
+            <span>{t("Not")}</span>
+            <span>{t("charged")}</span>
           </span>
           <div className="flex w-full flex-col items-center gap-3">
             <span
@@ -201,7 +202,7 @@ export default function BoardingPass({ payload }: { payload: CheckoutPayload }) 
                 color: "rgba(247,243,236,0.75)",
               }}
             >
-              {fulfillmentLabel(payload.fulfillment_method)}
+              {t(fulfillmentLabel(payload.fulfillment_method))}
             </span>
             <div aria-hidden className="h-10 w-full" style={BARCODE} />
           </div>

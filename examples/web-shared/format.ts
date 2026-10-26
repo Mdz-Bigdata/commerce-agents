@@ -1,6 +1,9 @@
 // Copyright 2026 Anthropic PBC
 // SPDX-License-Identifier: Apache-2.0
 
+import { english } from "./english";
+import type { Translate } from "./i18n";
+
 const moneyFormatters = new Map<string, Intl.NumberFormat>();
 
 export function formatMoney(
@@ -73,19 +76,27 @@ export function formatWeekday(value: string | null | undefined): string {
   return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year });
 }
 
-/** "1 order", "3 orders". */
-export function plural(count: number, one: string, many = `${one}s`): string {
-  return `${formatNumber(count)} ${count === 1 ? one : many}`;
+/**
+ * "1 order", "3 orders". With `t`, the noun is looked up as written ("order" or "orders"), so a
+ * table gives each form its own wording; the count and noun are joined without a suffix. A noun
+ * that is not ASCII (already translated) takes no "s".
+ */
+export function plural(count: number, one: string, many = /[^\x00-\x7f]/.test(one) ? one : `${one}s`, t: Translate = english): string {
+  return `${formatNumber(count)} ${t(count === 1 ? one : many)}`;
 }
 
 /** "12 days of cover", "1 day of cover", "<1 day of cover". */
-export function coverLabel(days: number): string {
-  return days < 1 ? "<1 day of cover" : `${plural(Math.round(days), "day")} of cover`;
+export function coverLabel(days: number, t: Translate = english): string {
+  if (days < 1) return t("<1 day of cover");
+  const n = formatNumber(Math.round(days));
+  return Math.round(days) === 1 ? t("{n} day of cover", { n }) : t("{n} days of cover", { n });
 }
 
 /** "sells out in ~4 days", "sells out within a day". */
-export function runwayLabel(days: number): string {
-  return days < 1 ? "sells out within a day" : `sells out in ~${plural(Math.round(days), "day")}`;
+export function runwayLabel(days: number, t: Translate = english): string {
+  if (days < 1) return t("sells out within a day");
+  const n = formatNumber(Math.round(days));
+  return Math.round(days) === 1 ? t("sells out in ~{n} day", { n }) : t("sells out in ~{n} days", { n });
 }
 
 /** What can still be chosen on a product with options, and what a variant chose. */
@@ -114,9 +125,9 @@ export function optionValuesLabel(item: Pick<OptionFields, "option_values">): st
 }
 
 /** "From $349" on a family record, whose price is its lowest variant's; the plain price otherwise. */
-export function priceLabel(product: OptionFields): string {
+export function priceLabel(product: OptionFields, t: Translate = english): string {
   const money = formatMoney(product.price, product.currency);
-  return hasOptions(product) ? `From ${money}` : money;
+  return hasOptions(product) ? t("From {price}", { price: money }) : money;
 }
 
 export function titleCase(value: string): string {
@@ -181,6 +192,7 @@ export function formatPeriodLabel(value: string | null | undefined): string {
 export function formatComparisonLabel(
   period: string | null | undefined,
   compareTo: string | null | undefined,
+  t: Translate = english,
 ): string {
   if (!compareTo) return "";
   const primary = ISO_RANGE.exec(period?.trim() ?? "");
@@ -192,43 +204,49 @@ export function formatComparisonLabel(
     const compareEnd = parseDate(compare[2]).getTime();
     const compareDays = Math.round((compareEnd - parseDate(compare[1]).getTime()) / dayMs);
     if (primaryDays === compareDays && Math.round((primaryStart - compareEnd) / dayMs) === 1) {
-      return primaryDays === 6 ? "prior week" : "prior period";
+      return primaryDays === 6 ? t("prior week") : t("prior period");
     }
   }
   return formatPeriodLabel(compareTo);
 }
 
-export function describeProposer(change: {
-  created_by: string;
-  created_by_kind?: "operator" | "agent";
-}): string {
+export function describeProposer(
+  change: {
+    created_by: string;
+    created_by_kind?: "operator" | "agent";
+  },
+  t: Translate = english,
+): string {
   return change.created_by_kind === "agent"
-    ? `Proposed by ${change.created_by}'s assistant`
-    : `Staged by ${change.created_by}`;
+    ? t("Proposed by {name}'s assistant", { name: change.created_by })
+    : t("Staged by {name}", { name: change.created_by });
 }
 
 /** Approvals are always a person. */
-export function describeResolver(change: {
-  status: string;
-  applied_by?: string | null;
-  discarded_by?: string | null;
-  discarded_by_kind?: "operator" | "agent" | null;
-}): string | null {
-  if (change.status === "applied" && change.applied_by) return `Approved by ${change.applied_by}`;
+export function describeResolver(
+  change: {
+    status: string;
+    applied_by?: string | null;
+    discarded_by?: string | null;
+    discarded_by_kind?: "operator" | "agent" | null;
+  },
+  t: Translate = english,
+): string | null {
+  if (change.status === "applied" && change.applied_by) return t("Approved by {name}", { name: change.applied_by });
   if (change.status === "discarded" && change.discarded_by) {
     return change.discarded_by_kind === "agent"
-      ? `Dismissed by ${change.discarded_by}'s assistant`
-      : `Dismissed by ${change.discarded_by}`;
+      ? t("Dismissed by {name}'s assistant", { name: change.discarded_by })
+      : t("Dismissed by {name}", { name: change.discarded_by });
   }
   return null;
 }
 
 /** "Good morning" before noon, "Good afternoon" until six, then "Good evening". */
-export function greeting(now: Date): string {
+export function greeting(now: Date, t: Translate = english): string {
   const hour = now.getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
+  if (hour < 12) return t("Good morning");
+  if (hour < 18) return t("Good afternoon");
+  return t("Good evening");
 }
 
 export interface HandoffLink {

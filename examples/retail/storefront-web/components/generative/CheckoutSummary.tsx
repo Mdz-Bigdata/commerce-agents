@@ -4,13 +4,14 @@
 "use client";
 
 import { useId } from "react";
-import { formatMoney, useCatalogIndex, safeHandoffs } from "web-shared";
+import { formatMoney, useCatalogIndex, safeHandoffs, useT } from "web-shared";
 import { fetchProducts } from "@/lib/api";
 import type { CheckoutPayload, Product } from "@/lib/types";
 import { STORE_POLICY } from "@/lib/storePolicy";
 import { DeliveryPromise, ProductImage } from "../ProductTile";
 
 export default function CheckoutSummary({ payload }: { payload: CheckoutPayload }) {
+  const t = useT();
   const cart = payload.cart;
   const handoffs = safeHandoffs(payload.handoffs);
   // Several summaries can coexist across turns, so the describedby id is per card.
@@ -23,10 +24,10 @@ export default function CheckoutSummary({ payload }: { payload: CheckoutPayload 
   return (
     <section data-checkout-card className="rounded-2xl border-2 border-(--accent) bg-(--card) p-4 shadow-(--shadow-sm)">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-[15px] font-semibold text-(--ink)">Ready to check out</h3>
+        <h3 className="text-[15px] font-semibold text-(--ink)">{t("Ready to check out")}</h3>
         <div className="flex items-center gap-1.5">
           <span className="whitespace-nowrap rounded-full border border-(--line) bg-(--well)/60 px-2.5 py-0.5 text-[11px] font-semibold text-(--ink-soft)">
-            Not charged
+            {t("Not charged")}
           </span>
           {payload.fulfillment_method ? (
             <span className="rounded-full bg-(--accent-soft) px-2.5 py-0.5 text-[13px] font-semibold capitalize text-(--ink)">
@@ -63,42 +64,40 @@ export default function CheckoutSummary({ payload }: { payload: CheckoutPayload 
           );
         })}
         <div className="flex justify-between border-t border-(--line) pt-1.5 text-(--ink)">
-          <span>Subtotal</span>
+          <span>{t("Subtotal")}</span>
           <span>{formatMoney(cart.subtotal, cart.currency)}</span>
         </div>
         <div className="flex justify-between gap-2 text-(--ink)">
           <span>
-            Shipping{" "}
+            {t("Shipping")}{" "}
             <span className="text-[13px] text-(--ink-soft)">
-              standard · {STORE_POLICY.standardShippingEta}
+              {t("standard · {eta}", { eta: t(STORE_POLICY.standardShippingEta) })}
             </span>
           </span>
           <span className={freeShipping ? "font-medium text-(--ok)" : "text-(--ink)"}>
-            {freeShipping ? "Free" : "Calculated at checkout"}
+            {freeShipping ? t("Free") : t("Calculated at checkout")}
           </span>
         </div>
         {!freeShipping && STORE_POLICY.freeShippingThreshold - cart.subtotal > 0 ? (
           <div className="flex justify-between text-[13px] text-(--ink-soft)">
             <span>
-              Add {formatMoney(STORE_POLICY.freeShippingThreshold - cart.subtotal)} more to
-              unlock free shipping
+              {t("Add {amount} more to unlock free shipping", { amount: formatMoney(STORE_POLICY.freeShippingThreshold - cart.subtotal) })}
             </span>
           </div>
         ) : null}
         <div className="flex justify-between text-(--ink)">
-          <span>Tax</span>
-          <span>Calculated at checkout</span>
+          <span>{t("Tax")}</span>
+          <span>{t("Calculated at checkout")}</span>
         </div>
         <div className="flex justify-between border-t border-(--line) pt-1.5 text-base font-bold text-(--ink)">
-          <span>Estimated total</span>
+          <span>{t("Estimated total")}</span>
           <span>{formatMoney(cart.subtotal, cart.currency)}</span>
         </div>
         <p className="text-[11px] leading-snug text-(--ink-soft)">
-          {freeShipping ? "Before tax" : "Before shipping and tax"}; the final total appears at
-          checkout.
+          {t(freeShipping ? "Before tax; the final total appears at checkout." : "Before shipping and tax; the final total appears at checkout.")}
         </p>
       </div>
-      <p className="mt-2 text-[11px] text-(--ink-soft)">{STORE_POLICY.returnsLine}</p>
+      <p className="mt-2 text-[11px] text-(--ink-soft)">{t(STORE_POLICY.returnsLine)}</p>
       {handoffs.length ? (
         // The backend named where payment happens (a hosted checkout URL, or one per seller).
         <div className="mt-3 flex flex-col gap-2">
@@ -111,7 +110,7 @@ export default function CheckoutSummary({ payload }: { payload: CheckoutPayload 
               aria-describedby={handoffNoteId}
               className="w-full rounded-xl bg-(--accent) py-2.5 text-center text-sm font-bold text-(--ink)"
             >
-              {h.label ?? (h.seller ? `Continue to checkout with ${h.seller}` : "Continue to checkout")}
+              {h.label ?? (h.seller ? t("Continue to checkout with {seller}", { seller: h.seller }) : t("Continue to checkout"))}
             </a>
           ))}
         </div>
@@ -122,13 +121,13 @@ export default function CheckoutSummary({ payload }: { payload: CheckoutPayload 
           aria-disabled
           aria-describedby={handoffNoteId}
           className="mt-3 w-full cursor-not-allowed rounded-xl bg-(--accent) py-2.5 text-sm font-bold text-(--ink) opacity-90"
-          title="Nothing is charged here. Payment happens when you check out."
+          title={t("Nothing is charged here. Payment happens when you check out.")}
         >
-          Continue to checkout
+          {t("Continue to checkout")}
         </button>
       )}
       <p id={handoffNoteId} className="mt-2 text-center text-[11px] text-(--ink-soft)/80">
-        Nothing is charged here. Payment happens when you check out.
+        {t("Nothing is charged here. Payment happens when you check out.")}
       </p>
     </section>
   );
