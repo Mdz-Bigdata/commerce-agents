@@ -6,6 +6,7 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityButton } from "../ActivityButton";
 import { LanguageToggle, useLocale } from "../i18n";
+import { ModelSettingsButton } from "../ModelSettings";
 import type { AgentApi } from "../api";
 import { Composer } from "../Composer";
 import { Icon, type IconName } from "../icons";
@@ -151,6 +152,7 @@ export function StoreShell<V extends string>({
             })}
           </nav>
           <div className="ml-auto flex items-center gap-2">
+            <ModelSettingsButton api={api} />
             <LanguageToggle />
             <ActivityButton
               streaming={chat.streaming}

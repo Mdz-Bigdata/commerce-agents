@@ -84,6 +84,7 @@ export default function PortalPage() {
   return (
     <>
       <PortalShell
+        api={api}
         brand={{ mark: <StoreMark />, name: "ACME", detail: t("Merchant workspace") }}
         nav={nav}
         view={view}

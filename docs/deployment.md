@@ -141,7 +141,10 @@ agent = ShoppingAgent(
 The example APIs build this client from `MODEL_PROVIDER` and its companions
 (`examples/demo_common/model_provider.py`, `.env.example`): presets for OpenAI, DeepSeek,
 Qwen (DashScope), Moonshot, Zhipu GLM, and Ollama, and `openai-compatible` for any other
-endpoint.
+endpoint. The web apps' model settings panel writes the same values to `.model-settings.json`
+through `/api/model-settings` (`examples/demo_common/model_settings.py`); a deployment whose
+model is fixed by its environment sets `DEMO_MODEL_SETTINGS=0`, which makes those routes
+read-only.
 
 The packages declare `anthropic>=0.91`, the release that adds `AsyncAnthropicBedrockMantle`,
 the newest of the client classes above.

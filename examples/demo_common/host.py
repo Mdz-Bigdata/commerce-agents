@@ -29,7 +29,8 @@ from commerce_common.turn import session_tag
 from shopping_agent import Cart, Order, ProductDetails, ShoppingSessionContext
 
 from .analytics import OperationsLog
-from .model_provider import ModelProvider, resolve_provider
+from .model_provider import ModelProvider, apply_model_settings, resolve_provider
+from .model_settings import install_model_settings_routes
 from .sessions import SessionConflictError, SessionRecord, SessionStore
 
 logger = logging.getLogger(__name__)
@@ -44,21 +45,24 @@ REPLY_LANGUAGES: dict[str, str] = {"en": "English", "zh": "Simplified Chinese"}
 # provider, ``{key_hint}`` the variable its key goes in, ``{env_hint}`` the example's .env.
 _ERROR_TEXT: dict[str, dict[str, str]] = {
     "no_key": {
-        "en": "No API key is configured for {label}, so chat can't run. Set {key_hint} in "
-        "{env_hint} or the repo-root .env and restart; everything except chat works without one.",
-        "zh": "尚未为 {label} 配置 API 密钥，聊天暂不可用。请在 {env_hint} 或仓库根目录的 .env 中"
-        "设置 {key_hint} 后重启；除聊天外的功能都可正常使用。",
+        "en": "No API key is configured for {label}, so chat can't run. Add one in Model "
+        "settings in the top bar, or set {key_hint} in {env_hint} or the repo-root .env and "
+        "restart; everything except chat works without one.",
+        "zh": "尚未为 {label} 配置 API 密钥，聊天暂不可用。请在顶栏的「模型设置」中填写，或在 "
+        "{env_hint} 或仓库根目录的 .env 中设置 {key_hint} 后重启；除聊天外的功能都可正常使用。",
     },
     "auth_failed": {
-        "en": "{label} rejected the API key. Check {key_hint} in {env_hint} or the repo-root "
-        ".env, and unset any stale key exported by your shell.",
-        "zh": "{label} 拒绝了 API 密钥。请检查 {env_hint} 或仓库根目录 .env 中的 {key_hint}，"
-        "并清除 shell 中导出的过期密钥。",
+        "en": "{label} rejected the API key. Check it in Model settings, or {key_hint} in "
+        "{env_hint} or the repo-root .env, and unset any stale key exported by your shell.",
+        "zh": "{label} 拒绝了 API 密钥。请在「模型设置」中检查，或检查 {env_hint} 或仓库根目录 "
+        ".env 中的 {key_hint}，并清除 shell 中导出的过期密钥。",
     },
     "provider_error": {
-        "en": "{label} could not complete the request ({status}). Check MODEL_NAME and "
-        "MODEL_BASE_URL in the .env, then try again.",
-        "zh": "{label} 无法完成请求（{status}）。请检查 .env 中的 MODEL_NAME 和 MODEL_BASE_URL 后重试。",
+        "en": "{label} could not complete the request ({status}). Check the model name and "
+        "endpoint in Model settings (or MODEL_NAME and MODEL_BASE_URL in the .env), then try "
+        "again.",
+        "zh": "{label} 无法完成请求（{status}）。请在「模型设置」中检查模型名称和接口地址"
+        "（或 .env 中的 MODEL_NAME 和 MODEL_BASE_URL）后重试。",
     },
     "generic": {
         "en": "Something went wrong on our side. Please try again.",
@@ -182,6 +186,7 @@ def build_app(title: str, on_startup: Sequence[Callable[[], Awaitable[None]]] = 
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    install_model_settings_routes(app)
     return app
 
 
@@ -224,7 +229,9 @@ def stream_turn(
     a readable error event, in the request's ``locale``, naming ``env_hint`` (the example's
     ``.env`` path); anything else is logged and reported generically. Memory extraction
     runs after the response has streamed. With ``log``, the turn's record goes to the
-    operations log and ``turn_complete`` carries its ``turn_id``."""
+    operations log and ``turn_complete`` carries its ``turn_id``. The turn runs under the
+    model settings in force when it starts."""
+    apply_model_settings(agent)
     provider = resolve_provider()
     recorder = log.turn(record.session_id, locale) if log is not None else None
 

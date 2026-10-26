@@ -4,7 +4,9 @@
 "use client";
 
 import type { ReactNode } from "react";
+import type { AgentApi } from "../api";
 import { LanguageToggle, useT } from "../i18n";
+import { ModelSettingsButton } from "../ModelSettings";
 import { Icon, type IconName } from "../icons";
 import { Avatar } from "../ui";
 
@@ -42,6 +44,7 @@ export function PortalShell<V extends string>({
   onToggleAssistant,
   rail,
   children,
+  api,
 }: {
   brand: PortalBrand;
   nav: PortalNavItem<V>[];
@@ -53,6 +56,8 @@ export function PortalShell<V extends string>({
   onToggleAssistant: () => void;
   rail: ReactNode;
   children: ReactNode;
+  /** The portal's API client; the model settings panel calls its root. */
+  api: AgentApi;
 }) {
   const t = useT();
   return (
@@ -118,7 +123,10 @@ export function PortalShell<V extends string>({
             <span className="hidden h-[7px] w-[7px] rounded-full bg-(--accent) shadow-[0_0_0_3px_var(--accent-soft)] xl:block" aria-hidden />
           ) : null}
         </button>
-        <LanguageToggle className="mb-3 mt-auto self-center xl:ml-2 xl:self-start" />
+        <div className="mb-3 mt-auto flex flex-col items-center gap-2 xl:ml-2 xl:flex-row">
+          <LanguageToggle />
+          <ModelSettingsButton api={api} />
+        </div>
         <div className="flex items-center gap-2.5 border-t border-(--line) px-1 pt-3 xl:px-2">
           <Avatar name={operator.name} />
           <div className="hidden min-w-0 xl:block">
@@ -149,6 +157,7 @@ export function PortalShell<V extends string>({
               </button>
             ))}
           </nav>
+          <ModelSettingsButton api={api} />
           <LanguageToggle />
           <button
             type="button"

@@ -5,12 +5,20 @@
 
 from __future__ import annotations
 
+import os
 import sys
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import pytest
+
+# Model settings a web app's panel saved in this checkout never reach a test; tests that
+# save settings point the variable at their own tmp_path.
+os.environ["DEMO_MODEL_SETTINGS_FILE"] = str(
+    Path(tempfile.gettempdir()) / f"commerce-agents-tests-{os.getpid()}" / "model-settings.json"
+)
 
 from commerce_common.skills import Skill, SkillRegistry
 from merchant_agent import (

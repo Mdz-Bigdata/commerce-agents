@@ -9,7 +9,7 @@ prompts to try on both surfaces, and what it adds to the libraries.
 
 | Path | Contents |
 |---|---|
-| `demo_common/` | Host code the four APIs share: app and middleware (`host.py`), the model provider from `MODEL_PROVIDER` (`model_provider.py`), the operations log with the feedback and handoff routes (`analytics.py`), session store (`sessions.py`), storefront routes (`storefront.py`), merchant router (`merchant.py`), memory routes and fixture seeder (`memory.py`), mock-backend helpers (`*_fixtures.py`) |
+| `demo_common/` | Host code the four APIs share: app and middleware (`host.py`), the model provider from `MODEL_PROVIDER` or the settings panel (`model_provider.py`), the settings panel's routes (`model_settings.py`), the operations log with the feedback and handoff routes (`analytics.py`), session store (`sessions.py`), storefront routes (`storefront.py`), merchant router (`merchant.py`), memory routes and fixture seeder (`memory.py`), mock-backend helpers (`*_fixtures.py`) |
 | `web-shared/` | The npm package the eight web apps import: the API client, the session and turn hooks, the event types (`protocol.ts` mirrors `commerce_common/streaming.py`), the transcript and inspector components, shared primitives and icons, and the two app frames (`storefront/`, `portal/`), and the English/Chinese switch (`i18n.tsx`, `locale.ts`, `i18n-zh.ts`) |
 | `package.json` | The npm workspace: `web-shared` plus every `*/storefront-web` and `*/merchant-web` (`npm ci` installs all of them) |
 | `<vertical>/api/` | One FastAPI process: the two mock backends, the two agent configs (`agent_config.py`), the vertical's own routes and presentation extensions, and the merchant router mounted under `/api/merchant` |
@@ -57,6 +57,7 @@ only the session id, in `X-Session-Id`, and the routes read the principal from i
 | `MODEL_BASE_URL`, `MODEL_NAME`, `MODEL_FAST_NAME` | The endpoint, the turn loop's model, and memory extraction's model, over the preset's | `demo_common/model_provider.py` | the preset's |
 | `COMMERCE_DEMO_AUTH` | `sdk` skips the `.env` files and clears the key variables so the client's credential chain is used; `run_demo.py --federated` sets it | `demo_common/host.py` | unset |
 | `DEMO_ALLOWED_HOSTS` | Comma-separated Host values the API answers to besides `localhost` and `127.0.0.1` | `demo_common/host.py` | unset |
+| `DEMO_MODEL_SETTINGS`, `DEMO_MODEL_SETTINGS_FILE` | `0` makes the model settings panel read-only; the file replaces `.model-settings.json` at the repo root, whose values (saved from the panel) replace the `MODEL_*` variables while it exists | `demo_common/model_settings.py`, `demo_common/model_provider.py` | editable, repo root |
 | `DEMO_ANALYTICS`, `DEMO_ANALYTICS_DIR` | `0` turns the operations log off; the directory replaces `<vertical>/data/.analytics/` (`docs/metrics.md`) | `demo_common/analytics.py` | on, per vertical |
 | `DEMO_LOG_LEVEL` | `INFO` writes one line per model call; `DEBUG` adds each request and response | `demo_common/host.py` | `INFO` |
 | `MERCHANT_REQUIRE_HOST_APPROVAL` | `0` lets an approval typed in chat apply a change; `1` requires the preview card's button | `demo_common/host.py` | `1` |

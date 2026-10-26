@@ -4,13 +4,19 @@
 from __future__ import annotations
 
 import pytest
+from anthropic import AsyncAnthropic
 
 from commerce_common.openai_compat import OpenAICompatibleClient
 from demo_common.host import chat_error_text, reply_language
 from demo_common.model_provider import (
+    ModelSettings,
+    apply_model_settings,
+    clear_settings,
     model_client,
     model_config_fields,
     resolve_provider,
+    save_settings,
+    settings_path,
 )
 
 VARIABLES = (
@@ -25,15 +31,16 @@ VARIABLES = (
 
 
 @pytest.fixture(autouse=True)
-def clean_env(monkeypatch):
+def clean_env(monkeypatch, tmp_path):
     for name in VARIABLES:
         monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("DEMO_MODEL_SETTINGS_FILE", str(tmp_path / "model-settings.json"))
 
 
-def test_anthropic_is_the_default_and_keeps_the_agents_own_client():
+def test_anthropic_is_the_default_on_the_sdks_own_credential_chain():
     provider = resolve_provider()
-    assert provider.is_anthropic and not provider.has_key()
-    assert model_client() is None
+    assert provider.is_anthropic and not provider.has_key() and provider.source == "env"
+    assert isinstance(model_client().current(), AsyncAnthropic)
     assert model_config_fields() == {}
 
 
@@ -42,9 +49,42 @@ def test_a_preset_supplies_endpoint_models_and_its_usual_key(monkeypatch):
     monkeypatch.setenv("DEEPSEEK_API_KEY", "k")
     provider = resolve_provider()
     assert provider.has_key() and provider.base_url.startswith("https://api.deepseek.com")
-    client = model_client()
-    assert isinstance(client, OpenAICompatibleClient)
+    assert isinstance(model_client().current(), OpenAICompatibleClient)
     assert model_config_fields() == {"model": "deepseek-chat", "memory_model": "deepseek-chat"}
+
+
+def test_saved_settings_replace_the_environment_until_cleared(monkeypatch):
+    monkeypatch.setenv("MODEL_PROVIDER", "openai")
+    monkeypatch.setenv("MODEL_NAME", "from-env")
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "preset-key")
+    client = model_client()
+    first = client.current()
+    save_settings(ModelSettings(provider="deepseek", model=" reasoner "))
+    provider = resolve_provider()
+    assert provider.source == "page" and provider.name == "deepseek"
+    assert provider.model == "reasoner" and provider.api_key == "preset-key"
+    assert client.current() is not first and client.current() is client.current()
+    assert oct(settings_path().stat().st_mode & 0o777) == "0o600"
+    with pytest.raises(ValueError, match="is not one of"):
+        save_settings(ModelSettings(provider="nope"))
+    assert resolve_provider().name == "deepseek"
+    clear_settings()
+    assert resolve_provider().model == "from-env" and resolve_provider().source == "env"
+
+
+def test_a_running_agent_takes_the_saved_model_names_on_its_next_turn():
+    from commerce_common.testing import FakeClient
+    from shopping_agent import ShoppingAgentConfig
+    from shopping_agent_runtime import ShoppingAgent
+
+    agent = ShoppingAgent(backend=None, config=ShoppingAgentConfig(), client=FakeClient([]))
+    default = ShoppingAgentConfig().model
+    save_settings(ModelSettings(provider="ollama", model="local-big", fast_model="local-small"))
+    apply_model_settings(agent)
+    assert agent.config.model == "local-big" and agent.memory.model == "local-small"
+    clear_settings()
+    apply_model_settings(agent)
+    assert agent.config.model == default
 
 
 def test_model_name_overrides_both_models_unless_a_fast_one_is_named(monkeypatch):
@@ -96,3 +136,37 @@ def test_the_reply_language_reaches_both_context_blocks():
     assert "reply_language" not in shopping_context(
         preferences=None, memory_facts=[], cart=None, page=None
     )
+
+
+@pytest.fixture
+def settings_api():
+    from fastapi.testclient import TestClient
+
+    from demo_common.host import build_app
+
+    return TestClient(build_app("test"), base_url="http://localhost")
+
+
+def test_the_settings_routes_take_a_key_and_never_return_it(settings_api, monkeypatch):
+    secret = "k-" + "9" * 20 + "WXYZ"
+    read = settings_api.get("/api/model-settings").json()
+    assert read["provider"] == "anthropic" and read["source"] == "env" and read["editable"]
+    assert {row["name"] for row in read["presets"]} >= {"anthropic", "deepseek", "ollama"}
+    saved = settings_api.put(
+        "/api/model-settings", json={"provider": "deepseek", "api_key": secret}
+    ).json()
+    assert saved["source"] == "page" and saved["has_key"] and saved["key_preview"] == "…WXYZ"
+    assert secret not in settings_api.get("/api/model-settings").text
+    # A save that leaves the key out keeps it; an empty key removes it.
+    kept = settings_api.put("/api/model-settings", json={"provider": "deepseek", "model": "m2"})
+    assert kept.json()["has_key"] and kept.json()["model"] == "m2"
+    cleared = settings_api.put("/api/model-settings", json={"provider": "deepseek", "api_key": ""})
+    assert not cleared.json()["has_key"]
+    bad = settings_api.put("/api/model-settings", json={"provider": "openai-compatible"})
+    assert bad.status_code == 422 and bad.json()["detail"] == "This provider needs an endpoint."
+    test = settings_api.post("/api/model-settings/test").json()
+    assert not test["ok"] and "No API key" in test["error"]
+    assert settings_api.delete("/api/model-settings").json()["source"] == "env"
+    monkeypatch.setenv("DEMO_MODEL_SETTINGS", "0")
+    assert settings_api.put("/api/model-settings", json={"provider": "ollama"}).status_code == 403
+    assert not settings_api.get("/api/model-settings").json()["editable"]

@@ -15,6 +15,7 @@ export { LanguageToggle, LocaleProvider, type Messages, type Translate, translat
 export { cookieLocale, htmlLang, type Locale, LOCALE_COOKIE, parseLocale } from "./locale";
 export { Icon, type IconName } from "./icons";
 export { Inspector } from "./Inspector";
+export { ModelSettingsButton } from "./ModelSettings";
 export { AssistantPanel } from "./portal/AssistantPanel";
 export { AssistantRail } from "./portal/AssistantRail";
 export * from "./portal/cards";

@@ -1,0 +1,310 @@
+// Copyright 2026 Anthropic PBC
+// SPDX-License-Identifier: Apache-2.0
+
+"use client";
+
+/**
+ * The model settings panel both shells carry in their bars: the provider, endpoint, model
+ * names, and key the example API calls, saved through `/api/model-settings`
+ * (demo_common/model_settings.py). The API never returns a key; the panel shows whether one is
+ * set and, for a key saved here, its last four characters.
+ */
+
+import { type ReactNode, useCallback, useEffect, useState } from "react";
+import type { AgentApi } from "./api";
+import { useT } from "./i18n";
+import { Icon } from "./icons";
+import { Button, Sheet } from "./ui";
+
+interface Preset {
+  name: string;
+  label: string;
+  base_url: string | null;
+  model: string | null;
+  fast_model: string | null;
+  key_required: boolean;
+}
+
+interface Settings {
+  provider: string | null;
+  label: string | null;
+  base_url: string | null;
+  model: string | null;
+  fast_model: string | null;
+  has_key: boolean;
+  key_hint: string | null;
+  key_preview: string | null;
+  source: "page" | "env";
+  problem: string | null;
+  editable: boolean;
+  presets: Preset[];
+}
+
+type Notice = { tone: "ok" | "error"; text: string } | null;
+
+const PATH = "/api/model-settings";
+
+async function call<T>(root: string, method: string, path = "", body?: unknown): Promise<{ data?: T; error?: string }> {
+  try {
+    const response = await fetch(`${root}${PATH}${path}`, {
+      method,
+      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) return { error: typeof data?.detail === "string" ? data.detail : `HTTP ${response.status}` };
+    return { data: data as T };
+  } catch {
+    return { error: "unreachable" };
+  }
+}
+
+function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-[12.5px] font-semibold text-(--ink)">{label}</span>
+      {children}
+      {hint ? <span className="text-[11.5px] leading-snug text-(--ink-soft)">{hint}</span> : null}
+    </label>
+  );
+}
+
+const INPUT =
+  "w-full rounded-[10px] border border-(--line-strong) bg-(--card) px-3 py-[7px] text-[14px] text-(--ink) outline-none placeholder:text-(--ink-faint) focus:border-(--accent) disabled:opacity-60";
+
+function ModelSettingsSheet({ api, onClose }: { api: AgentApi; onClose: () => void }) {
+  const t = useT();
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [provider, setProvider] = useState("anthropic");
+  const [baseUrl, setBaseUrl] = useState("");
+  const [model, setModel] = useState("");
+  const [fastModel, setFastModel] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [busy, setBusy] = useState<"save" | "test" | "reset" | null>(null);
+  const [notice, setNotice] = useState<Notice>(null);
+
+  const adopt = useCallback((next: Settings) => {
+    setSettings(next);
+    const preset = next.presets.find((p) => p.name === next.provider);
+    setProvider(next.provider ?? "anthropic");
+    // A value equal to the preset's default shows as the placeholder, not as an override.
+    setBaseUrl(next.base_url && next.base_url !== preset?.base_url ? next.base_url : "");
+    setModel(next.model && next.model !== preset?.model ? next.model : "");
+    setFastModel(next.fast_model && next.fast_model !== preset?.fast_model ? next.fast_model : "");
+    setApiKey("");
+  }, []);
+
+  useEffect(() => {
+    call<Settings>(api.root, "GET").then(({ data }) => (data ? adopt(data) : setLoadError(true)));
+  }, [api.root, adopt]);
+
+  const preset = settings?.presets.find((p) => p.name === provider);
+  const sameProvider = settings?.provider === provider;
+  const editable = settings?.editable ?? false;
+  const errorText = (error?: string) => (error === "unreachable" ? t("The API is not reachable.") : t(error ?? ""));
+
+  const save = async () => {
+    setBusy("save");
+    setNotice(null);
+    const { data, error } = await call<Settings>(api.root, "PUT", "", {
+      provider,
+      base_url: baseUrl || null,
+      model: model || null,
+      fast_model: fastModel || null,
+      // Left empty, the key already saved for this provider stays.
+      api_key: apiKey ? apiKey : null,
+    });
+    setBusy(null);
+    if (data) {
+      adopt(data);
+      setNotice({ tone: "ok", text: t("Saved. The next reply uses these settings.") });
+    } else {
+      setNotice({ tone: "error", text: errorText(error) });
+    }
+  };
+
+  const removeKey = async () => {
+    setBusy("save");
+    const { data, error } = await call<Settings>(api.root, "PUT", "", {
+      provider,
+      base_url: baseUrl || null,
+      model: model || null,
+      fast_model: fastModel || null,
+      api_key: "",
+    });
+    setBusy(null);
+    if (data) adopt(data);
+    setNotice(data ? { tone: "ok", text: t("The saved key was removed.") } : { tone: "error", text: errorText(error) });
+  };
+
+  const test = async () => {
+    setBusy("test");
+    setNotice(null);
+    const { data, error } = await call<{ ok: boolean; model?: string; label?: string; error?: string }>(api.root, "POST", "/test");
+    setBusy(null);
+    if (data?.ok) {
+      setNotice({ tone: "ok", text: t("Connected: {label} answered with {model}.", { label: data.label ?? "", model: data.model ?? "" }) });
+    } else {
+      setNotice({ tone: "error", text: data?.error ?? errorText(error) });
+    }
+  };
+
+  const reset = async () => {
+    setBusy("reset");
+    setNotice(null);
+    const { data, error } = await call<Settings>(api.root, "DELETE");
+    setBusy(null);
+    if (data) {
+      adopt(data);
+      setNotice({ tone: "ok", text: t("Back to the .env settings.") });
+    } else {
+      setNotice({ tone: "error", text: errorText(error) });
+    }
+  };
+
+  const keyPlaceholder = !sameProvider
+    ? t("Paste the key for this provider")
+    : settings?.key_preview
+      ? t("Saved ({preview}); leave empty to keep it", { preview: settings.key_preview })
+      : settings?.has_key
+        ? t("Set in .env ({hint}); paste one to override it", { hint: settings.key_hint ?? "" })
+        : t("Not set");
+
+  return (
+    <Sheet
+      title={t("Model settings")}
+      onClose={onClose}
+      footer={
+        editable ? (
+          <>
+            <Button variant="primary" onClick={save} disabled={busy !== null}>
+              {busy === "save" ? t("Saving…") : t("Save")}
+            </Button>
+            <Button onClick={test} disabled={busy !== null}>
+              {busy === "test" ? t("Testing…") : t("Test connection")}
+            </Button>
+            {settings?.source === "page" ? (
+              <button
+                type="button"
+                onClick={reset}
+                disabled={busy !== null}
+                className="ml-auto text-[12.5px] font-medium text-(--ink-soft) underline-offset-2 hover:text-(--ink) hover:underline disabled:opacity-50"
+              >
+                {t("Use .env instead")}
+              </button>
+            ) : null}
+          </>
+        ) : undefined
+      }
+    >
+      {loadError ? (
+        <p className="text-[13.5px] text-(--danger)">{t("The API is not reachable.")}</p>
+      ) : !settings ? (
+        <div className="ac-skeleton h-24 rounded-xl" />
+      ) : (
+        <>
+          <div className="rounded-xl border border-(--line) bg-(--well) px-3.5 py-2.5 text-[13px] leading-relaxed text-(--ink)">
+            <div className="font-semibold">
+              {settings.label ? `${settings.label} · ${settings.model ?? t("default model")}` : t("No usable provider")}
+            </div>
+            <div className="text-(--ink-soft)">
+              {settings.source === "page" ? t("Saved from this panel") : t("From the .env files")}
+              {" · "}
+              {settings.has_key ? t("API key set") : t("No API key")}
+            </div>
+            {settings.problem ? <div className="mt-1 text-(--danger)">{settings.problem}</div> : null}
+          </div>
+          {notice ? (
+            <p role="status" className={`text-[13px] leading-relaxed ${notice.tone === "ok" ? "text-(--ok)" : "text-(--danger)"}`}>
+              {notice.text}
+            </p>
+          ) : null}
+          {!editable ? (
+            <p className="text-[13px] text-(--ink-soft)">{t("This API's model is set by its environment (DEMO_MODEL_SETTINGS=0).")}</p>
+          ) : null}
+          <Field label={t("Provider")}>
+            <select value={provider} onChange={(event) => setProvider(event.target.value)} disabled={!editable} className={INPUT}>
+              {settings.presets.map((p) => (
+                <option key={p.name} value={p.name}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field
+            label={t("API key")}
+            hint={preset && !preset.key_required ? t("This provider runs without a key.") : t("Stored on this computer only; never sent back to the page.")}
+          >
+            <input
+              type="password"
+              autoComplete="off"
+              value={apiKey}
+              onChange={(event) => setApiKey(event.target.value)}
+              placeholder={keyPlaceholder}
+              disabled={!editable}
+              className={INPUT}
+            />
+          </Field>
+          {editable && sameProvider && settings.key_preview ? (
+            <button
+              type="button"
+              onClick={removeKey}
+              disabled={busy !== null}
+              className="-mt-2 self-start text-[12px] font-medium text-(--ink-soft) underline-offset-2 hover:text-(--ink) hover:underline"
+            >
+              {t("Remove the saved key")}
+            </button>
+          ) : null}
+          <Field label={t("Endpoint")} hint={provider === "anthropic" ? t("Leave empty for the Anthropic API.") : undefined}>
+            <input
+              value={baseUrl}
+              onChange={(event) => setBaseUrl(event.target.value)}
+              placeholder={preset?.base_url ?? (provider === "anthropic" ? "https://api.anthropic.com" : "https://…/v1")}
+              disabled={!editable}
+              className={INPUT}
+            />
+          </Field>
+          <Field label={t("Model")} hint={t("Leave empty for the provider's default.")}>
+            <input
+              value={model}
+              onChange={(event) => setModel(event.target.value)}
+              placeholder={preset?.model ?? t("default model")}
+              disabled={!editable}
+              className={INPUT}
+            />
+          </Field>
+          <Field label={t("Memory model")} hint={t("Extracts saved facts after each reply; a smaller model is enough.")}>
+            <input
+              value={fastModel}
+              onChange={(event) => setFastModel(event.target.value)}
+              placeholder={preset?.fast_model ?? (model || t("default model"))}
+              disabled={!editable}
+              className={INPUT}
+            />
+          </Field>
+        </>
+      )}
+    </Sheet>
+  );
+}
+
+/** The bar button that opens the panel. */
+export function ModelSettingsButton({ api, className = "" }: { api: AgentApi; className?: string }) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label={t("Model settings")}
+        title={t("Model settings")}
+        className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border border-(--line) text-(--ink-2) transition-colors hover:text-(--ink) ${className}`}
+      >
+        <Icon name="settings" size={16} />
+      </button>
+      {open ? <ModelSettingsSheet api={api} onClose={() => setOpen(false)} /> : null}
+    </>
+  );
+}

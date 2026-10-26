@@ -42,6 +42,9 @@ STOREFRONT_PUBLIC = {
     "/api/products",
     "/api/products/{product_id:path}",
     "/api/health",
+    # The model settings are the API's, not a session's (demo_common/model_settings.py).
+    "/api/model-settings",
+    "/api/model-settings/test",
 }
 MERCHANT_PUBLIC = {"/api/merchant/session", "/api/merchant/health"}
 LOOPBACK = ("127.0.0.1", 12345)

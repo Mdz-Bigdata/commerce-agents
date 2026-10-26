@@ -31,6 +31,10 @@ npm-debug.log*
 # Example runtime state. The memory files hold whatever a local demo
 # remembered — personal data in a real deployment — and are never committed.
 examples/*/data/.memory-*.json
+# Model settings the web apps' settings panel saves (demo_common/model_provider.py); holds a key.
+.model-settings.json
+.model-settings.json.tmp
+
 # The operations log (demo_common/analytics.py): ids, tool names, and counts per turn.
 examples/*/data/.analytics/
 shopping-agent/managed-agents/storefront-mcp-server/.storefront_memory.json

@@ -144,6 +144,13 @@ const PATHS = {
       <path d="m5 17 4.5-4 3.5 3 2.5-2 4 3.5" />
     </>
   ),
+  settings: (
+    <>
+      <path d="M4.5 7h9M17.5 7h2M4.5 17h2M10.5 17h9" />
+      <circle cx="15.5" cy="7" r="2" />
+      <circle cx="8.5" cy="17" r="2" />
+    </>
+  ),
 } as const;
 
 export type IconName = keyof typeof PATHS | "spark";

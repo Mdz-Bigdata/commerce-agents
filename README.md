@@ -25,9 +25,11 @@ python scripts/run_demo.py retail     # API :8000 + storefront :3000
 ```
 
 `--merchant` starts the portal instead of the storefront and `--all` starts both.
-`MODEL_PROVIDER` in `.env` runs the examples on Anthropic or on an OpenAI-compatible provider
-(OpenAI, DeepSeek, Qwen, Moonshot, Zhipu GLM, Ollama, or any other endpoint); every app
-switches between English and Chinese from its app bar ([`examples/README.md`](examples/README.md)).
+`MODEL_PROVIDER` in `.env`, or the model settings panel in every app's bar, runs the examples
+on Anthropic or on an OpenAI-compatible provider (OpenAI, DeepSeek, Qwen, Moonshot, Zhipu GLM,
+Ollama, or any other endpoint), and a saved change applies to the next reply without a
+restart; every app switches between English and Chinese from its app bar
+([`examples/README.md`](examples/README.md)).
 Every reply carries 👍/👎 and a handoff to a person; the example APIs log each turn's tools,
 evidence ids, and outcome (never its text), and `python scripts/metrics_report.py --lang zh`
 computes resolution, self-service, and handoff rates from that log ([`docs/metrics.md`](docs/metrics.md)).
