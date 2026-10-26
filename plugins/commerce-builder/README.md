@@ -1,10 +1,11 @@
 # commerce-builder (Claude Code plugin)
 
-Six skills and four commands for building a shopping agent or a merchant agent on the packages
-in this repo ([`../../README.md`](../../README.md)), or bringing one that exists onto them. Skills
-and commands alike load when a conversation matches their description, and a command can also be
-typed; the commands read the reference repo (this checkout, a local clone, or a fresh one) while
-they run. The plugin runs no code of its own.
+Six skills, four commands, and two hooks for building a shopping agent or a merchant agent on the
+packages in this repo ([`../../README.md`](../../README.md)), or bringing one that exists onto
+them. Skills and commands alike load when a conversation matches their description, and a command
+can also be typed; the commands read the reference repo (this checkout, a local clone, or a fresh
+one) while they run. The hooks are the plugin's only code: two Python scripts with no
+dependencies beyond `python3`.
 
 ## Install
 
@@ -24,6 +25,16 @@ claude plugin install commerce-builder@claude-commerce-agents
 
 The scaffold and the review write what they learned to your project's `CLAUDE.md` under
 `## Commerce agent decision record`; the other two commands read that section instead of asking again.
+
+## Hooks
+
+| Hook | Runs | Does |
+|---|---|---|
+| [`secret_guard.py`](hooks/secret_guard.py) | before Write and Edit | Refuses text that hardcodes a live credential (a model API key, a live payment key, a cloud access key, a private key) in any file but a local `.env`; the message tells Claude to read it from the environment |
+| [`prompt_bytes.py`](hooks/prompt_bytes.py) | after Write and Edit | After an edit to `prompt.py`, `fencing.py`, `tools/registry.py`, a skill's `SKILL.md`, or `agent.yaml`, reminds Claude to keep those bytes stable across requests, re-derive the Managed Agents `system.md`, and re-record the eval replay; blocks nothing |
+
+`COMMERCE_BUILDER_HOOKS=0` turns both off. [`hooks/hooks.json`](hooks/hooks.json) declares them,
+and `scripts/check.py` checks that every script it names exists.
 
 ## Skills
 

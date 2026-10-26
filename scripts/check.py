@@ -668,6 +668,23 @@ def check_manifests() -> None:
     except Exception as error:
         problem(f"marketplace.json: {error}")
 
+    hooks_file = REPO_ROOT / "plugins" / "commerce-builder" / "hooks" / "hooks.json"
+    try:
+        events = load_json(hooks_file)["hooks"]
+        commands = [
+            hook["command"]
+            for entries in events.values()
+            for entry in entries
+            for hook in entry["hooks"]
+        ]
+        for command in commands:
+            script = re.search(r"\$\{CLAUDE_PLUGIN_ROOT\}/([\w./-]+)", command)
+            if script is None or not (hooks_file.parents[1] / script.group(1)).exists():
+                problem(f"commerce-builder hooks.json: no script for command: {command}")
+        ok(f"commerce-builder hooks.json parses; {len(commands)} hook scripts resolve")
+    except Exception as error:
+        problem(f"commerce-builder hooks.json: {error}")
+
     from commerce_common.manifest import ManifestError, resolve
 
     for role in ROLES:
