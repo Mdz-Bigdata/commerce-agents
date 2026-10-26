@@ -229,11 +229,21 @@ def stream_turn(
     a readable error event, in the request's ``locale``, naming ``env_hint`` (the example's
     ``.env`` path); anything else is logged and reported generically. Memory extraction
     runs after the response has streamed. With ``log``, the turn's record goes to the
-    operations log and ``turn_complete`` carries its ``turn_id``. The turn runs under the
-    model settings in force when it starts."""
+    operations log, naming the model and provider it ran on, and ``turn_complete``
+    carries its ``turn_id``. The turn runs under the model settings in force when it
+    starts."""
     apply_model_settings(agent)
     provider = resolve_provider()
-    recorder = log.turn(record.session_id, locale) if log is not None else None
+    recorder = (
+        log.turn(
+            record.session_id,
+            locale,
+            model=getattr(getattr(agent, "config", None), "model", None) or provider.model,
+            provider=provider.name,
+        )
+        if log is not None
+        else None
+    )
 
     def error(kind: str, status: object = "") -> str:
         if recorder is not None:

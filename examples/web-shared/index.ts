@@ -33,6 +33,6 @@ export { Greeting, HomeSection, MoreLink, type Profile, type Starter, Starters }
 export { ArrivingPanel, estimateOf, isOpen, ORDER_NOUNS, type OrderNouns, orderStatusLabel, OrdersView, OrderStatusPill, upcoming } from "./storefront/orders";
 export { StorePage, StoreShell, type StoreView } from "./storefront/Shell";
 export { Suggestions } from "./Suggestions";
-export { ActivityLine } from "./Transcript";
+export { ActivityLine, AiLabel } from "./Transcript";
 export { type AgentTurn, useAgentTurn } from "./turn";
 export * from "./ui";
