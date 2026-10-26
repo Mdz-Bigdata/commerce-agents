@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { cookieLocale } from "./locale";
-import type { AgentEvent, HandoffReason, MemoryFact, Order } from "./protocol";
+import type { AgentEvent, HandoffBrief, HandoffReason, MemoryFact, Order } from "./protocol";
 
 const SESSION_HEADER = "X-Session-Id";
 
@@ -110,10 +110,13 @@ export class AgentApi {
     return (await this.post<{ ok: boolean }>("/feedback", { turn_id: turnId, helpful })) !== null;
   }
 
-  /** Opens a support ticket for a person to pick up; the ticket id, or null. */
-  async requestHandoff(turnId: string | undefined, reason: HandoffReason): Promise<string | null> {
-    const data = await this.post<{ ticket: string }>("/handoff", { turn_id: turnId ?? null, reason });
-    return data?.ticket ?? null;
+  /** Opens a support ticket for a person to pick up; the ticket id and its brief, or null. */
+  async requestHandoff(
+    turnId: string | undefined,
+    reason: HandoffReason,
+  ): Promise<{ ticket: string; brief: HandoffBrief } | null> {
+    const data = await this.post<{ ticket: string; brief: HandoffBrief }>("/handoff", { turn_id: turnId ?? null, reason });
+    return data?.ticket ? { ticket: data.ticket, brief: data.brief } : null;
   }
 
   /** Throws when the request itself fails. */

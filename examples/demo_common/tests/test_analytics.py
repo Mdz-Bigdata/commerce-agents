@@ -8,7 +8,12 @@ from fastapi.testclient import TestClient
 
 from commerce_common.streaming import AgentEvent
 from demo_common import SESSION_HEADER, SessionStore, session_dependency
-from demo_common.analytics import OperationsLog, install_operations_routes
+from demo_common.analytics import (
+    REQUEST_MAX_CHARS,
+    OperationsLog,
+    handoff_request,
+    install_operations_routes,
+)
 from shopping_agent import ShoppingSessionState
 
 
@@ -173,6 +178,101 @@ def test_a_handoff_from_a_turn_that_fell_back_is_rule_triggered(tmp_path):
     # The client cannot claim the server's reason.
     claimed = client.post("/api/handoff", json={"reason": "rule_triggered"}, headers=headers)
     assert claimed.status_code == 422
+
+
+def test_a_handoff_carries_a_brief_built_from_the_sessions_turns(tmp_path):
+    log = OperationsLog(tmp_path / "storefront.jsonl", vertical="retail", role="storefront")
+    store: SessionStore[ShoppingSessionState] = SessionStore(ShoppingSessionState)
+    app = FastAPI()
+    install_operations_routes(
+        app,
+        "/api",
+        current_session=session_dependency(store, "/api/session"),
+        log=log,
+        handoff_note="ticket {ticket}",
+    )
+    client = TestClient(app)
+    session, other = store.start("u-1"), store.start("u-2")
+    lapsed = {"source_id": "retail/promo", "version": "1", "status": "expired"}
+    current = {"source_id": "retail/returns", "version": "2", "status": "current"}
+
+    first = log.turn(session.session_id, None)
+    for event in [
+        AgentEvent.tool_call("get_order_status", "tu-1", {"order_id": "AO-1"}),
+        AgentEvent.tool_result("get_order_status", "tu-1", "ok"),
+        AgentEvent.tool_call("search_policies", "tu-2", {"query": "returns"}),
+        AgentEvent.tool_result("search_policies", "tu-2", "ok", evidence=[current]),
+        AgentEvent.tool_call("present_suggestions", "tu-3", {}),
+    ]:
+        first.observe(event)
+    first.write()
+    second = log.turn(session.session_id, None)
+    for event in [
+        AgentEvent.tool_call("search_policies", "tu-4", {"query": "promo"}),
+        AgentEvent.tool_result("search_policies", "tu-4", "ok", evidence=[lapsed, current]),
+        AgentEvent.tool_call("add_to_cart", "tu-5", {"product_id": "AR-9"}),
+        AgentEvent.tool_result("add_to_cart", "tu-5", "held", status="blocked", reason="cap"),
+    ]:
+        second.observe(event)
+    second.write()
+    elsewhere = log.turn(other.session_id, None)
+    elsewhere.observe(AgentEvent.tool_call("get_cart", "tu-9", {}))
+    elsewhere.write()
+
+    record = store.require(session.session_id)
+    record.messages = [
+        {"role": "user", "content": "Where is my order?"},
+        {"role": "assistant", "content": "It shipped."},
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "[App events since your last reply: cart cleared]"},
+                {"type": "text", "text": "Card 4111 1111 1111 1111 was charged twice,  refund it."},
+            ],
+        },
+        {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "tu-5"}]},
+    ]
+    store.save(record)
+
+    response = client.post(
+        "/api/handoff",
+        json={"turn_id": second.turn_id},
+        headers={SESSION_HEADER: session.session_id},
+    )
+    body = response.json()
+    assert body["brief"] == {
+        "request": "Card [removed] was charged twice, refund it.",
+        "tried": {
+            "tools": [
+                {"name": "get_order_status", "status": "ok"},
+                {"name": "search_policies", "status": "ok"},
+                {"name": "add_to_cart", "status": "blocked"},
+            ],
+            "held": [{"tool": "add_to_cart", "reason": "cap"}],
+            "fallbacks": ["terms_withheld"],
+        },
+        "evidence_versions": [current, lapsed],
+        "reason": "rule_triggered",
+    }
+    (handoff,) = [line for line in lines(log) if line["kind"] == "handoff"]
+    assert handoff["ticket"] == body["ticket"]
+    assert {key: handoff[key] for key in body["brief"]} == body["brief"]
+    assert session.session_id not in json.dumps(handoff) and "4111" not in json.dumps(handoff)
+
+
+def test_the_brief_request_skips_host_texts_and_is_cut_short():
+    reminder = "[a host reminder]"
+    long = "word " * 100
+    messages = [
+        {"role": "user", "content": long},
+        {"role": "user", "content": [{"type": "text", "text": reminder}]},
+    ]
+    request = handoff_request(messages, {reminder})
+    assert len(request) == REQUEST_MAX_CHARS and request.endswith("…")
+    assert handoff_request(messages[1:], {reminder}) == ""
+    assert handoff_request([{"role": "user", "content": "mail me at a.b@example.com"}]) == (
+        "mail me at [removed]"
+    )
 
 
 def test_logging_can_be_switched_off(tmp_path, monkeypatch):

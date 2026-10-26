@@ -85,8 +85,9 @@ The reference stops at the boundary of your systems. Before either agent is expo
   controls of the memory store.
   The example APIs' operations log (`examples/demo_common/analytics.py`, `docs/metrics.md`)
   holds the same session digest, tool names and statuses, and the record ids tool inputs
-  named, but no message text; ids can still identify what a person browsed, so it gets the
-  same retention rules.
+  named. Its only message text is a handoff ticket's copy of the customer's last request,
+  with card, account, phone, and email shapes masked; a name typed in it stays, and ids can
+  still identify what a person browsed, so it gets the same retention rules.
 - **Approval surface.** The merchant approval surface and who may use it. The gate checks only that your code
   set the mark.
 - **Guardrail values.** The defaults in the two `config.py` modules are demonstration values.

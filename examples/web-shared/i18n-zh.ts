@@ -292,4 +292,12 @@ export const SHARED_ZH: Readonly<Record<string, string>> = {
   "Talk to a person": "转人工客服",
   "Escalate to support": "转交支持团队",
   "A person will pick this up from here. Ticket {ticket}.": "已转接人工，接下来由工作人员跟进。工单号 {ticket}。",
+  "What the assistant already checked": "助手已经查过的内容",
+  "{step} (held by a store rule)": "{step}（被店铺规则拦下）",
+  "{step} (did not go through)": "{step}（未成功）",
+  "{source} v{version}": "{source} 第 {version} 版",
+  "{terms} (not applied)": "{terms}（未采用）",
+  "Store terms: {terms}": "店铺条款：{terms}",
+  "The store terms had no answer": "店铺条款中没有相关答案",
+  "Your last message goes with the ticket too.": "你的最后一条消息也已随工单一并转交。",
 };

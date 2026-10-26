@@ -111,6 +111,8 @@ export interface AssistantChatItem {
   rating?: "up" | "down";
   /** The support ticket a handoff from this reply opened. */
   ticket?: string;
+  /** What that ticket carries for the person who takes it (`POST /handoff`). */
+  handoff?: HandoffBrief;
   /** The terms versions this reply's reads returned as current (`evidence` on `tool_result`). */
   sources?: ReplySource[];
 }
@@ -124,5 +126,23 @@ export interface ReplySource {
 
 /** Why the user asked for a person: the reason the operations log counts it under. */
 export type HandoffReason = "user_requested" | "after_negative_feedback" | "after_error";
+
+/** A ticket's brief, built by the API from the session's turns (`OperationsLog.brief`). */
+export interface HandoffBrief {
+  /** The customer's last request, identifier shapes masked and cut short. */
+  request: string | null;
+  tried: {
+    /** Each tool the session called, with how its last call ended (`ok`, `error`, `blocked`). */
+    tools: { name: string; status: string }[];
+    /** Each call a gate held, with the gate. */
+    held: { tool: string; reason: string }[];
+    /** Why turns fell back (`terms_withheld`, `no_terms_match`, `gate_held:<gate>`). */
+    fallbacks: string[];
+  };
+  /** Each terms version the session's reads returned or withheld. */
+  evidence_versions: { source_id: string; version: string; status: string }[];
+  /** The reason the operations log counts the handoff under. */
+  reason: HandoffReason | "rule_triggered";
+}
 
 export type ChatItem = UserChatItem | AssistantChatItem;

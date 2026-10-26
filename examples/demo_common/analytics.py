@@ -9,9 +9,12 @@ A turn record carries the evidence the turn rested on (the tools it called, the 
 their inputs named, the source and version of each terms passage a read returned or
 withheld, how each call ended, the gates that refused one), why it fell back, if it did
 (``fallback_reason``, read from those events), and its outcome (stop reason, error kind,
-usage, latency, the writes it made). No message text, tool result, or fact value is
-written: the log is for counting, and ``docs/safety.md`` keeps conversation content out
-of logs below DEBUG.
+usage, latency, the writes it made). No tool result or fact value is written, and the
+only message text is a handoff's ``request``: the log is for counting, and
+``docs/safety.md`` keeps conversation content out of logs below DEBUG.
+
+A handoff record carries the ticket's brief (``OperationsLog.brief``), so the person who
+takes it starts from what the agent already did.
 
 Each role of each vertical writes its own file under ``<vertical>/data/.analytics/``
 (``DEMO_ANALYTICS_DIR`` moves the directory; ``DEMO_ANALYTICS=0`` turns logging off).
@@ -23,9 +26,10 @@ Each role of each vertical writes its own file under ``<vertical>/data/.analytic
 import json
 import logging
 import os
+import re
 import threading
 import uuid
-from collections.abc import Iterable
+from collections.abc import Collection, Iterable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
@@ -33,6 +37,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+from commerce_common.memory import DEFAULT_BLOCKED_PATTERNS
 from commerce_common.streaming import AgentEvent
 from commerce_common.turn import session_tag
 from shopping_agent.gates import TERMS_GATE, WITHHELD
@@ -49,6 +54,14 @@ HandoffReason = RequestedHandoffReason | Literal["rule_triggered"]
 # Input keys whose values name a record: the turn's evidence ids.
 _ID_KEYS = ("product_id", "listing_id", "change_id", "order_id", "campaign_id", "event_id")
 _MAX_IDS = 20
+# The turns of one session a handoff brief reads, most recent last.
+_BRIEF_TURNS = 20
+REQUEST_MAX_CHARS = 200
+# Card, account, phone, and email shapes, as the memory write filter refuses them; a digit
+# run is masked whole, not only its first nine digits.
+_IDENTIFIER = re.compile(
+    "|".join(f"(?:{p})" for p in (r"(?:\d[ .()-]{0,2}){8,}\d", *DEFAULT_BLOCKED_PATTERNS[1:]))
+)
 
 
 def _now() -> str:
@@ -71,6 +84,41 @@ def _ids_in(value: Any, found: list[str]) -> None:
             _ids_in(item, found)
 
 
+def handoff_request(messages: list[dict[str, Any]], host_texts: Collection[str] = ()) -> str:
+    """The customer's last request as a handoff brief carries it: the last text the user
+    typed (not an app-event note or a host reminder), identifier shapes masked, whitespace
+    collapsed, cut to ``REQUEST_MAX_CHARS``; "" when there is none."""
+    for message in reversed(messages):
+        content = message.get("content")
+        if message.get("role") != "user":
+            continue
+        blocks = [content] if isinstance(content, str) else content
+        if not isinstance(blocks, list):
+            continue
+        texts = [
+            block if isinstance(block, str) else str(block.get("text", ""))
+            for block in blocks
+            if isinstance(block, str) or (isinstance(block, dict) and block.get("type") == "text")
+        ]
+        typed = [text for text in texts if text not in host_texts]
+        if not typed:
+            continue
+        # The host puts an app-event note ahead of the user's own text in the same message.
+        text = " ".join(_IDENTIFIER.sub("[removed]", typed[-1]).split())
+        if len(text) > REQUEST_MAX_CHARS:
+            text = text[: REQUEST_MAX_CHARS - 1].rstrip() + "…"
+        return text
+    return ""
+
+
+def _unique(items: Iterable[Any]) -> list[Any]:
+    seen: list[Any] = []
+    for item in items:
+        if item not in seen:
+            seen.append(item)
+    return seen
+
+
 class TurnRecorder:
     """Watches one turn's events on their way to the client and writes its record when the
     turn ends. ``observe`` returns the event to send, with ``turn_id`` stamped on
@@ -78,6 +126,7 @@ class TurnRecorder:
 
     def __init__(self, log: "OperationsLog", session_id: str, locale: str | None) -> None:
         self.log = log
+        self.session_id = session_id
         self.turn_id = f"t_{uuid.uuid4().hex[:16]}"
         self._record: dict[str, Any] = {
             "kind": "turn",
@@ -159,6 +208,7 @@ class TurnRecorder:
     def write(self) -> None:
         self._record["fallback_reason"] = reason = self.fallback_reason()
         self.log.remember_fallback(self.turn_id, reason)
+        self.log.remember_turn(self.session_id, self._record)
         self.log.write(self._record)
 
 
@@ -175,6 +225,8 @@ class OperationsLog:
         self._turns: dict[str, str] = {}
         # turn_id -> fallback_reason, for the turns that fell back.
         self._fallbacks: dict[str, str] = {}
+        # session_id -> its latest turn records, which a handoff brief reads.
+        self._session_turns: dict[str, list[dict[str, Any]]] = {}
 
     @classmethod
     def for_example(cls, example_root: Path, role: str) -> "OperationsLog":
@@ -194,6 +246,39 @@ class OperationsLog:
     def remember_fallback(self, turn_id: str, reason: str | None) -> None:
         if reason is not None:
             self._fallbacks[turn_id] = reason
+
+    def remember_turn(self, session_id: str, record: dict[str, Any]) -> None:
+        turns = self._session_turns.setdefault(session_id, [])
+        turns.append(record)
+        del turns[:-_BRIEF_TURNS]
+
+    def brief(self, session_id: str, reason: HandoffReason, request: str = "") -> dict[str, Any]:
+        """What a ticket hands the person who takes it, from the session's turn records:
+        ``request`` (see :func:`handoff_request`), ``tried`` (each tool called, by name and
+        last status; each call a gate held, with the gate; each ``fallback_reason``),
+        ``evidence_versions`` (each terms version read or withheld), and ``reason``.
+        Presentation calls are left out: they render, they do not check anything."""
+        turns = self._session_turns.get(session_id, [])
+        statuses: dict[str, str] = {}
+        for turn in turns:
+            for tool in turn["tools"]:
+                name = tool.get("name")
+                if isinstance(name, str) and not name.startswith("present_"):
+                    statuses[name] = tool.get("status")  # keeps the first call's place
+        return {
+            "request": request or None,
+            "tried": {
+                "tools": [{"name": name, "status": status} for name, status in statuses.items()],
+                "held": _unique(held for turn in turns for held in turn["blocked"]),
+                "fallbacks": _unique(
+                    turn["fallback_reason"] for turn in turns if turn["fallback_reason"]
+                ),
+            },
+            "evidence_versions": _unique(
+                item for turn in turns for item in turn["evidence_versions"]
+            )[:_MAX_IDS],
+            "reason": reason,
+        }
 
     def handoff_reason(
         self, turn_id: str | None, requested: RequestedHandoffReason
@@ -218,18 +303,22 @@ class OperationsLog:
             }
         )
 
-    def handoff(self, session_id: str, turn_id: str | None, reason: HandoffReason) -> str:
+    def handoff(
+        self, session_id: str, turn_id: str | None, reason: HandoffReason, request: str = ""
+    ) -> tuple[str, dict[str, Any]]:
+        """Opens a ticket and records it with its :meth:`brief`; returns both."""
         ticket = f"H-{uuid.uuid4().hex[:6].upper()}"
+        brief = self.brief(session_id, reason, request)
         self.write(
             {
                 "kind": "handoff",
                 "turn_id": turn_id,
                 "session": session_tag(session_id),
-                "reason": reason,
                 "ticket": ticket,
+                **brief,
             }
         )
-        return ticket
+        return ticket, brief
 
     def action(self, session_id: str, name: str, ids: Iterable[str] = ()) -> None:
         self.write(
@@ -276,11 +365,14 @@ def install_operations_routes(
     current_session: Any,
     log: OperationsLog,
     handoff_note: str,
+    host_texts: Collection[str] = (),
 ) -> None:
     """``POST {prefix}/feedback`` records a vote on one of the session's turns;
-    ``POST {prefix}/handoff`` opens a ticket for a person and returns it, and queues
-    ``handoff_note`` (``{ticket}``) for the model's next turn as an app event; the ticket's
-    reason is ``OperationsLog.handoff_reason``."""
+    ``POST {prefix}/handoff`` opens a ticket for a person and returns it with its brief
+    (``OperationsLog.brief``), and queues ``handoff_note`` (``{ticket}``) for the model's
+    next turn as an app event; the ticket's reason is ``OperationsLog.handoff_reason``.
+    ``host_texts`` names the messages the runtime appends as the user, which the brief's
+    request skips."""
 
     @router.post(f"{prefix}/feedback")
     async def feedback(request: FeedbackRequest, record: current_session) -> dict:
@@ -294,6 +386,7 @@ def install_operations_routes(
         if request.turn_id is not None and not log.owns(request.turn_id, record.session_id):
             raise HTTPException(status_code=404, detail="No such turn in this session")
         reason = log.handoff_reason(request.turn_id, request.reason)
-        ticket = log.handoff(record.session_id, request.turn_id, reason)
+        asked = handoff_request(record.messages, host_texts)
+        ticket, brief = log.handoff(record.session_id, request.turn_id, reason, asked)
         record.pending_app_events.append(handoff_note.format(ticket=ticket))
-        return {"ok": True, "ticket": ticket}
+        return {"ok": True, "ticket": ticket, "brief": brief}

@@ -45,6 +45,7 @@ from merchant_agent import (
 )
 from merchant_agent.executor import MerchantToolExecutor
 from merchant_agent_runtime import MerchantAgent
+from merchant_agent_runtime.orchestrator import HOST_TEXTS
 
 from .analytics import OperationsLog, install_operations_routes
 from .host import (
@@ -312,6 +313,7 @@ def build_merchant_router(
             "The operator escalated to the support team; ticket {ticket} is open and a "
             "person will follow up."
         ),
+        host_texts=HOST_TEXTS,
     )
 
     @router.post("/reset")

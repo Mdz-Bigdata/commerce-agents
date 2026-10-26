@@ -569,8 +569,8 @@ export function useAgentTurn(api: AgentApi, options: AgentTurnOptions): AgentTur
       if (!item || item.ticket) return;
       const failed = item.segments.some((segment) => segment.type === "error");
       const reason = item.rating === "down" ? "after_negative_feedback" : failed ? "after_error" : "user_requested";
-      const ticket = await api.requestHandoff(item.turnId, reason);
-      if (ticket) updateTurn(turn, (current) => ({ ...current, ticket }));
+      const opened = await api.requestHandoff(item.turnId, reason);
+      if (opened) updateTurn(turn, (current) => ({ ...current, ticket: opened.ticket, handoff: opened.brief }));
     },
     [api, itemOf, updateTurn],
   );

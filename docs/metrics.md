@@ -15,12 +15,21 @@ One JSON line per event, per vertical and role, in `examples/<vertical>/data/.an
 |---|---|---|
 | `turn` | A chat turn ends | `turn_id`, session tag, locale, each tool called with its status (`ok`, `error`, `blocked`), the record ids the tool inputs named (`evidence_ids`), the source, version, and terms-gate status of each policy passage a read returned or withheld (`evidence_versions`), gate refusals with their reason, why the turn fell back (`fallback_reason`), writes (`cart`, `change:<status>`), stop reason, error kind, usage, latency |
 | `feedback` | The user votes on a reply | `turn_id`, `helpful` |
-| `handoff` | The user asks for a person | `turn_id`, `reason` (the UI's, or `rule_triggered`), `ticket` |
+| `handoff` | The user asks for a person | `turn_id`, `reason` (the UI's, or `rule_triggered`), `ticket`, and the ticket's brief: `request`, `tried` (`tools`, `held`, `fallbacks`), `evidence_versions` |
 | `action` | The portal applies or dismisses a staged change | `name`, the change id |
 
-No message text, tool result, or memory value is written; the session appears as the same
-hashed tag the model-call log uses. `DEMO_ANALYTICS=0` turns the log off and
-`DEMO_ANALYTICS_DIR` moves it.
+No tool result or memory value is written, and the only message text is a handoff's
+`request`; the session appears as the same hashed tag the model-call log uses.
+`DEMO_ANALYTICS=0` turns the log off and `DEMO_ANALYTICS_DIR` moves it.
+
+A handoff's brief is what the person taking the ticket starts from, and the handoff
+response returns it to the UI. `OperationsLog.brief` builds it from the session's last 20
+turn records, with no model call: `request` is the customer's last typed message, with
+card, account, phone, and email shapes replaced by `[removed]` and cut to 200 characters;
+`tried.tools` is each tool called, with the status of its last call (presentation tools
+left out); `tried.held` is each call a gate held, with the gate; `tried.fallbacks` is each
+distinct `fallback_reason`; `evidence_versions` is each terms version read or withheld. A
+name or street typed as free text is not detected.
 
 `fallback_reason` is read from the turn's tool results, never from its text:
 `terms_withheld` when a `search_policies` result carried a source with status `expired`,

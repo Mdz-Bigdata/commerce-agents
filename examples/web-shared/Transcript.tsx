@@ -5,11 +5,12 @@
 
 import type { ReactNode } from "react";
 import { evidenceLabel } from "./format";
-import { useT } from "./i18n";
+import { type Translate, useT } from "./i18n";
 import { Icon } from "./icons";
 import { AssistantText, ErrorBubble, UserBubble } from "./MessageBubble";
-import type { AssistantChatItem, ChatItem, UISegment } from "./protocol";
+import type { AssistantChatItem, ChatItem, HandoffBrief, UISegment } from "./protocol";
 import { Suggestions } from "./Suggestions";
+import { describeToolCall } from "./tool-copy";
 
 export interface TranscriptProps {
   items: ChatItem[];
@@ -30,6 +31,28 @@ export interface TranscriptProps {
   handoffLabel?: string;
 }
 
+/** A handoff brief as the customer reads it: one line per step the assistant took (loading a
+ * skill is not one), then the terms it read. */
+function checkedSteps(brief: HandoffBrief, t: Translate): string[] {
+  const steps = brief.tried.tools
+    .filter(({ name }) => name !== "load_skill")
+    .map(({ name, status }) => {
+      const step = describeToolCall(name, {}, t).replace(/…$/, "");
+      if (status === "blocked") return t("{step} (held by a store rule)", { step });
+      if (status === "error") return t("{step} (did not go through)", { step });
+      return step;
+    });
+  const terms = brief.evidence_versions
+    .filter((entry) => entry.status !== "superseded")
+    .map((entry) => {
+      const label = t("{source} v{version}", { source: entry.source_id, version: entry.version });
+      return entry.status === "current" ? label : t("{terms} (not applied)", { terms: label });
+    });
+  if (terms.length) steps.push(t("Store terms: {terms}", { terms: terms.join(" · ") }));
+  if (brief.tried.fallbacks.includes("no_terms_match")) steps.push(t("The store terms had no answer"));
+  return [...new Set(steps)];
+}
+
 /** Under a finished reply: the vote, a person to hand off to, or the ticket a handoff opened. */
 function ReplyFooter({
   item,
@@ -46,11 +69,29 @@ function ReplyFooter({
 }) {
   const t = useT();
   if (item.ticket) {
+    const steps = item.handoff ? checkedSteps(item.handoff, t) : [];
     return (
-      <p role="status" className="flex items-center gap-2 text-[13px] text-(--ink-soft)">
-        <Icon name="headset" size={15} />
-        {t("A person will pick this up from here. Ticket {ticket}.", { ticket: item.ticket })}
-      </p>
+      <div role="status" className="flex flex-col gap-1.5 text-[13px] text-(--ink-soft)">
+        <p className="flex items-center gap-2">
+          <Icon name="headset" size={15} />
+          {t("A person will pick this up from here. Ticket {ticket}.", { ticket: item.ticket })}
+        </p>
+        {steps.length ? (
+          <div className="pl-[23px] text-[12.5px] leading-snug">
+            <p className="text-(--ink-faint)">{t("What the assistant already checked")}</p>
+            <ul className="mt-0.5 list-disc pl-4">
+              {steps.map((step) => (
+                <li key={step} className="break-words">
+                  {step}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {item.handoff?.request ? (
+          <p className="pl-[23px] text-[12px] text-(--ink-faint)">{t("Your last message goes with the ticket too.")}</p>
+        ) : null}
+      </div>
     );
   }
   const canRate = Boolean(onRate && item.turnId);
