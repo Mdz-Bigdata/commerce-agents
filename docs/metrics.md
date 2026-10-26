@@ -5,7 +5,7 @@ The metrics `scripts/metrics_report.py` computes from the example APIs' operatio
 denominator; a change to any of them bumps the version here and `DEFINITIONS_VERSION` in
 the script, so a trend never mixes two definitions.
 
-Version 1.0.
+Version 1.1.
 
 ## What is logged
 
@@ -13,14 +13,20 @@ One JSON line per event, per vertical and role, in `examples/<vertical>/data/.an
 
 | `kind` | Written when | Fields |
 |---|---|---|
-| `turn` | A chat turn ends | `turn_id`, session tag, locale, each tool called with its status (`ok`, `error`, `blocked`), the record ids the tool inputs named (`evidence_ids`), the source, version, and terms-gate status of each policy passage a read returned or withheld (`evidence_versions`), gate refusals with their reason, writes (`cart`, `change:<status>`), stop reason, error kind, usage, latency |
+| `turn` | A chat turn ends | `turn_id`, session tag, locale, each tool called with its status (`ok`, `error`, `blocked`), the record ids the tool inputs named (`evidence_ids`), the source, version, and terms-gate status of each policy passage a read returned or withheld (`evidence_versions`), gate refusals with their reason, why the turn fell back (`fallback_reason`), writes (`cart`, `change:<status>`), stop reason, error kind, usage, latency |
 | `feedback` | The user votes on a reply | `turn_id`, `helpful` |
-| `handoff` | The user asks for a person | `turn_id`, `reason`, `ticket` |
+| `handoff` | The user asks for a person | `turn_id`, `reason` (the UI's, or `rule_triggered`), `ticket` |
 | `action` | The portal applies or dismisses a staged change | `name`, the change id |
 
 No message text, tool result, or memory value is written; the session appears as the same
 hashed tag the model-call log uses. `DEMO_ANALYTICS=0` turns the log off and
 `DEMO_ANALYTICS_DIR` moves it.
+
+`fallback_reason` is read from the turn's tool results, never from its text:
+`terms_withheld` when a `search_policies` result carried a source with status `expired`,
+`not_in_force`, or `conflict`; else `no_terms_match` when a `search_policies` result was
+flagged `no_match` (nothing matched the query); else `gate_held:<gate>` when another gate
+held a call; else null.
 
 ## Units
 
@@ -46,14 +52,26 @@ hashed tag the model-call log uses. `DEMO_ANALYTICS=0` turns the log off and
 | Latency p50 / p95 | 响应时延 | the turn's `elapsed_ms`, turns without a system error | — |
 | Tokens per turn | 每轮 Token | mean over turns without a system error of the four usage counters summed | — |
 
-Handoffs are split by the reason the UI sends: `user_requested` (the button with no prior
-signal), `after_negative_feedback` (the button after a 👎 on that reply), and `after_error`
-(the button under a reply that ended in an error). System errors are split by kind
+Handoffs are split by reason: `user_requested` (the button with no prior signal),
+`after_negative_feedback` (the button after a 👎 on that reply), and `after_error` (the
+button under a reply that ended in an error) come from the UI; `rule_triggered` replaces
+the first two when the reply's turn has a `fallback_reason`, decided by the API from the
+turn it logged (`OperationsLog.handoff_reason`). System errors are split by kind
 (`no_key`, `auth_failed`, `provider_error`, `generic`) and gate refusals by tool and reason.
 
 A severe-error rate needs a reviewer's judgment, which no log supplies: `--sample N` lists
 the turns to review first (every 👎, then system errors, then gate refusals, then a seeded
 random draw), and the reviewer's findings are counted outside this report.
+
+### Terms gaps
+
+The questions the store terms could not answer, for the terms owner to fill. Per vertical
+and role, `terms_gaps` lists the `source_id`s withheld most often (the top ten, from
+`evidence_versions` entries with a withholding status, each source counted once per turn),
+the count of turns whose `fallback_reason` is `no_terms_match`, and the `rule_triggered`
+handoffs split by the `fallback_reason` of the turn they were opened from. The log holds
+no query text, so a miss counts how often the terms came up empty, not what was asked. A
+group with no gaps prints no section.
 
 ## Before reading a change in a number
 

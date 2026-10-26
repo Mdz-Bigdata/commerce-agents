@@ -17,7 +17,18 @@ sys.modules[spec.name] = report  # dataclasses resolve their module through sys.
 spec.loader.exec_module(report)
 
 
-def turn(session, turn_id, *, tools=(), writes=(), error=None, elapsed=1000, blocked=()):
+def turn(
+    session,
+    turn_id,
+    *,
+    tools=(),
+    writes=(),
+    error=None,
+    elapsed=1000,
+    blocked=(),
+    versions=(),
+    fallback=None,
+):
     return {
         "kind": "turn",
         "vertical": "retail",
@@ -28,6 +39,8 @@ def turn(session, turn_id, *, tools=(), writes=(), error=None, elapsed=1000, blo
         "writes": list(writes),
         "blocked": list(blocked),
         "error": error,
+        "evidence_versions": list(versions),
+        "fallback_reason": fallback,
         "elapsed_ms": elapsed,
         "usage": {"input_tokens": 100, "output_tokens": 20},
     }
@@ -93,3 +106,51 @@ def test_the_review_sample_puts_dislikes_errors_and_refusals_first(tmp_path):
         "gate_refusal",
         "random",
     ]
+
+
+def version(source_id, status):
+    return {"source_id": source_id, "version": "1", "status": status}
+
+
+def test_terms_gaps_count_withheld_sources_misses_and_rule_triggered_handoffs(tmp_path):
+    promo, returns = "retail/promo", "retail/returns"
+    records = [
+        # A source withheld twice in one turn counts once for that turn.
+        turn(
+            "s1",
+            "t1",
+            versions=[version(promo, "expired"), version(promo, "conflict")],
+            fallback="terms_withheld",
+        ),
+        other("handoff", "s1", turn_id="t1", reason="rule_triggered", ticket="H-1"),
+        turn(
+            "s2",
+            "t2",
+            versions=[version(promo, "not_in_force"), version(returns, "current")],
+            fallback="terms_withheld",
+        ),
+        turn("s3", "t3", tools=[("search_policies", "ok")], fallback="no_terms_match"),
+        other("handoff", "s3", turn_id="t3", reason="rule_triggered", ticket="H-2"),
+        turn("s4", "t4", versions=[version(returns, "superseded"), version(returns, "current")]),
+        other("handoff", "s4", turn_id="t4", reason="user_requested", ticket="H-3"),
+    ]
+    path = tmp_path / "storefront.jsonl"
+    path.write_text("\n".join(json.dumps(r) for r in records))
+    metrics = report.compute(report.load([path])[("retail", "storefront")])
+
+    assert metrics["terms_gaps"] == {
+        "withheld_sources": {promo: 2},
+        "no_terms_match_turns": 1,
+        "rule_triggered_handoffs": {"terms_withheld": 1, "no_terms_match": 1},
+    }
+    assert metrics["handoff_reasons"] == {"rule_triggered": 2, "user_requested": 1}
+    shown = report.render(("retail", "storefront"), metrics, zh=False)
+    assert "### Terms gaps" in shown and f"{promo} 2" in shown
+    assert "after a rule held the answer 2" in shown
+
+
+def test_a_group_without_terms_gaps_prints_no_section(tmp_path):
+    path = tmp_path / "storefront.jsonl"
+    path.write_text(json.dumps(turn("s1", "t1", writes=["cart"])))
+    metrics = report.compute(report.load([path])[("retail", "storefront")])
+    assert "Terms gaps" not in report.render(("retail", "storefront"), metrics, zh=False)

@@ -141,6 +141,13 @@ async def test_passages_in_force_still_answer_beside_a_withheld_source(clocked):
     assert "30 days" in fenced and "Promo terms" not in fenced
 
 
+async def test_a_search_that_finds_nothing_says_so_in_a_flag(clocked):
+    empty = await clocked([]).execute("search_policies", {"query": "warranty"})
+    assert empty.no_match and empty.blocked is None and not empty.evidence
+    found = await clocked([NEW]).execute("search_policies", {"query": "returns"})
+    assert not found.no_match
+
+
 async def test_a_guide_cites_the_passages_it_states(clocked, state):
     executor = clocked([NEW])
     await executor.execute("search_policies", {"query": "returns"})

@@ -210,6 +210,9 @@ def test_a_reads_evidence_reaches_its_tool_result():
     evidence = [{"source_id": "shop/returns", "version": "2", "status": "current"}]
     (result,) = outcome_events("tool", "t1", ToolOutcome("ok", evidence=evidence))
     assert result.data["evidence"] == evidence
+    assert "no_match" not in result.data
+    (empty,) = outcome_events("tool", "t2", ToolOutcome("none", no_match=True))
+    assert empty.data["no_match"] is True
 
 
 def test_held_and_failed_results_keep_their_text():

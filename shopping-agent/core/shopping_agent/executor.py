@@ -221,6 +221,7 @@ class ShoppingToolExecutor(BaseToolExecutor):
         self._state.remember_policies(check.current)
         if not check.withheld:
             outcome = self._fenced(policies_payload(check.current))
+            outcome.no_match = not check.current
         elif not check.current:
             outcome = ToolOutcome.held(TERMS_GATE, terms_withheld_text(check))
         else:

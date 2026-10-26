@@ -27,7 +27,10 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFINITIONS_VERSION = "1.0"
+DEFINITIONS_VERSION = "1.1"
+# The terms-gate statuses that withhold a source (shopping_agent.gates.WITHHELD).
+WITHHELD = frozenset({"expired", "not_in_force", "conflict"})
+TOP_SOURCES = 10
 
 NAMES = {
     "effective_sessions": ("Effective sessions", "有效接待会话数"),
@@ -53,6 +56,7 @@ HANDOFF_REASONS = {
     "user_requested": ("asked by the user", "用户主动要求"),
     "after_negative_feedback": ("after a 👎", "差评后转接"),
     "after_error": ("after a system error", "系统异常后转接"),
+    "rule_triggered": ("after a rule held the answer", "规则触发转接"),
 }
 
 
@@ -169,6 +173,35 @@ def compute(sessions: dict[str, Session]) -> dict[str, Any]:
         "latency_p50_ms": percentile(latencies, 50),
         "latency_p95_ms": percentile(latencies, 95),
         "tokens_per_turn": round(statistics.mean(tokens)) if tokens else None,
+        "terms_gaps": terms_gaps(sessions),
+    }
+
+
+def terms_gaps(sessions: dict[str, Session]) -> dict[str, Any]:
+    """What the terms could not answer: the sources withheld most often (each counted once
+    per turn), the turns whose terms read found nothing, and the rule-triggered handoffs
+    split by the fallback reason of the turn they were opened from."""
+    turns = [turn for s in sessions.values() for turn in s.turns]
+    withheld = Counter(
+        source
+        for turn in turns
+        for source in {
+            e.get("source_id")
+            for e in turn.get("evidence_versions", [])
+            if e.get("status") in WITHHELD
+        }
+    )
+    fallback = {turn["turn_id"]: turn.get("fallback_reason") for turn in turns}
+    triggered = Counter(
+        fallback.get(h.get("turn_id")) or "unknown"
+        for s in sessions.values()
+        for h in s.handoffs[:1]
+        if s.effective() and h.get("reason") == "rule_triggered"
+    )
+    return {
+        "withheld_sources": dict(withheld.most_common(TOP_SOURCES)),
+        "no_terms_match_turns": sum(t.get("fallback_reason") == "no_terms_match" for t in turns),
+        "rule_triggered_handoffs": dict(triggered),
     }
 
 
@@ -220,6 +253,24 @@ def render(group: tuple[str, str], metrics: dict[str, Any], zh: bool) -> str:
             labels = {k: v[index] for k, v in HANDOFF_REASONS.items()}
             parts = ", ".join(f"{labels.get(k, k)} {n}" for k, n in sorted(counts.items()))
             lines.append(f"\n{title}: {parts}")
+    gaps = metrics["terms_gaps"]
+    if not any(gaps.values()):
+        return "\n".join(lines)
+    lines += ["", f"### {'条款缺口' if zh else 'Terms gaps'}", ""]
+    sources = ", ".join(f"{k} {n}" for k, n in gaps["withheld_sources"].items())
+    triggered = ", ".join(f"{k} {n}" for k, n in sorted(gaps["rule_triggered_handoffs"].items()))
+    for label, shown in (
+        ("最常被拦截的条款来源" if zh else "Sources withheld most often", sources or "—"),
+        (
+            "条款无匹配的轮次" if zh else "Turns with no matching terms",
+            gaps["no_terms_match_turns"],
+        ),
+        (
+            "规则触发转接，按回退原因" if zh else "Rule-triggered handoffs by fallback reason",
+            triggered or "—",
+        ),
+    ):
+        lines.append(f"- {label}: {shown}")
     return "\n".join(lines)
 
 

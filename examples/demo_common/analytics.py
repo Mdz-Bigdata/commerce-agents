@@ -7,10 +7,11 @@ person, and per change the portal applies.
 
 A turn record carries the evidence the turn rested on (the tools it called, the record ids
 their inputs named, the source and version of each terms passage a read returned or
-withheld, how each call ended, the gates that refused one) and its outcome (stop reason,
-error kind, usage, latency, the writes it made). No message text, tool result, or
-fact value is written: the log is for counting, and ``docs/safety.md`` keeps conversation
-content out of logs below DEBUG.
+withheld, how each call ended, the gates that refused one), why it fell back, if it did
+(``fallback_reason``, read from those events), and its outcome (stop reason, error kind,
+usage, latency, the writes it made). No message text, tool result, or fact value is
+written: the log is for counting, and ``docs/safety.md`` keeps conversation content out
+of logs below DEBUG.
 
 Each role of each vertical writes its own file under ``<vertical>/data/.analytics/``
 (``DEMO_ANALYTICS_DIR`` moves the directory; ``DEMO_ANALYTICS=0`` turns logging off).
@@ -34,13 +35,16 @@ from pydantic import BaseModel, Field
 
 from commerce_common.streaming import AgentEvent
 from commerce_common.turn import session_tag
+from shopping_agent.gates import TERMS_GATE, WITHHELD
 
 logger = logging.getLogger(__name__)
 
 # Bump when a field's meaning changes; the report states the versions it read.
 SCHEMA_VERSION = 1
 
-HandoffReason = Literal["user_requested", "after_negative_feedback", "after_error"]
+# The reasons the UI sends; the handoff route may record ``rule_triggered`` in their place.
+RequestedHandoffReason = Literal["user_requested", "after_negative_feedback", "after_error"]
+HandoffReason = RequestedHandoffReason | Literal["rule_triggered"]
 
 # Input keys whose values name a record: the turn's evidence ids.
 _ID_KEYS = ("product_id", "listing_id", "change_id", "order_id", "campaign_id", "event_id")
@@ -86,8 +90,10 @@ class TurnRecorder:
             "blocked": [],
             "writes": [],
             "error": None,
+            "fallback_reason": None,
         }
         self._tools: dict[str, dict[str, Any]] = {}
+        self._withheld = self._no_match = False
         log.remember(self.turn_id, session_id)
 
     def observe(self, event: AgentEvent) -> AgentEvent:
@@ -104,6 +110,8 @@ class TurnRecorder:
                 entry["status"] = status
             versions = self._record["evidence_versions"]
             for item in data.get("evidence") or []:
+                if isinstance(item, dict) and item.get("status") in WITHHELD:
+                    self._withheld = True
                 if len(versions) < _MAX_IDS and isinstance(item, dict):
                     versions.append(
                         {
@@ -112,6 +120,8 @@ class TurnRecorder:
                             "status": item.get("status"),
                         }
                     )
+            if data.get("no_match") and data.get("tool") == "search_policies":
+                self._no_match = True
             if status == "blocked":
                 self._record["blocked"].append(
                     {"tool": data.get("tool"), "reason": data.get("reason")}
@@ -133,7 +143,22 @@ class TurnRecorder:
     def failed(self, kind: str) -> None:
         self._record["error"] = kind
 
+    def fallback_reason(self) -> str | None:
+        """Why the turn fell back, from its events alone: ``terms_withheld`` when a terms
+        read withheld a source, ``no_terms_match`` when one found nothing,
+        ``gate_held:<gate>`` when another gate held a call, else None."""
+        if self._withheld:
+            return "terms_withheld"
+        if self._no_match:
+            return "no_terms_match"
+        for held in self._record["blocked"]:
+            if held.get("reason") != TERMS_GATE:
+                return f"gate_held:{held.get('reason')}"
+        return None
+
     def write(self) -> None:
+        self._record["fallback_reason"] = reason = self.fallback_reason()
+        self.log.remember_fallback(self.turn_id, reason)
         self.log.write(self._record)
 
 
@@ -148,6 +173,8 @@ class OperationsLog:
         self._lock = threading.Lock()
         # turn_id -> session_id, so a vote or handoff is accepted only from the turn's session.
         self._turns: dict[str, str] = {}
+        # turn_id -> fallback_reason, for the turns that fell back.
+        self._fallbacks: dict[str, str] = {}
 
     @classmethod
     def for_example(cls, example_root: Path, role: str) -> "OperationsLog":
@@ -163,6 +190,20 @@ class OperationsLog:
 
     def owns(self, turn_id: str, session_id: str) -> bool:
         return self._turns.get(turn_id) == session_id
+
+    def remember_fallback(self, turn_id: str, reason: str | None) -> None:
+        if reason is not None:
+            self._fallbacks[turn_id] = reason
+
+    def handoff_reason(
+        self, turn_id: str | None, requested: RequestedHandoffReason
+    ) -> HandoffReason:
+        """The reason a handoff is recorded under: ``rule_triggered`` when the turn it was
+        opened from fell back (a withheld or missing term, a held call) and the UI saw no
+        system error, else the reason the UI sent."""
+        if turn_id in self._fallbacks and requested != "after_error":
+            return "rule_triggered"
+        return requested
 
     def turn(self, session_id: str, locale: str | None) -> TurnRecorder:
         return TurnRecorder(self, session_id, locale)
@@ -225,7 +266,7 @@ class FeedbackRequest(BaseModel):
 
 class HandoffRequest(BaseModel):
     turn_id: str | None = Field(default=None, max_length=40)
-    reason: HandoffReason = "user_requested"
+    reason: RequestedHandoffReason = "user_requested"
 
 
 def install_operations_routes(
@@ -238,7 +279,8 @@ def install_operations_routes(
 ) -> None:
     """``POST {prefix}/feedback`` records a vote on one of the session's turns;
     ``POST {prefix}/handoff`` opens a ticket for a person and returns it, and queues
-    ``handoff_note`` (``{ticket}``) for the model's next turn as an app event."""
+    ``handoff_note`` (``{ticket}``) for the model's next turn as an app event; the ticket's
+    reason is ``OperationsLog.handoff_reason``."""
 
     @router.post(f"{prefix}/feedback")
     async def feedback(request: FeedbackRequest, record: current_session) -> dict:
@@ -251,6 +293,7 @@ def install_operations_routes(
     async def handoff(request: HandoffRequest, record: current_session) -> dict:
         if request.turn_id is not None and not log.owns(request.turn_id, record.session_id):
             raise HTTPException(status_code=404, detail="No such turn in this session")
-        ticket = log.handoff(record.session_id, request.turn_id, request.reason)
+        reason = log.handoff_reason(request.turn_id, request.reason)
+        ticket = log.handoff(record.session_id, request.turn_id, reason)
         record.pending_app_events.append(handoff_note.format(ticket=ticket))
         return {"ok": True, "ticket": ticket}

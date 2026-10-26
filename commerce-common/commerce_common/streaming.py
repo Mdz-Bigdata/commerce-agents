@@ -10,10 +10,11 @@ produces. Hosts render the event types below and ignore any they do not know.
                     words for the person waiting while the call runs (the call's
                     ``status`` argument), absent on presentation calls.
 ``tool_result``     ``{"tool", "id", "summary", "is_error", "status"[, "reason", "excerpt",
-                    "evidence"]}``; ``status`` is ``ok``, ``error``, or ``blocked`` (a gate
-                    held the call; ``reason`` names the gate); ``evidence`` lists the
-                    versioned sources the read returned or withheld, one
-                    ``{"source_id", "version", "status"}`` each.
+                    "evidence", "no_match"]}``; ``status`` is ``ok``, ``error``, or
+                    ``blocked`` (a gate held the call; ``reason`` names the gate);
+                    ``evidence`` lists the versioned sources the read returned or withheld,
+                    one ``{"source_id", "version", "status"}`` each; ``no_match`` is
+                    ``true`` when a read found nothing to return.
 ``ui``              ``{"component", "payload"}``: a validated, enriched component.
 ``ui_partial``      The same, plus ``stream_id``, while the call is still being
                     generated; the final ``ui`` event carries the same ``stream_id``.
@@ -80,6 +81,7 @@ class AgentEvent(BaseModel):
         reason: str | None = None,
         excerpt: str | None = None,
         evidence: list[dict[str, Any]] | None = None,
+        no_match: bool = False,
     ) -> AgentEvent:
         data: dict[str, Any] = {
             "tool": tool,
@@ -94,6 +96,8 @@ class AgentEvent(BaseModel):
             data["excerpt"] = excerpt
         if evidence:
             data["evidence"] = evidence
+        if no_match:
+            data["no_match"] = True
         return cls(type="tool_result", data=data)
 
     @classmethod
@@ -147,13 +151,15 @@ class AgentEvent(BaseModel):
 class ToolOutcome:
     """One tool call's product: ``result_text`` for the model, ``events`` for the host.
     ``blocked`` names the gate that held the call; ``is_error`` marks a failure;
-    ``evidence`` names the versioned sources a read rested on, for the host's trace."""
+    ``evidence`` names the versioned sources a read rested on, and ``no_match`` marks a
+    read that found nothing, both for the host's trace."""
 
     result_text: str
     events: list[AgentEvent] = field(default_factory=list)
     is_error: bool = False
     blocked: str | None = None
     evidence: list[dict[str, Any]] = field(default_factory=list)
+    no_match: bool = False
 
     @classmethod
     def error(cls, text: str) -> ToolOutcome:
