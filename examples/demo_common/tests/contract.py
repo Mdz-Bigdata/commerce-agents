@@ -4,6 +4,7 @@
 """Routes, gates, and merchant writes every vertical honors; each test_contract.py star-imports it."""
 
 import asyncio
+import contextlib
 import inspect
 import re
 from collections.abc import Iterable
@@ -606,6 +607,68 @@ async def test_every_staging_path_is_the_agents_proposal_and_applying_is_the_ope
         await merchant.apply_change(operator_session, staged[0].change_id)
     context = await merchant.get_merchant_context(operator_session)
     assert context["operator"] == operator_session.operator
+
+
+async def test_a_change_applies_against_the_values_it_was_staged_from(merchant, operator_session):
+    plain = [listing for listing in merchant.all_listings() if not listing.has_options]
+    priced, promoted, paused = plain[0], plain[1], plain[2]
+    campaign = (await merchant.get_campaign_performance(operator_session))[0]
+    staged = [
+        await merchant.stage_price_update(
+            operator_session,
+            [PriceUpdateItem(listing_id=priced.listing_id, new_price=priced.price)],
+        ),
+        await merchant.stage_listing_update(
+            operator_session, priced.listing_id, {"title": priced.title + " (edited)"}
+        ),
+        await merchant.stage_promotion(
+            operator_session,
+            PromotionDraft(
+                name="Contract",
+                listing_ids=[promoted.listing_id],
+                discount_pct=5,
+                starts="2026-09-01",
+                ends="2026-09-07",
+            ),
+        ),
+        await merchant.stage_campaign(
+            operator_session,
+            CampaignDraft(
+                campaign_id=campaign.campaign_id,
+                name=campaign.name,
+                budget=10.0,
+            ),
+        ),
+    ]
+    with contextlib.suppress(ChangeNotApplicable):  # a vertical that does not pause listings
+        staged.append(
+            await merchant.stage_inventory_action(
+                operator_session,
+                [InventoryActionItem(listing_id=paused.listing_id, action="pause")],
+            )
+        )
+    for change in staged:
+        applied = await merchant.apply_change(operator_session, change.change_id)
+        assert applied.status is ChangeStatus.APPLIED, change.kind
+
+
+async def test_a_change_whose_values_moved_since_staging_is_refused(merchant, operator_session):
+    listing = next(listing for listing in merchant.all_listings() if not listing.has_options)
+    first, second = [
+        await merchant.stage_price_update(
+            operator_session,
+            [
+                PriceUpdateItem(
+                    listing_id=listing.listing_id, new_price=round(listing.price * pct, 2)
+                )
+            ],
+        )
+        for pct in (1.02, 1.04)
+    ]
+    await merchant.apply_change(operator_session, first.change_id)
+    with pytest.raises(ChangeNotApplicable, match=r"was .* when staged.*stage it again"):
+        await merchant.apply_change(operator_session, second.change_id)
+    assert merchant.ledger.get(second.change_id).status is ChangeStatus.STAGED
 
 
 # -- showcase fixtures ---------------------------------------------------------------

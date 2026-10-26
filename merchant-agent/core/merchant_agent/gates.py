@@ -5,19 +5,20 @@
 accept only listing and campaign ids that tools returned this session; a price or
 restock write that names a listing with options is pointed at its variants; apply and
 discard accept only change ids that staging or ``get_pending_changes`` returned;
-apply re-checks the guardrails and, when the deployment requires it, the host's
-approval mark. A gate that holds returns a :class:`ToolOutcome` naming itself.
+apply refuses a change past its time to live, then re-checks the guardrails and, when
+the deployment requires it, the host's approval mark. A gate that holds returns a :class:`ToolOutcome` naming itself.
 """
 
 from __future__ import annotations
 
 import json
 from collections.abc import Iterable
+from datetime import UTC, datetime
 from typing import Any
 
 from commerce_common.streaming import ToolOutcome
 
-from .changes import check_guardrails
+from .changes import check_guardrails, expires_at
 from .config import MerchantAgentConfig
 from .fencing import MERCHANT_FENCE
 from .types import ActorKind, MerchantSessionState, PromotionDraft
@@ -192,8 +193,9 @@ def check_promotion_depth(
 def check_apply_change(
     state: MerchantSessionState, config: MerchantAgentConfig, change_id: str
 ) -> ToolOutcome | None:
-    """Provenance, then the guardrails under the current config, then the host's
-    approval mark when the deployment requires one."""
+    """Provenance, then the change's time to live, then the guardrails under the current
+    config, then the host's approval mark when the deployment requires one. An expired
+    change is never applied, whatever approval it carries."""
     known = state.seen_changes.get(change_id)
     if known is None:
         return ToolOutcome.held(
@@ -201,6 +203,13 @@ def check_apply_change(
             f"change_id {change_id} was not staged or listed in this session. Stage "
             "the change (or call get_pending_changes) first, preview it, and apply it "
             "only after the operator approves it.",
+        )
+    if datetime.now(UTC) >= expires_at(known, config):
+        return ToolOutcome.held(
+            APPROVAL_GATE,
+            f"change {change_id} expired unapproved after "
+            f"{config.staged_change_ttl_minutes} minutes and was not applied. Tell the "
+            "operator it expired and offer to stage it again from the current values.",
         )
     if violations := check_guardrails(known.kind, known.items, config):
         return ToolOutcome.held(GUARDRAIL_GATE, apply_guardrail_message(violations))

@@ -199,8 +199,10 @@ class MerchantBackend(ABC):
         """Apply an approved change by writing it to the live system this backend fronts,
         then mark it applied and stamp who applied it and when. This method is the platform
         write. A backend that only updates its ledger has changed nothing the store can see.
-        Refuse a change that is not currently staged, and raise on a failed write so the
-        change stays staged."""
+        Refuse a change that is not currently staged or is past
+        ``staged_change_ttl_minutes`` (mark that one expired), and one whose items'
+        ``before`` no longer match the live record (``changes.check_drift``); raise on a
+        failed write so the change stays staged."""
 
     @abstractmethod
     async def discard_change(

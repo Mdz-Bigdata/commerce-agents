@@ -3,7 +3,7 @@
 
 """Semantics of the shared session gates in merchant_agent.gates."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from merchant_agent import (
     ActorKind,
@@ -116,6 +116,23 @@ def test_apply_gate_enforces_host_verified_approval(state, config):
     assert strict.approval_surface in refusal.result_text
     state.approved_change_ids.add("chg-0001")
     assert check_apply_change(state, strict, "chg-0001") is None
+
+
+def test_apply_gate_refuses_an_expired_change_whatever_its_approval(state, config):
+    change = _staged_change()
+    state.remember_change(
+        change.model_copy(
+            update={
+                "created_at": change.created_at
+                - timedelta(minutes=config.staged_change_ttl_minutes)
+            }
+        )
+    )
+    state.approved_change_ids.add("chg-0001")
+    refusal = check_apply_change(state, config, "chg-0001")
+    assert refusal is not None
+    assert refusal.blocked == "approval"
+    assert "expired unapproved" in refusal.result_text
 
 
 # -- discard: provenance and attribution --------------------------------------------------

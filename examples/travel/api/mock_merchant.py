@@ -17,6 +17,7 @@ from demo_common.merchant_fixtures import (
     apply_campaign_item,
     filter_listings,
     is_browse,
+    live_values,
     load_campaigns,
     load_issues,
     load_returns,
@@ -770,7 +771,8 @@ class MockTravelMerchant(MerchantBackend):
         return self.ledger.pending()
 
     async def apply_change(self, session: MerchantSessionContext, change_id: str) -> StagedChange:
-        applied = self.ledger.apply(change_id, actor=session.operator)
+        live = await live_values(self, session, self.ledger.get(change_id), self._campaigns)
+        applied = self.ledger.apply(change_id, actor=session.operator, live=live)
         self._apply_to_live_state(applied)
         return applied
 

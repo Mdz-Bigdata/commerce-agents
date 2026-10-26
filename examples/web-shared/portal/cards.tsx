@@ -6,7 +6,7 @@
 /** The frame the merchant presentation cards share; each vertical fills in its own rows. */
 
 import { type ReactNode, useEffect, useState } from "react";
-import { type FieldKinds, formatDate, formatFieldValue, formatMoney, humanizeField } from "../format";
+import { describeApply, type FieldKinds, formatDate, formatFieldValue, formatMoney, humanizeField } from "../format";
 import { type Translate, useT } from "../i18n";
 import { Icon, type IconName } from "../icons";
 import { AskButton, Button, KindIcon, Pill, type Tone } from "../ui";
@@ -74,17 +74,21 @@ export function DigestList({ children }: { children: ReactNode }) {
 
 interface ChangeLike {
   change_id: string;
-  status: "staged" | "applied" | "discarded";
+  kind: string;
+  items: DiffItem[];
+  status: "staged" | "applied" | "discarded" | "expired";
   applied_at?: string | null;
   applied_by?: string | null;
   discarded_by?: string | null;
   discarded_by_kind?: "operator" | "agent" | null;
+  expired_at?: string | null;
 }
 
 export const CHANGE_STATUS: Record<ChangeLike["status"], { tone: Tone; label: string }> = {
   staged: { tone: "violet", label: "Awaiting approval" },
   applied: { tone: "ok", label: "Approved" },
   discarded: { tone: "muted", label: "Dismissed" },
+  expired: { tone: "warn", label: "Expired" },
 };
 
 export function ChangeStatusPill({ status }: { status: ChangeLike["status"] }) {
@@ -143,6 +147,7 @@ export function ApproveBar({
   const t = useT();
   return (
     <div className="px-3.5 pb-3.5 pt-3">
+      {change.status === "staged" ? <p className="mb-2.5 text-[13px] leading-snug text-(--ink)">{describeApply(change, t)}</p> : null}
       {change.status === "staged" ? (
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="accent" size="sm" icon="check" onClick={() => onAct("apply")} disabled={busy !== null || !canAct}>
@@ -155,8 +160,12 @@ export function ApproveBar({
         </div>
       ) : (
         <div className="flex items-center gap-2 text-[13px] text-(--ink-soft)">
-          <Icon name={change.status === "applied" ? "check" : "x"} size={15} className={change.status === "applied" ? "text-(--ok)" : "text-(--ink-faint)"} />
-          {change.status === "applied" ? approvedLine(change, t) : dismissedLine(change, t)}
+          <Icon
+            name={change.status === "applied" ? "check" : change.status === "expired" ? "clock" : "x"}
+            size={15}
+            className={change.status === "applied" ? "text-(--ok)" : change.status === "expired" ? "text-(--warn)" : "text-(--ink-faint)"}
+          />
+          {change.status === "applied" ? approvedLine(change, t) : change.status === "expired" ? expiredLine(change, t) : dismissedLine(change, t)}
         </div>
       )}
       {error ? <div className="mt-2 text-[13px] text-(--danger)">{error}</div> : null}
@@ -172,6 +181,12 @@ function approvedLine(change: ChangeLike, t: Translate): string {
   if (name) return t("Approved by {name}.", { name });
   if (date) return t("Approved on {date}.", { date });
   return t("Approved.");
+}
+
+function expiredLine(change: ChangeLike, t: Translate): string {
+  return change.expired_at
+    ? t("Expired unapproved on {date}. Nothing was changed.", { date: formatDate(change.expired_at) })
+    : t("Expired unapproved. Nothing was changed.");
 }
 
 function dismissedLine(change: ChangeLike, t: Translate): string {

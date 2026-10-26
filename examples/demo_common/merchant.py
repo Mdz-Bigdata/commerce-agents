@@ -34,6 +34,7 @@ from commerce_common.memory import MemoryStore
 from merchant_agent import (
     BusinessSnapshot,
     ChangeLedger,
+    ChangeStatus,
     InventoryAlert,
     Listing,
     ListingDetails,
@@ -177,7 +178,9 @@ def build_merchant_router(
         pending = await backend.get_pending_changes(session)
         resolved = sorted(
             backend.ledger.resolved(),
-            key=lambda change: change.applied_at or change.discarded_at or change.created_at,
+            key=lambda change: (
+                change.applied_at or change.discarded_at or change.expired_at or change.created_at
+            ),
             reverse=True,
         )
         return {
@@ -254,7 +257,8 @@ def build_merchant_router(
 
     async def change_action(change_id: str, action: str, record: MerchantRecord) -> dict:
         """``{"ok": true, "change": record}`` when the change moved; ``{"ok": false,
-        "change": null, "reason": text}`` when a gate held it; 400 when the call failed.
+        "change": null, "reason": text}`` when a gate held it, with the record in
+        ``change`` when the hold was its expiry; 400 when the call failed.
         A click on the preview card is the host's own approval or dismissal, so the id is
         marked before the executor runs; neither mark outlives the click, whatever the
         outcome, so a later chat turn cannot spend one."""
@@ -276,7 +280,16 @@ def build_merchant_router(
         if execution.is_error:
             raise HTTPException(status_code=400, detail=execution.result_text)
         if execution.blocked is not None:
-            return {"ok": False, "change": None, "reason": execution.result_text}
+            # An expired change is shown as expired, so the card stops offering Approve.
+            current = backend.ledger.get(change_id)
+            expired = current is not None and current.status is ChangeStatus.EXPIRED
+            if expired:
+                record.state.remember_change(current)
+            return {
+                "ok": False,
+                "change": _dump(current) if expired else None,
+                "reason": execution.result_text,
+            }
         verb = "approved and applied" if action == "apply_change" else "dismissed"
         log.action(record.session_id, action, [change_id])
         record.pending_app_events.append(

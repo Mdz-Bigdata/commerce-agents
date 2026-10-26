@@ -129,7 +129,7 @@ export type ChangeKind =
   | "promotion"
   | "campaign";
 
-export type ChangeStatus = "staged" | "applied" | "discarded";
+export type ChangeStatus = "staged" | "applied" | "discarded" | "expired";
 
 export interface ChangeItem {
   target: string;
@@ -152,6 +152,7 @@ export interface StagedChange {
   discarded_at?: string | null;
   discarded_by?: string | null;
   discarded_by_kind?: "operator" | "agent" | null;
+  expired_at?: string | null;
   guardrail_notes?: string[];
   currency?: string | null;
   margin_impact?: number | null;

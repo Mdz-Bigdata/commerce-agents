@@ -479,6 +479,7 @@ class ChangeStatus(StrEnum):
     STAGED = "staged"
     APPLIED = "applied"
     DISCARDED = "discarded"
+    EXPIRED = "expired"
 
 
 class ActorKind(StrEnum):
@@ -504,7 +505,8 @@ class StagedChange(BaseModel):
     the audit trail: ``created_by`` and ``discarded_by`` name the operator principal
     and the ``*_kind`` fields record whether the assistant acted on the operator's
     behalf; ``applied_by`` has no assistant variant because approval is always the
-    operator's.
+    operator's. ``expired_at`` is when a change left unapproved passed
+    ``staged_change_ttl_minutes``; an expired change is never applied.
 
     The money fields are backend-computed. ``currency`` applies to every amount in
     ``items`` and the margin fields; ``margin_before_pct`` / ``margin_after_pct`` are set
@@ -525,6 +527,7 @@ class StagedChange(BaseModel):
     discarded_at: datetime | None = None
     discarded_by: str | None = None
     discarded_by_kind: ActorKind | None = None
+    expired_at: datetime | None = None
     guardrail_notes: list[str] = Field(default_factory=list)
     currency: str | None = None
     margin_impact: float | None = None

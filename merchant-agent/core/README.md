@@ -10,12 +10,12 @@ variants and what to return for a figure the platform cannot supply.
 |---|---|
 | `types.py` | Listings (a family's `options`, its `variants` with `option_values` and `variant_of`), snapshots and series (a figure the store cannot supply is `None` with a `note`), `DataLimitation`, alerts, issues, returns (`ReturnReason`, `ReturnLog`, `ReturnsSummary`), pricing context, campaigns, drafts, `StagedChange`, `MerchantSessionContext`, `MerchantSessionState` |
 | `backend.py` | `MerchantBackend`: 8 reads, 5 `stage_*` methods, and `get_pending_changes`, `apply_change`, `discard_change`; optional `get_returns`, `execute_analysis_query`, `get_analysis_schema`, `get_merchant_context` |
-| `config.py` | `MerchantAgentConfig`: analysis settings and budgets, the `enable_*` system switches, guardrail limits, approval, `stage_shows_preview`, grounding lexicons |
+| `config.py` | `MerchantAgentConfig`: analysis settings and budgets, the `enable_*` system switches, guardrail limits, approval, `stage_shows_preview`, `staged_change_ttl_minutes`, grounding lexicons |
 | `prompt.py` | `build_static_system` (cached) and `build_dynamic_context` (fenced, per request) |
 | `tools/registry.py` | The tool contracts, in a fixed order; `run_analysis` is added when `enable_analysis` is set |
 | `tools/presentation.py` | Payload schemas for the three built-in presentation tools (chips are in `commerce_common`) |
 | `enrichment.py` | Metric picks resolved to session values, digest items joined to records, the preview built from the staged record; partial payloads while streaming |
-| `changes.py` | `check_guardrails`, run at staging and again at apply, and the in-memory `ChangeLedger` |
+| `changes.py` | `check_guardrails`, run at staging and again at apply; `expires_at` and `check_drift`, run at apply; and the in-memory `ChangeLedger` |
 | `gates.py` | Listing and campaign provenance, the options hold (a family listing is priced and restocked per variant), the apply and discard gates, the follow-through reminder text |
 | `grounding.py` | The metrics and queue grounding rules and the `change_requested` detector |
 | `returns.py` | `summarize_returns`: a `ReturnLog` counted per listing and by reason, each reason's stage (`REASON_STAGES`), clipped buyer notes |

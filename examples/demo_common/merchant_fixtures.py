@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """Helpers the mock merchant backends share: fixture loading, the daily-metrics window
-arithmetic, the returns window, listing lookup and filtering, campaign staging, and the
-promotion-window bookkeeping the portals chart. Vertical arithmetic (what a restock or a promotion means
+arithmetic, the returns window, listing lookup and filtering, campaign staging, the live
+values a change is checked against at apply, and the promotion-window bookkeeping the portals chart. Vertical arithmetic (what a restock or a promotion means
 for stock, rooms, lines, or seats) stays in each mock."""
 
 from __future__ import annotations
@@ -28,6 +28,8 @@ from merchant_agent import (
     Listing,
     ListingFilters,
     MerchantAgentConfig,
+    MerchantBackend,
+    MerchantSessionContext,
     OrderIssue,
     PricingContext,
     ReturnLog,
@@ -375,6 +377,38 @@ def stage_campaign(
         actor_kind=ActorKind.AGENT,
         currency=currency,
     )
+
+
+async def live_values(
+    backend: MerchantBackend,
+    session: MerchantSessionContext,
+    change: StagedChange | None,
+    campaigns: Mapping[str, Campaign],
+) -> dict[tuple[str, str], object]:
+    """The current value of each item ``change`` would write, read the way staging read
+    its ``before``, for ``ChangeLedger.apply`` to compare. A restock, a campaign's
+    audience, and its copy are not read: the first applies as a delta and the others are
+    staged without a current value."""
+    live: dict[tuple[str, str], object] = {}
+    for item in change.items if change is not None else []:
+        key = (item.target, item.field)
+        if change.kind is ChangeKind.CAMPAIGN:
+            if item.field == "budget":
+                existing = campaigns.get(item.target)
+                live[key] = existing.budget if existing else None
+            continue
+        if change.kind is ChangeKind.INVENTORY_ACTION and item.field != "status":
+            continue
+        listing = await backend.get_listing(session, item.target)
+        if listing is None:
+            live[key] = None
+        elif change.kind in {ChangeKind.PRICE_UPDATE, ChangeKind.PROMOTION}:
+            live[key] = listing.price
+        elif change.kind is ChangeKind.INVENTORY_ACTION:
+            live[key] = listing.status
+        else:
+            live[key] = getattr(listing, item.field, listing.attributes.get(item.field))
+    return live
 
 
 def apply_campaign_item(campaigns: dict[str, Campaign], item: ChangeItem) -> None:
